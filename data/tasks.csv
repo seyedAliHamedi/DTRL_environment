@@ -1,0 +1,14 @@
+job_id,computational_load,input_size,out_put_size,predecessors,is_safe,task_kind,is_head,is_tail,execution_time,energy_consumed,status
+0,444016,50125,160531,,0,1,True,False,-1,-1,NOT_REGISTERD
+1,258378,341404,817439,,0,3,True,False,-1,-1,NOT_REGISTERD
+2,430718,503555,283304,,0,1,True,False,-1,-1,NOT_REGISTERD
+3,73107,609046,275372,,0,4,True,False,-1,-1,NOT_REGISTERD
+0,936529,774088,361175,[0],0,2,False,False,-1,-1,NOT_REGISTERD
+0,719777,106363,494599,[3],0,1,False,False,-1,-1,NOT_REGISTERD
+0,318639,313475,559003,"[3, 1]",0,4,False,False,-1,-1,NOT_REGISTERD
+0,731711,610115,930298,"[1, 2, 3, 0]",0,3,False,False,-1,-1,NOT_REGISTERD
+0,500942,645857,768508,[3],0,4,False,False,-1,-1,NOT_REGISTERD
+0,3713,94706,115651,"[5, 6, 4, 7, 8]",0,2,False,True,-1,-1,NOT_REGISTERD
+1,295361,255566,760351,"[4, 6]",0,4,False,True,-1,-1,NOT_REGISTERD
+2,480544,755388,799033,"[6, 7, 8, 5]",0,4,False,True,-1,-1,NOT_REGISTERD
+3,440462,958111,467746,[7],0,2,False,True,-1,-1,NOT_REGISTERD
