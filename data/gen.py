@@ -3,6 +3,7 @@ import numpy as np
 from data.configs import devices_config, jobs_config, environment_config
 import os
 import time
+import ast
 
 
 class Generator:
@@ -16,7 +17,18 @@ class Generator:
     @classmethod
     def get_devices(cls, file_path=_devices_path):
         if os.path.exists(file_path):
-            return pd.read_csv(file_path)
+            devices = pd.read_csv(file_path)
+            devices["voltages_frequencies"] = devices["voltages_frequencies"].apply(lambda x: ast.literal_eval(x))
+            devices["capacitance"] = devices["capacitance"].apply(
+                lambda x: ast.literal_eval(x)
+            )
+            devices["powerIdle"] = devices["powerIdle"].apply(
+                lambda x: ast.literal_eval(x)
+            )
+            devices["acceptableTasks"] = devices["acceptableTasks"].apply(
+                lambda x: ast.literal_eval(x)
+            )
+            return devices
         else:
             return Generator._generate_device()
 
@@ -100,7 +112,14 @@ class Generator:
     @classmethod
     def get_jobs(cls, file_path_jobs=_job_path, file_path_tasks=_tasks_path):
         if os.path.exists(file_path_jobs):
-            return pd.read_csv(file_path_jobs), pd.read_csv(file_path_tasks)
+            jobs = pd.read_csv(file_path_jobs)
+            jobs["tasks_ID"] = jobs["tasks_ID"].apply(lambda x: ast.literal_eval(x))
+            jobs["heads"] = jobs["heads"].apply(lambda x: ast.literal_eval(x))
+            jobs["tails"] = jobs["tails"].apply(lambda x: ast.literal_eval(x))
+            jobs["tree"] = jobs["tree"].apply(lambda x: ast.literal_eval(x))
+            tasks = pd.read_csv(file_path_tasks)
+            tasks["predecessors"] = tasks["predecessors"].apply(lambda x: ast.literal_eval(x))
+            return jobs, tasks
         else:
             return Generator._generate_jobs()
 
