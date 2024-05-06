@@ -86,11 +86,11 @@ class Generator:
                     "errorRate": np.random.uniform(
                         config["error_rate"][0], config["error_rate"][1]
                     ),
-                    "acceptableTasks": np.random.choice(
+                    "acceptableTasks":list(np.random.choice(
                         jobs_config["task"]["task_kinds"],
                         size=np.random.randint(2, 5),
                         replace=False,
-                    ),
+                    )),
                     "handleSafeTask": int(
                         np.random.choice(
                             [0, 1], p=[config["safe"][0], config["safe"][1]]
@@ -209,7 +209,7 @@ class Generator:
         return predecessors
 
     @classmethod
-    def _generate_random_task(cls, job_id, is_head, is_tail, predecessors=None, config=jobs_config["task"]):
+    def _generate_random_task(cls, job_id, is_head, is_tail, predecessors=[], config=jobs_config["task"]):
         task_id = Generator._task_id_counter
         Generator._task_id_counter += 1
         # generate tasks based on the attribute ranges and bounds defind in the config file
