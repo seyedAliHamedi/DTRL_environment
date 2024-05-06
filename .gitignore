@@ -1,12 +1,3 @@
-# data files
-data/devices.csv
-data/jobs.csv
-data/tasks.csv
-devices.csv
-jobs.csv
-tasks.csv
-
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

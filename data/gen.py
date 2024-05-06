@@ -4,18 +4,19 @@ from configs import devices_config, jobs_config, environment_config
 import os
 import time
 
+
 class Generator:
-    _task_id_counter = 0 
-    _devices_path = os.path.join(os.path.dirname(__file__),"devices.csv")
-    _job_path = os.path.join(os.path.dirname(__file__),"jobs.csv")
-    _tasks_path = os.path.join(os.path.dirname(__file__),"tasks.csv")
+    _task_id_counter = 0
+    _devices_path = os.path.join(os.path.dirname(__file__), "devices.csv")
+    _job_path = os.path.join(os.path.dirname(__file__), "jobs.csv")
+    _tasks_path = os.path.join(os.path.dirname(__file__), "tasks.csv")
+
     @classmethod
-    def get_devices(cls, file_path = _devices_path):
+    def get_devices(cls, file_path=_devices_path):
         try:
             with open(file_path, "r") as f:
                 return pd.read_csv(f)
         except:
-            print('kir to ghaedi')
             return Generator._generate_device()
 
     # generate random Processing element attributes based on the bounds and ranges defined in the config
@@ -30,13 +31,13 @@ class Generator:
     @classmethod
     def _generate_device(cls, config=devices_config):
         devices_data = []
-        for type in ("iot","mec","cloud"):
+        for type in ("iot", "mec", "cloud"):
             config = devices_config[type]
 
             for _ in range(config["num_devices"]):
                 cpu_cores = int(np.random.choice(config["num_cores"]))
                 device_info = {
-                    "type":type,
+                    "type": type,
                     "number_of_cpu_cores": cpu_cores,
                     "voltages_frequencies": [
                         [
@@ -96,13 +97,13 @@ class Generator:
     def get_jobs(cls, file_path_jobs=_job_path, file_path_tasks=_tasks_path):
         try:
             with open(file_path_jobs, "r") as f:
-                with open(file_path_tasks,"r") as f2:
-                    return (pd.read_csv(f),pd.read_csv(f2),)
+                with open(file_path_tasks, "r") as f2:
+                    return (pd.read_csv(f), pd.read_csv(f2),)
         except:
             return Generator._generate_jobs()
 
     @classmethod
-    def _generate_jobs(self,config=jobs_config):
+    def _generate_jobs(cls, config=jobs_config):
 
         max_deadline = config["max_deadline"]
         max_task_per_depth = config["max_task_per_depth"]
@@ -113,16 +114,16 @@ class Generator:
         for i in range(config["num_jobs"]):
             # generate jobs based on job attributes
             task_list = []
-            head_count = np.random.randint(1, max_task_per_depth+1)
-            depth = np.random.randint(1, max_depth+1)
-            tail_count = np.random.randint(1, max_task_per_depth+1)
+            head_count = np.random.randint(1, max_task_per_depth + 1)
+            depth = np.random.randint(1, max_depth + 1)
+            tail_count = np.random.randint(1, max_task_per_depth + 1)
 
             # generate tasks in three steps:
             #   1- head tasks
             #   2- middle tasks
             #   3- tail tasks
             for i in range(head_count):
-                task_list.append(self._generate_random_task(i,True, False))
+                task_list.append(Generator._generate_random_task(i, True, False))
 
             last_depth_task_list = []
             for task in task_list:
@@ -130,17 +131,17 @@ class Generator:
 
             for i in range(depth):
                 current_depth_task_list = []
-                current_depth_task_count = np.random.randint(1, max_task_per_depth+1)
+                current_depth_task_count = np.random.randint(1, max_task_per_depth + 1)
                 for j in range(current_depth_task_count):
-                    predecessors = self._choose_random_tasks(last_depth_task_list)
-                    new_task = self._generate_random_task(i,False, False, predecessors)
+                    predecessors = Generator._choose_random_tasks(last_depth_task_list)
+                    new_task = Generator._generate_random_task(i, False, False, predecessors)
                     task_list.append(new_task)
                     current_depth_task_list.append(new_task)
                 last_depth_task_list = current_depth_task_list
 
             for i in range(tail_count):
-                predecessors = self._choose_random_tasks(last_depth_task_list)
-                new_task = self._generate_random_task(i,False, True, predecessors)
+                predecessors = Generator._choose_random_tasks(last_depth_task_list)
+                new_task = Generator._generate_random_task(i, False, True, predecessors)
                 task_list.append(new_task)
             deadline = np.random.randint(1, max_deadline)
 
@@ -186,7 +187,7 @@ class Generator:
         return predecessors
 
     @classmethod
-    def _generate_random_task(cls, job_id,is_head, is_tail, predecessors=None, config=jobs_config["task"]):
+    def _generate_random_task(cls, job_id, is_head, is_tail, predecessors=None, config=jobs_config["task"]):
         task_id = Generator._task_id_counter
         Generator._task_id_counter += 1
         # generate tasks based on the attribute ranges and bounds defind in the config file
@@ -200,24 +201,24 @@ class Generator:
             config["computational_load"][1],
         )
         return {
-            "id":task_id,
-            "job_id":job_id,
-            "computational_load":computational_load,
-            "input_size":input_size,
-            "out_put_size":output_size,
-            "predecessors":predecessors,
-            "is_safe":safe,
-            "task_kind":task_kind,
-            "is_head":is_head,
-            "is_tail":is_tail,
-            "execution_time":-1,
-            "energy_consumed":-1,
-            "status":"NOT_REGISTERD",
+            "id": task_id,
+            "job_id": job_id,
+            "computational_load": computational_load,
+            "input_size": input_size,
+            "out_put_size": output_size,
+            "predecessors": predecessors,
+            "is_safe": safe,
+            "task_kind": task_kind,
+            "is_head": is_head,
+            "is_tail": is_tail,
+            "execution_time": -1,
+            "energy_consumed": -1,
+            "status": "NOT_REGISTERED",
         }
 
 
 devices = Generator.get_devices()
-jobs,tasks = Generator.get_jobs()
+jobs, tasks = Generator.get_jobs()
 
 print(devices.head(5))
 print("//////////////")
