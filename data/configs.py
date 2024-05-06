@@ -1,6 +1,6 @@
 devices_config = {
     "iot": {
-        "num_devices": 10,
+        "num_devices": 100,
         "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (1e6, 1.8),
@@ -21,7 +21,7 @@ devices_config = {
         "safe": (0.1, 0.9),
     },
     "mec": {
-        "num_devices": 10,
+        "num_devices": 100,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (6 * 1e8, 0.8),
@@ -54,7 +54,7 @@ devices_config = {
 }
 
 jobs_config = {
-    "num_jobs": 1,
+    "num_jobs": 100000,
     "max_deadline": 2000,
     "max_task_per_depth": 5,
     "max_depth": 3,

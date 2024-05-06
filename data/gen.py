@@ -2,17 +2,20 @@ import pandas as pd
 import numpy as np
 from configs import devices_config, jobs_config, environment_config
 import os
-import copy
+import time
 
 class Generator:
     _task_id_counter = 0 
-
+    _devices_path = os.path.join(os.path.dirname(__file__),"devices.csv")
+    _job_path = os.path.join(os.path.dirname(__file__),"jobs.csv")
+    _tasks_path = os.path.join(os.path.dirname(__file__),"tasks.csv")
     @classmethod
-    def get_devices(cls, file_name="devices"):
+    def get_devices(cls, file_path = _devices_path):
         try:
-            with open(file_name,"r") as f:
+            with open(file_path, "r") as f:
                 return pd.read_csv(f)
         except:
+            print('kir to ghaedi')
             return Generator._generate_device()
 
     # generate random Processing element attributes based on the bounds and ranges defined in the config
@@ -90,10 +93,11 @@ class Generator:
         return devices
 
     @classmethod
-    def get_jobs(cls, file_name="jobs"):
+    def get_jobs(cls, file_path_jobs=_job_path, file_path_tasks=_tasks_path):
         try:
-            with open(file_name,"r") as f:
-                return pd.read_csv(f)
+            with open(file_path_jobs, "r") as f:
+                with open(file_path_tasks,"r") as f2:
+                    return (pd.read_csv(f),pd.read_csv(f2),)
         except:
             return Generator._generate_jobs()
 
@@ -211,3 +215,12 @@ class Generator:
             "status":"NOT_REGISTERD",
         }
 
+
+devices = Generator.get_devices()
+jobs,tasks = Generator.get_jobs()
+
+print(devices.head(5))
+print("//////////////")
+print(jobs.head(5))
+print("//////////////")
+print(tasks.head(5))
