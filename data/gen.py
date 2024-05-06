@@ -40,7 +40,7 @@ class Generator:
                 device_info = {
                     "id": Generator._device_id_counter,
                     "type": type,
-                    "number_of_cpu_cores": cpu_cores,
+                    "num_cores": cpu_cores,
                     "voltages_frequencies": [
                         [
                             config["voltage_frequencies"][i]
