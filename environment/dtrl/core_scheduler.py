@@ -10,7 +10,7 @@ class CoreScheduler(nn.Module):
         self.num_features = 10
         self.exploration_factor = 0.10
         self.forest = [DDTNode(self.num_features, device.num_cores, 0, np.log2(device.num_cores),self.exploration_factor) for device in devices]
-        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005) for tree in self.forest]
+        self.optimizers = [optim.Adam(tree.parameters(), lr=0.01) for tree in self.forest]
 
     def forward(self,x,device_index):
         return self.forst[device_index](x)

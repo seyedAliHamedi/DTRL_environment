@@ -46,8 +46,8 @@ class State:
                 }
             )
 
+    
     def get_state(self):
-
         return pd.DataFrame(self._PEs), pd.DataFrame(self._jobs)
 
     ####### AGENT #######

@@ -8,7 +8,7 @@ from sklearn.cluster import KMeans
 class DeviceScheduler:
     def __init__(self, devices):
         self.devices = devices
-        self.num_tnum_featuresask_features = 5
+        self.num_features = 5
         self.max_tree_depth = 5
         self.agent = DeviceDDTNode(self.num_features, self.devices,0, self.max_tree_depth)
         self.optimizer = optim.Adam(self.agent.parameters(), lr=0.005)

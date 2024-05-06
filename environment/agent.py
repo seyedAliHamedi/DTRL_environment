@@ -6,6 +6,7 @@ import pandas as pd
 
 from environment.dtrl.core_scheduler import CoreScheduler
 from environment.dtrl.device_scheduler import DeviceScheduler
+from environment.state import State
 
 class Agent:
 
@@ -21,14 +22,14 @@ class Agent:
     def takeAction(self):
         return 1
     
-    def schedule(self,task_queue,env_snapshot,active_jobs):
+    def schedule(self,task_queue,pe_list,job_list):
         log_probs = {}
         device_values = {}
         core_values = {}
         rewards = {}
         for taskToken in range(task_queue):
             task  = taskToken.task
-            state = self.get_state(task,env_snapshot)
+            state = State.get_state(task,env_snapshot)
             state = torch.tensor(state, dtype=torch.float32)
     
             option_logits,devices = self.device.agent(state)
@@ -158,42 +159,4 @@ class Agent:
     
         return [cores, devicePower, battery, error_rate]
 
-    @classmethod
-    def core_schedule(cls, cores_attrs, cores_availability, queue):
-        # ! change the queue
-        # ! change the core avail
-        # queue = [  token   ]
-
-        # cores_attrs = {
-        #             "num_of_cores" (int),
-        #             "voltages_frequencies" (vector,(int)),
-        #             "capacitance" (vector,(int)),
-        #             "power_idle (vector,(int))"
-        #         }
-
-        # command = {
-        # (core)0 : token, cpu_performance_mod
-        #       1 : token, cpu_performance_mod
-        #       2 : token, cpu_performance_mod
-        #             .
-        #             .
-        #       n: token, cpu_performance_mod
-        #   }
-        command = {}
-        log = []
-        if len(queue) == 0:
-            return command, log
-        for item_index, item in enumerate(queue):
-            free_core_index = -1
-            for index, core in enumerate(cores_availability):
-                if cores_availability[index] == 0:
-                    free_core_index = index
-                    break
-            if free_core_index == -1:
-                log.append(f"{item.task.name} -> waiting for free core")
-                return command, log
-            else:
-                log.append(f"{item.task.name} -> core{free_core_index}")
-                command[free_core_index] = [queue.pop(item_index), 1]
-                cores_availability[free_core_index] = 1
-        return command, log
+    
