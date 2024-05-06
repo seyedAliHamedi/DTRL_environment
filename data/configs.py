@@ -1,6 +1,6 @@
 devices_config = {
     "iot": {
-        "num_devices": 100,
+        "num_devices": 5,
         "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (1e6, 1.8),
@@ -19,9 +19,10 @@ devices_config = {
         "battery_capacity": (36000, 40000),
         "error_rate": (0.005, 0.01),
         "safe": (0.1, 0.9),
+        "maxQueue": 10
     },
     "mec": {
-        "num_devices": 100,
+        "num_devices": 0,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (6 * 1e8, 0.8),
@@ -39,6 +40,7 @@ devices_config = {
         "battery_capacity": -1,
         "error_rate": (0.01, 0.015),
         "safe": (0.25, 0.75),
+        "maxQueue": 50
     },
     "cloud": {
         "num_devices": 0,
@@ -50,18 +52,18 @@ devices_config = {
         "battery_capacity": -1,
         "error_rate": (0.01, 0.015),
         "safe": (0.4, 0.6),
+        "maxQueue": 100
     },
 }
 
 jobs_config = {
-    "num_jobs": 100000,
+    "num_jobs": 100,
     "max_deadline": 2000,
     "max_task_per_depth": 5,
     "max_depth": 3,
     "task": {
         "input_size": [1000, 1000000],
         "output_size": [1000, 1000000],
-        "task_kinds": 4,
         "computational_load": [1000, 1000000],
         "safe_measurement": [0.95, 0.05],
         "task_kinds": [1, 2, 3, 4],

@@ -1,22 +1,23 @@
 import pandas as pd
 import numpy as np
-from configs import devices_config, jobs_config, environment_config
+from data.configs import devices_config, jobs_config, environment_config
 import os
 import time
 
 
 class Generator:
     _task_id_counter = 0
+    _device_id_counter = 0
+    _job_id_counter = 0
     _devices_path = os.path.join(os.path.dirname(__file__), "devices.csv")
     _job_path = os.path.join(os.path.dirname(__file__), "jobs.csv")
     _tasks_path = os.path.join(os.path.dirname(__file__), "tasks.csv")
 
     @classmethod
     def get_devices(cls, file_path=_devices_path):
-        try:
-            with open(file_path, "r") as f:
-                return pd.read_csv(f)
-        except:
+        if os.path.exists(file_path):
+            return pd.read_csv(file_path)
+        else:
             return Generator._generate_device()
 
     # generate random Processing element attributes based on the bounds and ranges defined in the config
@@ -37,6 +38,7 @@ class Generator:
             for _ in range(config["num_devices"]):
                 cpu_cores = int(np.random.choice(config["num_cores"]))
                 device_info = {
+                    "id": Generator._device_id_counter,
                     "type": type,
                     "number_of_cpu_cores": cpu_cores,
                     "voltages_frequencies": [
@@ -82,8 +84,10 @@ class Generator:
                             [0, 1], p=[config["safe"][0], config["safe"][1]]
                         )
                     ),
-                }
+                    "maxQueue": config["maxQueue"],
 
+                }
+                Generator._device_id_counter += 1
                 devices_data.append(device_info)
 
         devices = pd.DataFrame(devices_data)
@@ -95,11 +99,9 @@ class Generator:
 
     @classmethod
     def get_jobs(cls, file_path_jobs=_job_path, file_path_tasks=_tasks_path):
-        try:
-            with open(file_path_jobs, "r") as f:
-                with open(file_path_tasks, "r") as f2:
-                    return (pd.read_csv(f), pd.read_csv(f2),)
-        except:
+        if os.path.exists(file_path_jobs):
+            return pd.read_csv(file_path_jobs), pd.read_csv(file_path_tasks)
+        else:
             return Generator._generate_jobs()
 
     @classmethod
@@ -148,6 +150,7 @@ class Generator:
             # set the tasks and update the job.tasks_list
 
             job = {
+                "id": i,
                 "task_count": len(task_list),
                 "tasks_ID": [task["id"] for task in task_list],
                 "heads": [
@@ -215,13 +218,3 @@ class Generator:
             "energy_consumed": -1,
             "status": "NOT_REGISTERED",
         }
-
-
-devices = Generator.get_devices()
-jobs, tasks = Generator.get_jobs()
-
-print(devices.head(5))
-print("//////////////")
-print(jobs.head(5))
-print("//////////////")
-print(tasks.head(5))
