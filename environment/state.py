@@ -1,7 +1,4 @@
-import pandas as pd
-
 from data.gen import Generator
-
 
 class State:
     _instance = None
@@ -49,7 +46,7 @@ class State:
             )
 
     def get(self):
-        return self._jobs,self._PEs
+        return self._jobs, self._PEs
 
     ####### ENVIRONMENT #######
 
@@ -77,4 +74,3 @@ class State:
 
     def __update_active_jobs(self, jobs):
         pass
-

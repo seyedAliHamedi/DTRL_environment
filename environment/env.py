@@ -1,7 +1,8 @@
+import time
+
 from data.db import Database
 from environment.agent import Agent
 from environment.state import State
-from time import *
 
 class Environment:
 
@@ -9,7 +10,7 @@ class Environment:
         self.agent = Agent()
         self.state = State()
         self.window_generator = ()
-        self.db = Database()
+        self.db = Database().load()
         self.cycle_wait = 0.001
         self.__runner_flag = False
 
