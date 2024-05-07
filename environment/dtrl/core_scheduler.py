@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from torch.nn import nn
+import  torch.nn as nn
 import torch.optim as optim
 
 class CoreScheduler(nn.Module):

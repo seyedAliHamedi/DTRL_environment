@@ -1,3 +1,4 @@
+from data.db import Database
 from data.gen import Generator
 
 
@@ -9,11 +10,12 @@ class State:
             cls._instance = super().__new__(cls)
             cls._instance._PEs = []
             cls._instance._jobs = []
+            cls._active_jobs_count = 5
         return cls._instance
 
     def initialize(self):
-        self.init_PEs(Generator.get_devices())
-        self.init_jobs(Generator.get_jobs()[0])
+        self.init_PEs(Database.get_all_devices())
+        self.init_jobs(Database.get_jobs(self._active_jobs_count))
 
     def init_PEs(self, PEs):
         dict_PEs = PEs.to_dict(orient='records')

@@ -48,7 +48,11 @@ class Generator:
             config = devices_config[type]
 
             for _ in range(config["num_devices"]):
-                cpu_cores = int(np.random.choice(config["num_cores"]))
+                cpu_cores = (
+                    -1
+                    if config["num_cores"]
+                    == -1 else int(np.random.choice(config["num_cores"]))
+                )
                 device_info = {
                     "id": Generator._device_id_counter,
                     "type": type,

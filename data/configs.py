@@ -43,7 +43,7 @@ devices_config = {
         "maxQueue": 50
     },
     "cloud": {
-        "num_devices": 0,
+        "num_devices": 1,
         "num_cores": -1,
         "voltage_frequencies": ((50000, 13.85), (80000, 24.28)),
         "isl": -1,

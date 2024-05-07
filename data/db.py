@@ -8,9 +8,11 @@ class Database:
 
     @classmethod
     def load(cls):
-        Database._devices = Generator.get_devices()
-        Database._jobs, Database._tasks = Generator.get_jobs()
-
+        if not Database._devices: 
+            Database._devices = Generator.get_devices()
+        if not Database._jobs or not Database._tasks:
+            Database._jobs, Database._tasks = Generator.get_jobs()
+    # ------------ all ----------
     @classmethod
     def get_all_devices(cls):
         return cls._devices.to_dict(orient='records')
@@ -51,3 +53,6 @@ class Database:
         return cls._tasks.iloc[id].to_dict(orient='records')
 
     # ---------- helper  ------------
+    @classmethod
+    def get_jobs_window(cls,head,count):
+        return cls._jobs.iloc[head:head+count].to_dict(orient='records')
