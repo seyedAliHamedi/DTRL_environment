@@ -26,9 +26,10 @@ class State:
                     "batteryLevel": pe["batteryLevel"],
                     "occupiedCores": [0 for core in range(pe["num_cores"])],
                     "energyConsumption": pe["powerIdle"],
+                    # time,task_id
                     "queue": [
-                        [(0, -1) for core in range(pe["num_cores"])]
-                        for _ in range(pe["maxQueue"])
+                        [(0, -1) for _ in range(pe["maxQueue"])]
+                        for core in range(pe["num_cores"])
                     ],
                 }
             )
@@ -90,20 +91,52 @@ class State:
         self.__update_occupied_cores()
         self.__update_batteries_capp()
         self.__update_energy_consumption()
-        pass
 
     def __update_batteries_capp(self):
+        # time
         for pe in self._PEs:
             pe["batteryLevel"] -= sum(pe["energyConsumption"])
-        return
 
-    def __update_energy_consumption(self):
-        for pe in self._PEs:
-            pass
-        return
+    def __update_energy_consumption(self, pe_index, core_index, dvfs):
+        # agent
+        pe = Database().get_device(self._PEs[pe_index]["id"])
+        freq, vol = pe["voltages_frequencies"][core_index][dvfs]
+        capacitence = pe["capacitance"][core_index]
+        self._PEs[pe_index][core_index] = capacitence*(vol*vol)*freq
 
-    def __update_PEs_queue(self):
-        return
+        # time
+        for pe_dict in self._PEs:
+            for index in range(pe_dict["energyConsumption"]):
+                if pe_dict["occupiedCores"][index] == 0:
+                    self._PEs[pe_index][core_index] = pe["powerIdle"][core_index]
+
+    def __update_PEs_queue(self, task_id , pe_index, core_index, dvfs):
+        # agent
+        current_quque = self._PEs[pe_index]["queue"][core_index]
+        pe = Database().get_device(self._PEs[pe_index]["id"])
+        task = Database().get_task(task_id)
+        for elem in current_quque :
+            if elem != (0,-1):
+                continue
+            freq, vol = pe["voltages_frequencies"][core_index][dvfs]
+            elem = (task["computational_load"] / freq, task_id)
+            break
+
+        # time
+        element = current_quque[0]
+        if element[0]> 1:
+            element[0] -=1
+        else:
+            element.pop(0)
+            element.append((0,-1))
 
     def __update_occupied_cores(self):
-        pass
+        # both
+        for pe_index in range(len(self._PEs)):
+            occupiedCores = self._PEs[pe_index]["occupiedCores"]
+            for core_index in range(len(occupiedCores)):
+                queue = self._PEs[pe_index]["queue"][core_index]
+                if queue[0]==(0,-1):
+                    occupiedCores[core_index] = 0
+                else:
+                    occupiedCores[core_index] = 1

@@ -60,7 +60,7 @@ class Generator:
                     "voltages_frequencies": [
                         [
                             config["voltage_frequencies"][i]
-                            for i in np.random.choice(6, size=4, replace=False)
+                            for i in np.random.choice(6, size=3, replace=False)
                         ]
                         for _ in range(cpu_cores)
                     ],
