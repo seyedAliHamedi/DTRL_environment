@@ -10,8 +10,13 @@ class WindowManager:
         self.__head_index = 0
         self.__max_jobs = config["max_jobs"]
         self.__window_size = config["size"]
+        self.current_cycle = 0
+        self.__cycle = config["clock"]
 
     def get_window(self):
+        if self.current_cycle != self.__cycle:
+            self.current_cycle = 0
+            return []
         window = []
         if len(self.__pool) == 0:
             self.__pool = self.__slice()
@@ -27,6 +32,7 @@ class WindowManager:
         else:
             for i in range(self.__window_size):
                 window.append(self.__pool.pop(0))
+        self.current_cycle += 1
         return window
 
     def __slice(self):

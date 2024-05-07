@@ -40,8 +40,9 @@ class State:
                     "id": job["id"],
                     "task_count": job["task_count"],
                     "finishedTasks": [],
-                    "assignedTasks": [],
-                    "remainingTasks": job["tasks_ID"],
+                    "assignedTask": {},
+                    "runningTasks": [],
+                    "unScheduled": job["tasks_ID"],
                     "remainingDeadline": job["deadline"],
                 }
             )
@@ -53,10 +54,43 @@ class State:
 
     def environment_update(self, job_window):
 
-        job_window
+        print(f"new_job_window: {job_window}")
+
+        # process 1
+        self.__update_jobs()
+        # process 2
+        self.__update_PEs()
+        # TODO pop assigned task
+
+    ### PROCESS 1 ###
+
+    def __update_jobs(self):
+        # update remaining_task
+        # update running_tasks
+        # update finished_tasks
+        # update deadline
+        pass
+
+    def __update_remaining_tasks(self):
+        pass
+
+    def __update_running_tasks(self):
+        pass
+
+    def __update_finished_tasks(self):
+        pass
+
+    def __update_deadlines(self):
+        pass
+
+    ### PROCESS 2 ###
+
+    def __update_PEs(self):
         self.__update_PEs_queue()
-        self.__update_energy_consumption()
+        self.__update_occupied_cores()
         self.__update_batteries_capp()
+        self.__update_energy_consumption()
+        pass
 
     def __update_batteries_capp(self):
         for pe in self._PEs:
@@ -71,5 +105,5 @@ class State:
     def __update_PEs_queue(self):
         return
 
-    def __update_active_jobs(self, jobs):
+    def __update_occupied_cores(self):
         pass
