@@ -18,8 +18,7 @@ class State:
         self.init_jobs(Database.get_jobs(self._active_jobs_count))
 
     def init_PEs(self, PEs):
-        dict_PEs = PEs.to_dict(orient='records')
-        for pe in dict_PEs:
+        for pe in PEs:
             self._PEs.append(
                 {
                     "type": pe["type"],
@@ -35,8 +34,7 @@ class State:
             )
 
     def init_jobs(self, jobs):
-        dict_jobs = jobs.to_dict(orient='records')
-        for job in dict_jobs:
+        for job in jobs:
             self._jobs.append(
                 {
                     "id": job["id"],
@@ -53,10 +51,9 @@ class State:
 
     ####### ENVIRONMENT #######
 
-    def environment_update(self, instructions):
+    def environment_update(self, job_window):
 
-        window = instructions["window"]
-
+        job_window
         self.__update_PEs_queue()
         self.__update_energy_consumption()
         self.__update_batteries_capp()

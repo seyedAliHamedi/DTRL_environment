@@ -149,7 +149,7 @@ class Generator:
             #   1- head tasks
             #   2- middle tasks
             #   3- tail tasks
-            for i in range(head_count):
+            for j in range(head_count):
                 new_head_task = Generator._generate_random_task(i, True, False)
                 task_list.append(new_head_task)
                 head_tasks_list.append(new_head_task)
@@ -158,7 +158,7 @@ class Generator:
             for task in task_list:
                 last_depth_task_list.append(task)
 
-            for i in range(depth):
+            for j in range(depth):
                 current_depth_task_list = []
                 current_depth_task_count = np.random.randint(1, max_task_per_depth + 1)
                 for j in range(current_depth_task_count):
@@ -168,7 +168,7 @@ class Generator:
                     current_depth_task_list.append(new_task)
                 last_depth_task_list = current_depth_task_list
 
-            for i in range(tail_count):
+            for j in range(tail_count):
                 predecessors = Generator._choose_random_tasks(last_depth_task_list)
                 new_task = Generator._generate_random_task(i, False, True, predecessors)
                 tail_tasks_list.append(new_task)

@@ -11,13 +11,12 @@ from environment.state import State
 
 class Agent:
 
-    def __init__(self, devices):
-        self.devices = devices
-        self.core = CoreScheduler(devices)
-        self.device = DeviceScheduler(devices)
+    def __init__(self):
+        self.devices = Database.get_all_devices()
+        self.core = CoreScheduler(self.devices)
+        self.device = DeviceScheduler(self.devices)
         # self.value = ValueNetwork()
         self.gamma = 0.95
-        self.db = Database()
 
         self.log_probs = {}
         self.device_values = {}
@@ -136,7 +135,7 @@ class Agent:
         ]
     
     def get_pe_data(self, pe_dict):
-        pe = self.db.get_device(pe_dict["id"])
+        pe = Database.get_device(pe_dict["id"])
         battery_capacity = pe["battery_capacity"]
         battery_level = pe_dict["battery_level"]
         battery_isl = pe["isl"]
