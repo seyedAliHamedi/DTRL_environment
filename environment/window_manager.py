@@ -1,3 +1,4 @@
+import random
 import time
 
 import numpy as np
@@ -42,19 +43,21 @@ class WindowManager:
         self.__head_job_index = self.__tail_job_index
         selected_tasks = []
         for job in self.__jobs_pool:
-            print(f'jobs tasks:{job["tasks_ID"]} | len:{len(job["tasks_ID"])}')
             for task in job["tasks_ID"]:
                 selected_tasks.append(task)
-                print(f"task:{task}")
-        print(f"selected_tasks = {selected_tasks}")
-        np.random.shuffle(np.array(selected_tasks))
+        random.shuffle(selected_tasks)
         return selected_tasks
 
     def get_slice_range(self):
         return self.__head_job_index, self.__tail_job_index
 
 
-Database().load()
-window_manager = WindowManager(Database.get_jobs(10))
-window_buffer = []
-window_manager.get_window()
+Database.load()
+window_manager = WindowManager(Database.get_all_jobs())
+while True:
+    starting_time = time.time()
+    buffer = window_manager.get_window()
+    ending_time = time.time()
+    print(buffer)
+    print(f"total_time = {ending_time - starting_time}\n")
+    time.sleep(1)

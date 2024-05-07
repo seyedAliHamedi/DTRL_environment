@@ -135,6 +135,8 @@ class Generator:
         for i in range(config["num_jobs"]):
             # generate jobs based on job attributes
             task_list = []
+            head_tasks_list = []
+            tail_tasks_list = []
             head_count = np.random.randint(1, max_task_per_depth + 1)
             depth = np.random.randint(1, max_depth + 1)
             tail_count = np.random.randint(1, max_task_per_depth + 1)
@@ -144,7 +146,9 @@ class Generator:
             #   2- middle tasks
             #   3- tail tasks
             for i in range(head_count):
-                task_list.append(Generator._generate_random_task(i, True, False))
+                new_head_task = Generator._generate_random_task(i, True, False)
+                task_list.append(new_head_task)
+                head_tasks_list.append(new_head_task)
 
             last_depth_task_list = []
             for task in task_list:
@@ -163,6 +167,7 @@ class Generator:
             for i in range(tail_count):
                 predecessors = Generator._choose_random_tasks(last_depth_task_list)
                 new_task = Generator._generate_random_task(i, False, True, predecessors)
+                tail_tasks_list.append(new_task)
                 task_list.append(new_task)
             deadline = np.random.randint(1, max_deadline)
 
@@ -173,10 +178,10 @@ class Generator:
                 "task_count": len(task_list),
                 "tasks_ID": [task["id"] for task in task_list],
                 "heads": [
-                    task["id"] for task in last_depth_task_list if task["is_head"]
+                    task["id"] for task in head_tasks_list if task["is_head"]
                 ],
                 "tails": [
-                    task["id"] for task in last_depth_task_list if task["is_tail"]
+                    task["id"] for task in tail_tasks_list if task["is_tail"]
                 ],
                 "tree": [(task["id"], task["predecessors"]) for task in task_list],
                 "deadline": deadline,

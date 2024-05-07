@@ -1,5 +1,6 @@
 from data.gen import Generator
 
+
 class State:
     _instance = None
 
@@ -52,8 +53,7 @@ class State:
 
     def environment_update(self, instructions):
 
-        new_jobs = instructions["jobs"]
-        self.init_new_jobs(new_jobs)
+        window = instructions["window"]
 
         self.__update_PEs_queue()
         self.__update_energy_consumption()
