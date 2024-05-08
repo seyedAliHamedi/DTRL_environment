@@ -42,15 +42,15 @@ class Database:
     # ---------- single ------------
     @classmethod
     def get_device(cls, id):
-        return cls._devices.iloc[id].to_dict(orient='records')
+        return cls._devices.iloc[id].to_dict()
 
     @classmethod
     def get_job(cls, id):
-        return cls._jobs.iloc[id].to_dict(orient='records')
+        return cls._jobs.iloc[id].to_dict()
 
     @classmethod
     def get_task(cls, id):
-        return cls._tasks.iloc[id].to_dict(orient='records')
+        return cls._tasks.iloc[id].to_dict()
 
     # ---------- helper  ------------
     @classmethod

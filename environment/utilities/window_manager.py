@@ -12,30 +12,26 @@ class WindowManager:
         self.__head_index = 0
         self.__max_jobs = config["max_jobs"]
         self.__window_size = config["size"]
-        self.current_cycle = 0
-        self.__cycle = config["clock"]
+        self.current_cycle = 1
+        self.__cycle = 3
         self.active_jobs_ID = []
 
     def get_window(self):
         if self.current_cycle != self.__cycle:
-            self.current_cycle = 0
+            self.current_cycle += 1
             return []
+        self.current_cycle = 0
         window = []
         if len(self.__pool) == 0:
             self.__pool = self.__slice()
 
-            print(f"pool  = {self.__pool}")
-            print(f"len(selected_tasks) = {len(self.__pool)}")
-            print(f"window_size = {self.__window_size}")
-
-        elif len(self.__pool) < self.__window_size:
+        if len(self.__pool) < self.__window_size:
             for i in range(len(self.__pool)):
                 window.append(self.__pool.pop(0))
             return window
         else:
             for i in range(self.__window_size):
                 window.append(self.__pool.pop(0))
-        self.current_cycle += 1
         return window
 
     def __slice(self):

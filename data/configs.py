@@ -43,7 +43,7 @@ devices_config = {
         "maxQueue": 50
     },
     "cloud": {
-        "num_devices": 1,
+        "num_devices": 0,
         "num_cores": -1,
         "voltage_frequencies": ((50000, 13.85), (80000, 24.28)),
         "isl": -1,
@@ -72,6 +72,6 @@ jobs_config = {
 environment_config = {
     "generator": {"iot": 1, "mec": 0, "cloud": 0, "jobs_count": 100},
     "window": {"size": 10, "max_jobs": 5, "clock": 10},
-    "environment": {"cycle": 0.001}
+    "environment": {"cycle": 1}
 
 }

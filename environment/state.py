@@ -1,3 +1,5 @@
+import math
+
 from data.db import Database
 from environment.utilities import helper
 
@@ -34,13 +36,17 @@ class State:
             self._jobs[job["id"]] = {
                 "task_count": job["task_count"],
                 "finishedTasks": [],
+                "assignedTask": None,
                 "runningTasks": [],
-                "unScheduled": job["tasks_ID"],
+                "remainingTasks": job["tasks_ID"],
                 "remainingDeadline": job["deadline"],
             }
 
     def get(self):
         return self._jobs, self._PEs
+
+    def take_action(self):
+        State().apply_action(2, 3, 2000, 1.5, 4)
 
     def apply_action(self, pe_ID, core_index, freq, volt, task_ID):
         last_queue_slot_index = helper.find_last_queue_slot_index(self._PEs[pe_ID]["queue"][core_index])
@@ -48,7 +54,7 @@ class State:
             return False
 
         # apply on queue
-        execution_time = Database.get_task(task_ID)["execution_time"] // freq
+        execution_time = math.ceil(Database.get_task(task_ID)["execution_time"] / freq)
         placing_slot = (execution_time, task_ID)
         self._PEs[pe_ID]["queue"][core_index][last_queue_slot_index] = placing_slot
         job_ID = Database.get_task(task_ID)["job_ID"]
@@ -63,6 +69,8 @@ class State:
 
     def environment_update(self, task_window):
 
+        print(f"new task window: {task_window}")
+
         # process 1
         self.__update_jobs(task_window)
         # process 2
@@ -70,9 +78,11 @@ class State:
 
         self.__remove_assigned_task()
 
-    def __remove_assigned_task(self):
-        for job in self._jobs.values():
-            del job["assignedTask"]
+        print("PEs::")
+        print(self._PEs)
+        print("Jobs::")
+        print(self._jobs, "\n")
+
 
     def __update_jobs(self, new_tasks):
         self.__update_deadlines()
@@ -83,7 +93,7 @@ class State:
 
     def __add_new_active_jobs(self, new_tasks):
         for task in new_tasks:
-            job_id = Database.get_task(task)["job_ID"]
+            job_id = Database.get_task(task)["job_id"]
             if not self.__is_active_job(job_id):
                 self._init_jobs([Database.get_job(job_id)])
 
@@ -111,8 +121,13 @@ class State:
                 del self._jobs[job_ID]
 
     def __update_deadlines(self):
+        # TODO : if < 0 return punishment ????
         for job in self._jobs.values():
             job["remainingDeadline"] -= 1
+
+    def __remove_assigned_task(self):
+        for job in self._jobs.values():
+            job["assignedTask"] = None
 
     ### PROCESS 2 ###
 
@@ -131,8 +146,7 @@ class State:
         for pe_ID in self._PEs.keys():
             for core_index, core_av in enumerate(self._PEs[pe_ID]["occupiedCores"]):
                 if core_av == 0:
-                    self._PEs[pe_ID]["energyConsumption"][core_index] \
-                        = Database.get_device(pe_ID)["powerIdle"][core_index]
+                    self._PEs[pe_ID]["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][core_index]
 
     def __update_PEs_queue(self):
         for pe in self._PEs.values():
