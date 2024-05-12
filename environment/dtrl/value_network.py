@@ -1,9 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.optim import optim
+import torch.optim as optim
 
-from Utilities.Helper import get_pe_data
 
 class ValueNetwork(nn.Module):
     def __init__(self,num_features,devices):

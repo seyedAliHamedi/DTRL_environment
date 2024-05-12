@@ -7,20 +7,30 @@ from environment.state import State
 
 class WindowManager:
 
-    def __init__(self, config=environment_config["window"]):
-        self.__pool = []
-        self.__head_index = 0
-        self.__max_jobs = config["max_jobs"]
-        self.__window_size = config["size"]
-        self.current_cycle = 1
-        self.__cycle = 3
-        self.active_jobs_ID = []
+    _instance = None
 
-    def get_window(self):
+    def __new__(cls,config=environment_config['window']):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.__pool = []
+            cls._instance.__head_index = 0
+            cls._instance.__max_jobs = config["max_jobs"]
+            cls._instance.__window_size = config["size"]
+            cls._instance.current_cycle = 1
+            cls._instance.__cycle = 3
+            cls._instance.active_jobs_ID = []
+        return cls._instance
+
+        
+
+    def run(self):
         if self.current_cycle != self.__cycle:
             self.current_cycle += 1
-            return []
-        self.current_cycle = 0
+        else:
+            self.current_cycle = 0
+            State().set_task_window(self.get_window())
+        
+    def get_window(self):
         window = []
         if len(self.__pool) == 0:
             self.__pool = self.__slice()
@@ -52,3 +62,18 @@ class WindowManager:
         for job_ID in self.active_jobs_ID:
             jobs_from_list.append(Database.get_job(job_ID))
         State().init_jobs(jobs_from_list)
+
+class PreProccesing:
+    def __init__(self):
+        pass
+
+    @classmethod
+    def process(self):
+        jobs , _ = State().get()
+        
+        task_list = []
+        for id in jobs.keys():
+            for task in jobs[id]['remainingTasks']:
+                task_list.append(task)
+
+        return task_list

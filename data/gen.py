@@ -80,14 +80,14 @@ class Generator:
                         float(np.random.choice(config["powerIdle"])) * 1e-6
                         for core in range(cpu_cores)
                     ],
-                    "batteryLevel": (
+                    "battery_capacity": (
                         -1
                         if config["battery_capacity"] == -1
                         else np.random.uniform(
                             config["battery_capacity"][0], config["battery_capacity"][1]
                         )
                     ),
-                    "errorRate": np.random.uniform(
+                    "error_rate": np.random.uniform(
                         config["error_rate"][0], config["error_rate"][1]
                     ),
                     "acceptableTasks":list(np.random.choice(
@@ -236,7 +236,7 @@ class Generator:
             "job_id": job_id,
             "computational_load": computational_load,
             "input_size": input_size,
-            "out_put_size": output_size,
+            "output_size": output_size,
             "predecessors": predecessors,
             "is_safe": safe,
             "task_kind": task_kind,

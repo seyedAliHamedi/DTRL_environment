@@ -10,16 +10,17 @@ class DeviceScheduler:
         self.devices = devices
         self.num_features = 5
         self.max_tree_depth = 5
-        self.agent = DeviceDDTNode(self.num_features, self.devices,0, self.max_tree_depth)
+        self.agent = DeviceDDTNode(self.devices,0, self.max_tree_depth)
         self.optimizer = optim.Adam(self.agent.parameters(), lr=0.005)
 
 
 class DeviceDDTNode(nn.Module):
-    def __init__(self, num_features,devices, depth,max_depth):
+    def __init__(self, devices, depth,max_depth):
         super(DeviceDDTNode, self).__init__()
         self.depth = depth
         self.devices = devices
-        self.num_features = num_features * (1 + len(devices))
+        self.num_features = 5 + 4 * len(devices)
+        self.max_depth = max_depth
 
         if depth != max_depth:
             self.weights = nn.Parameter(torch.zeros(self.num_features))
@@ -32,36 +33,51 @@ class DeviceDDTNode(nn.Module):
             clusters = self.cluster(self.devices)
             left_cluster = clusters[0]
             right_cluster = clusters[1]
-            self.left = DeviceDDTNode(self.num_features,left_cluster,depth+1,max_depth)
-            self.right = DeviceDDTNode(self.num_features,right_cluster,depth+1,max_depth)
+            self.left = DeviceDDTNode(left_cluster,depth+1,max_depth)
+            self.right = DeviceDDTNode(right_cluster,depth+1,max_depth)
 
     def forward(self, x):
         if self.depth == self.max_depth:
-            return self.prob_dist,self.devices
+            return self.prob_dist
 
         val = torch.sigmoid(self.alpha * (torch.matmul(x, self.weights.t()) + self.bias))
-        a = np.random.uniform(0, 1)
-        if a<0.10:
-            val = 1-val
+            
         if val >= 0.5:
-            indices = [self.devices.index(device)+1 for device in self.right.devices]
-            indices.insert(0,0)
-            x=x.view(self.num_features,-1)
+            indices = [self.devices.index(device) for device in self.right.devices]
+            temp=x[5:].view(-1,4)
             indices_tensor = torch.tensor(indices)
-            x = x[indices_tensor]
-            x = x.view(1,-1)
+            x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
             return val * self.right(x)
         else:
-            indices = [self.devices.index(device)+1 for device in self.left.devices]
-            indices.insert(0,0)
-            x=x.view(self.num_features,-1)
+            indices = [self.devices.index(device) for device in self.left.devices]
+            temp=x[5:].view(-1,4)
             indices_tensor = torch.tensor(indices)
-            x = x[indices_tensor]
-            x = x.view(1,-1)
-            return (1-val) * self.left(x)
+            x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
+            return val * self.left(x)
+        
+    def get_devices(self,x):
+        if self.depth == self.max_depth:
+            return self.devices
+        
+        val = torch.sigmoid(self.alpha * (torch.matmul(x, self.weights.t()) + self.bias))
 
+        if val >= 0.5:
+            indices = [self.devices.index(device) for device in self.right.devices]
+            temp=x[5:].view(-1,4)
+            indices_tensor = torch.tensor(indices)
+            x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
+            return self.right.get_devices(x)
+        else:
+            indices = [self.devices.index(device) for device in self.left.devices]
+            temp=x[5:].view(-1,4)
+            indices_tensor = torch.tensor(indices)
+            x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
+            return self.left.get_devices(x)
+        
     def cluster(self, devices, k=2):
         data = [self.get_pe_data(device) for device in devices]
+        if len(devices)<k:
+            return [devices]*k
         X = np.array(data)
         kmeans = KMeans(n_clusters=k, init="random")
         kmeans.fit(X)
@@ -74,19 +90,14 @@ class DeviceDDTNode(nn.Module):
 
 
     def get_pe_data(self, pe):
-        battery_capacity = pe.battery_capacity
-        battery_level = pe.battery_eval
-        battery_isl = pe.isl
-        battery = (battery_level / battery_capacity - battery_isl) * battery_capacity
+        battery_capacity = pe['battery_capacity']
+        battery_isl = pe['ISL']
+        battery = (1 - battery_isl) * battery_capacity
 
-        num_cores = pe.num_cores
-        cores_availability = self.cores_availability
-        cores = 1 - (sum(cores_availability) / num_cores)
+        num_cores = pe['num_cores']
 
         devicePower = 0
-        for index, core in enumerate(pe.cores_attrs["voltages_frequencies"]):
-            if cores_availability[index] == 1:
-                continue
+        for index, core in enumerate(pe["voltages_frequencies"]):
             corePower = 0
             for mod in core:
                 freq, vol = mod
@@ -94,6 +105,6 @@ class DeviceDDTNode(nn.Module):
             devicePower += corePower
         devicePower = devicePower / num_cores
 
-        error_rate = pe.error_rate
+        error_rate = pe['error_rate']
 
-        return [cores, devicePower, battery, error_rate]
+        return [num_cores, devicePower, battery, error_rate]
