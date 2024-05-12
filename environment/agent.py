@@ -54,7 +54,6 @@ class Agent:
         selected_device = current_devices[option]
         selected_device_index = self.devices.index(selected_device)
 
-        print({0:selected_device})
         sub_state = get_input(current_task,{0:pe_state[selected_device['id']]})
         action_logits = self.core(sub_state,selected_device_index)
         action_probs = F.softmax(action_logits, dim=-1)
@@ -63,14 +62,13 @@ class Agent:
         
         
         #TODO : local scheduler
-        dvfs = selected_core[0]
-
-        print("???? ",selected_device_index,selected_core_index,dvfs[0],dvfs[1])
+        dvfs = selected_core[np.random.randint(0,3)]
+        print("??????  ",selected_device_index,selected_core_index,dvfs[0],dvfs[1],current_task_id)
+        reward = State().apply_action(selected_device_index,selected_core_index,dvfs[0],dvfs[1],current_task_id)
         return
 
 
         device_value,core_value = self.value_net()
-        reward = State().apply_action(selected_device_index,selected_core_index,dvfs[0],dvfs[1],current_task['id'])
 
         self.log_probs[current_task["job_ID"]].append(action_probs)
         self.device_values[current_task["job_ID"]].append(device_value)
@@ -113,9 +111,7 @@ class Agent:
         core_values_loss.backward()
         # optimizer_value.step()
     
-        print(
-            f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}"
-        )
+        print(f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}")
     
     def compute_advantages(self,rewards, values, gamma=0.99, normalize=True):
         advantages = []

@@ -27,13 +27,14 @@ class State:
         if last_queue_slot_index == -1:
             return False
         # apply on queue
-        execution_time = math.ceil(Database.get_task(task_ID)["execution_time"] / freq)
+        execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq)
+        print(Database.get_task(task_ID)["computational_load"],freq,execution_time)
         placing_slot = (execution_time, task_ID)
         self._PEs[pe_ID]["queue"][core_index][last_queue_slot_index] = placing_slot
-        job_ID = Database.get_task(task_ID)["job_ID"]
+        job_ID = Database.get_task(task_ID)["job_id"]
         self._jobs[job_ID]["assignedTask"] = task_ID
         # apply energyConsumption
-        capacitance = Database.get_device(pe_ID)[core_index]["capacitance"]
+        capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
         self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
         return True
 
@@ -74,10 +75,10 @@ class State:
 
         self.__remove_assigned_task()
 
-        # print("PEs::")
-        # print(self._PEs)
-        # print("Jobs::")
-        # print(self._jobs, "\n")
+        print("PEs::")
+        print(self._PEs)
+        print("Jobs::")
+        print(self._jobs, "\n")
         print("|||||||||||||||||||||||||||||||")
 
     ########  UPDATE JOBS ####### 
@@ -113,9 +114,9 @@ class State:
                 self._jobs[job_ID]["runningTasks"].append(self._jobs[job_ID]["assignedTask"])
 
     def __remove_finished_active_jobs(self):
-        for job_ID in self._jobs.keys():
-            if len(self._jobs[job_ID]["remainingTasks"]) == 0:
-                del self._jobs[job_ID]
+        for job in self._jobs.values():
+            if len(job["remainingTasks"]) == 0:
+                del job
 
                 
 
@@ -151,10 +152,10 @@ class State:
             for core_index, core_queue in enumerate(pe["queue"]):
                 current_queue = pe["queue"][core_index]
                 # if time of this slot in queue is 0
-                if core_queue[0][0] == 0:
-                     queue_shift_left(current_queue)
+                if current_queue[0][0] == 0:
+                    queue_shift_left(current_queue)
                 else:
-                    current_queue[0][0] -= 1
+                    current_queue[0] = (current_queue[0][0]-1,current_queue[0][1])
 
     def __update_occupied_cores(self):
         # based on pe queue

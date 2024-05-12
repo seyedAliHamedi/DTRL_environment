@@ -1,7 +1,7 @@
 devices_config = {
     "iot": {
-        "num_devices": 5,
-        "num_cores": [4, 8, 16],
+        "num_devices": 2,
+        "num_cores": [4, 2],
         "voltage_frequencies": [
             (1e6, 1.8),
             (2e6, 2.3),
@@ -19,7 +19,7 @@ devices_config = {
         "battery_capacity": (36000, 40000),
         "error_rate": (0.005, 0.01),
         "safe": (0.1, 0.9),
-        "maxQueue": 10
+        "maxQueue": 3
     },
     "mec": {
         "num_devices": 0,

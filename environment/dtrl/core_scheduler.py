@@ -39,12 +39,6 @@ class DDTNode(nn.Module):
     def forward(self, x):
         if self.depth == self.max_depth:
             return self.prob_dist
-        print("------")
-        print(x)
-        print(self.weights.t())
-        print("------")
-
-
 
         val = torch.sigmoid(self.alpha * (torch.matmul(torch.tensor(x), self.weights.t()) + self.bias))
         a = np.random.uniform(0, 1)
