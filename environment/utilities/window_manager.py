@@ -6,10 +6,9 @@ from environment.state import State
 
 
 class WindowManager:
-
     _instance = None
 
-    def __new__(cls,config=environment_config['window']):
+    def __new__(cls, config=environment_config['window']):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.__pool = []
@@ -21,15 +20,13 @@ class WindowManager:
             cls._instance.active_jobs_ID = []
         return cls._instance
 
-        
-
     def run(self):
         if self.current_cycle != self.__cycle:
             self.current_cycle += 1
         else:
             self.current_cycle = 0
             State().set_task_window(self.get_window())
-        
+
     def get_window(self):
         window = []
         if len(self.__pool) == 0:
@@ -63,14 +60,15 @@ class WindowManager:
             jobs_from_list.append(Database.get_job(job_ID))
         State().init_jobs(jobs_from_list)
 
+
 class PreProccesing:
     def __init__(self):
         pass
 
     @classmethod
     def process(self):
-        jobs , _ = State().get()
-        
+        jobs, _ = State().get()
+
         task_list = []
         for id in jobs.keys():
             for task in jobs[id]['remainingTasks']:

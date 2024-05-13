@@ -72,6 +72,6 @@ jobs_config = {
 environment_config = {
     "generator": {"iot": 1, "mec": 0, "cloud": 0, "jobs_count": 100},
     "window": {"size": 10, "max_jobs": 5, "clock": 10},
-    "environment": {"cycle": 1}
+    "environment": {"cycle": 0.1}
 
 }

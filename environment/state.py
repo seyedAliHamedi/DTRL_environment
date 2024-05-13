@@ -1,6 +1,9 @@
 import math
 
+import pandas as pd
+
 from data.db import Database
+
 
 class State:
     _instance = None
@@ -15,20 +18,20 @@ class State:
 
     def initialize(self):
         self._init_PEs(Database.get_all_devices())
-    
+
     def get(self):
         return self._jobs, self._PEs
 
-    def set_task_window(self,task_window):
+    def set_task_window(self, task_window):
         self._task_window = task_window
 
     def apply_action(self, pe_ID, core_index, freq, volt, task_ID):
-        last_queue_slot_index =  find_last_queue_slot_index(self._PEs[pe_ID]["queue"][core_index])
+        last_queue_slot_index = find_last_queue_slot_index(self._PEs[pe_ID]["queue"][core_index])
         if last_queue_slot_index == -1:
             return False
         # apply on queue
-        execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq)
-        print(Database.get_task(task_ID)["computational_load"],freq,execution_time)
+        execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq) * 10
+        print(Database.get_task(task_ID)["computational_load"], freq, execution_time)
         placing_slot = (execution_time, task_ID)
         self._PEs[pe_ID]["queue"][core_index][last_queue_slot_index] = placing_slot
         job_ID = Database.get_task(task_ID)["job_id"]
@@ -41,7 +44,7 @@ class State:
     def _init_PEs(self, PEs):
         for pe in PEs:
             self._PEs[pe["id"]] = {
-                "id":pe["id"],
+                "id": pe["id"],
                 "type": pe["type"],
                 "batteryLevel": pe["battery_capacity"],
                 "occupiedCores": [0 for core in range(pe["num_cores"])],
@@ -64,7 +67,6 @@ class State:
                 "remainingDeadline": job["deadline"],
             }
 
- 
     ####### ENVIRONMENT #######
     def update(self):
 
@@ -76,9 +78,9 @@ class State:
         self.__remove_assigned_task()
 
         print("PEs::")
-        print(self._PEs)
+        print(pd.DataFrame(self._PEs), '\n')
         print("Jobs::")
-        print(self._jobs, "\n")
+        print(pd.DataFrame(self._jobs), "\n")
         print("|||||||||||||||||||||||||||||||")
 
     ########  UPDATE JOBS ####### 
@@ -114,11 +116,13 @@ class State:
                 self._jobs[job_ID]["runningTasks"].append(self._jobs[job_ID]["assignedTask"])
 
     def __remove_finished_active_jobs(self):
-        for job in self._jobs.values():
-            if len(job["remainingTasks"]) == 0:
-                del job
-
-                
+        removing_items = []
+        for job_ID in self._jobs.keys():
+            selected_job = self._jobs[job_ID]
+            if len(selected_job["finishedTasks"]) == selected_job["task_count"]:
+                removing_items.append(job_ID)
+        for item in removing_items:
+            del self._jobs[item]
 
     def __update_deadlines(self):
         # TODO : if < 0 return punishment ????
@@ -145,7 +149,8 @@ class State:
         for pe_ID in self._PEs.keys():
             for core_index, core_av in enumerate(self._PEs[pe_ID]["occupiedCores"]):
                 if core_av == 0:
-                    self._PEs[pe_ID]["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][core_index]
+                    self._PEs[pe_ID]["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
+                        core_index]
 
     def __update_PEs_queue(self):
         for pe in self._PEs.values():
@@ -153,15 +158,23 @@ class State:
                 current_queue = pe["queue"][core_index]
                 # if time of this slot in queue is 0
                 if current_queue[0][0] == 0:
+                    if current_queue[0][1] != -1:
+                        finished_task_ID = current_queue[0][1]
+                        self.__task_finished(finished_task_ID)
                     queue_shift_left(current_queue)
                 else:
-                    current_queue[0] = (current_queue[0][0]-1,current_queue[0][1])
+                    current_queue[0] = (current_queue[0][0] - 1, current_queue[0][1])
+
+    def __task_finished(self, task_ID):
+        job_ID = Database.get_task(task_ID)["job_id"]
+        self._jobs[job_ID]["finishedTasks"].append(task_ID)
+        self._jobs[job_ID]["runningTasks"].remove(task_ID)
 
     def __update_occupied_cores(self):
         # based on pe queue
         for pe in self._PEs.values():
             for core_index, core in enumerate(pe["occupiedCores"]):
-                if  is_core_free(pe["queue"][core_index]):
+                if is_core_free(pe["queue"][core_index]):
                     pe["occupiedCores"][core_index] = 0
                 else:
                     pe["occupiedCores"][core_index] = 1
