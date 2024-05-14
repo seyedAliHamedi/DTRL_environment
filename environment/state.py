@@ -25,15 +25,15 @@ class State:
     def set_task_window(self, task_window):
         self._task_window = task_window
 
-    def apply_action(self, pe_ID, core_index, freq, volt, task_ID):
-        last_queue_slot_index = find_last_queue_slot_index(self._PEs[pe_ID]["queue"][core_index])
-        if last_queue_slot_index == -1:
+    def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
+        execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq) * 10
+        placing_slot = (execution_time, task_ID)
+        queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
+        if queue_index == -1:
             return False
         # apply on queue
-        execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq) * 10
-        print(Database.get_task(task_ID)["computational_load"], freq, execution_time)
-        placing_slot = (execution_time, task_ID)
-        self._PEs[pe_ID]["queue"][core_index][last_queue_slot_index] = placing_slot
+        print(task_ID, Database.get_task(task_ID)["computational_load"], freq, execution_time)
+        self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
         job_ID = Database.get_task(task_ID)["job_id"]
         self._jobs[job_ID]["assignedTask"] = task_ID
         # apply energyConsumption
@@ -105,14 +105,14 @@ class State:
 
     def __update_remaining_tasks(self):
         for job in self._jobs.values():
-            if job["assignedTask"]:
+            if job["assignedTask"] or job["assignedTask"] == 0:
                 for task in job["remainingTasks"]:
                     if task == job["assignedTask"]:
                         job["remainingTasks"].remove(task)
 
     def __update_running_tasks(self):
         for job_ID in self._jobs.keys():
-            if self._jobs[job_ID]["assignedTask"]:
+            if self._jobs[job_ID]["assignedTask"] or self._jobs[job_ID]["assignedTask"] == 0:
                 self._jobs[job_ID]["runningTasks"].append(self._jobs[job_ID]["assignedTask"])
 
     def __remove_finished_active_jobs(self):
@@ -143,6 +143,8 @@ class State:
     def __update_batteries_capp(self):
         # time
         for pe in self._PEs.values():
+            if pe["type"] == "mec" or pe["type"] == "cloud":
+                continue
             pe["batteryLevel"] -= sum(pe["energyConsumption"])
 
     def __update_energy_consumption(self):
@@ -154,16 +156,22 @@ class State:
 
     def __update_PEs_queue(self):
         for pe in self._PEs.values():
+            deleting_queues_on_pe = []
             for core_index, core_queue in enumerate(pe["queue"]):
                 current_queue = pe["queue"][core_index]
                 # if time of this slot in queue is 0
                 if current_queue[0][0] == 0:
+                    if pe["type"] == "cloud":
+                        deleting_queues_on_pe.append(core_index)
+                        continue
                     if current_queue[0][1] != -1:
                         finished_task_ID = current_queue[0][1]
                         self.__task_finished(finished_task_ID)
                     queue_shift_left(current_queue)
                 else:
                     current_queue[0] = (current_queue[0][0] - 1, current_queue[0][1])
+            for item in deleting_queues_on_pe:
+                del pe["queue"][item]
 
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
@@ -181,11 +189,15 @@ class State:
 
 
 ####### UTILITY #######     
-def find_last_queue_slot_index(queue):
-    for i, slot in enumerate(queue):
-        if slot == (0, -1):
-            return i
-    return -1
+def find_place(pe, core_i):
+    if pe["type"] == "cloud":
+        pe["queue"].append([])
+        return 0, len(pe["queue"]) - 1
+    else:
+        for i, slot in enumerate(pe["queue"][core_i]):
+            if slot == (0, -1):
+                return i, core_i
+    return -1, -1
 
 
 def is_core_free(queue):

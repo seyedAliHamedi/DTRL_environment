@@ -19,7 +19,7 @@ devices_config = {
         "battery_capacity": (36000, 40000),
         "error_rate": (0.005, 0.01),
         "safe": (0.1, 0.9),
-        "maxQueue": 3
+        "maxQueue": 5
     },
     "mec": {
         "num_devices": 0,
