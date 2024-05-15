@@ -85,7 +85,7 @@ class State:
                 "finishedTasks": [],
                 "assignedTask": None,
                 "runningTasks": [],
-                "remainingTasks": job["tasks_ID"],
+                "remainingTasks": [],
                 "remainingDeadline": job["deadline"],
             }
 
@@ -114,10 +114,16 @@ class State:
         self.__remove_finished_active_jobs()
 
     def __add_new_active_jobs(self, new_tasks):
+        print(f"new window{new_tasks}")
         for task in new_tasks:
             job_id = Database.get_task(task)["job_id"]
             if not self.__is_active_job(job_id):
                 self._set_jobs([Database.get_job(job_id)])
+            self.__add_task_to_active_job(task)
+
+    def __add_task_to_active_job(self, task):
+        job_id = Database.get_task(task)["job_id"]
+        self._jobs[job_id]["remainingTasks"].append(task)
 
     def __is_active_job(self, job_ID):
         for job_ID_key in self._jobs.keys():
@@ -191,10 +197,13 @@ class State:
                     queue_shift_left(current_queue)
                 else:
                     current_queue[0] = (current_queue[0][0] - 1, current_queue[0][1])
-            for i, item in enumerate(deleting_queues_on_pe):
-                del pe["queue"][item - i]
-                del pe["occupiedCores"][item - i]
-                del pe["energyConsumption"][item - i]
+            self.__remove_unused_cores_cloud(pe, deleting_queues_on_pe)
+
+    def __remove_unused_cores_cloud(self, pe, core_list):
+        for i, item in enumerate(core_list):
+            del pe["queue"][item - i]
+            del pe["occupiedCores"][item - i]
+            del pe["energyConsumption"][item - i]
 
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
@@ -237,3 +246,11 @@ def is_core_free(queue):
 def queue_shift_left(queue):
     queue.pop(0)
     queue.append((0, -1))
+
+
+def is_already_added_to_job(task, job_task_list):
+    for item in job_task_list:
+        if task == item:
+            return True
+        else:
+            return False

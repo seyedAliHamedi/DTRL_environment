@@ -16,13 +16,14 @@ class WindowManager:
             cls._instance.__max_jobs = config["max_jobs"]
             cls._instance.__window_size = config["size"]
             cls._instance.current_cycle = 1
-            cls._instance.__cycle = 3
+            cls._instance.__cycle = config["clock"]
             cls._instance.active_jobs_ID = []
         return cls._instance
 
     def run(self):
         if self.current_cycle != self.__cycle:
             self.current_cycle += 1
+            State().set_task_window([])
         else:
             self.current_cycle = 0
             State().set_task_window(self.get_window())

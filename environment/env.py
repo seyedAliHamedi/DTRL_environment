@@ -17,7 +17,7 @@ class Environment:
         self.__runner_flag = True
 
     def run(self):
-        
+        pre_processing = PreProccesing()
         while self.__runner_flag:
             WindowManager().run()
             PreProccesing().run()
