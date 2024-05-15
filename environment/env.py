@@ -10,7 +10,7 @@ from data.configs import environment_config
 class Environment:
 
     def __init__(self):
-        # ! important load db first
+        #! important load db first
         Database().load()
         State().initialize()
         self.cycle_wait = environment_config["environment"]["cycle"]
@@ -19,7 +19,8 @@ class Environment:
     def run(self):
         
         while self.__runner_flag:
-            Agent().run(PreProccesing.process())
             WindowManager().run()
+            PreProccesing().run()
+            Agent().run()
             State().update()
             time.sleep(self.cycle_wait)

@@ -14,6 +14,7 @@ class State:
             cls._instance._PEs = {}
             cls._instance._jobs = {}
             cls._instance._task_window = {}
+            cls._instance._agent_queue = []
         return cls._instance
 
     def initialize(self):
@@ -24,18 +25,30 @@ class State:
 
     def set_task_window(self, task_window):
         self._task_window = task_window
+    
+    def set_agent_queue(self, agent_queue):
+        self._agent_queue = agent_queue    
+    
+    def get_agent_queue(self):
+        return self._agent_queue 
+
+    def get_job(self,job_id):
+        print(job_id)
+        # print(self._jobs)
+        return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
         execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq) * 10
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
-        print(
-            f"assigned task{task_ID}(cl={Database.get_task(task_ID)['computational_load']},et={execution_time}) on core {core_index}(fq={freq}) queue_index {queue_index}")
+
+        print(f"assigned task{task_ID}(cl={Database.get_task(task_ID)['computational_load']},et={execution_time}) on core {core_index}(fq={freq}) queue_index {queue_index}")
+        
         if queue_index == -1:
+            #! punishment exceed queue
             return False
 
         # apply on queue
-
         self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
         job_ID = Database.get_task(task_ID)["job_id"]
         self._jobs[job_ID]["assignedTask"] = task_ID
@@ -47,6 +60,7 @@ class State:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
 
+        #! reward: e+t
         return True
 
     def _init_PEs(self, PEs):
@@ -57,11 +71,11 @@ class State:
                 "batteryLevel": pe["battery_capacity"],
                 "occupiedCores": [0 for core in range(pe["num_cores"])],
                 "energyConsumption": pe["powerIdle"],
-                # time,task_id
-                "queue": [
-                    [(0, -1) for _ in range(pe["maxQueue"])]
-                    for core in range(pe["num_cores"])
-                ],
+                # queue:
+                # core 1 queue ...
+                # core 2 queue ...
+                # each queue element: (execution_time,task_id)
+                "queue": [[(0, -1) for _ in range(pe["maxQueue"])]for core in range(pe["num_cores"])],
             }
 
     def _set_jobs(self, jobs):
@@ -136,7 +150,7 @@ class State:
         # TODO : if < 0 return punishment ????
         for job in self._jobs.values():
             job["remainingDeadline"] -= 1
-
+            
     def __remove_assigned_task(self):
         for job in self._jobs.values():
             job["assignedTask"] = None
@@ -149,7 +163,6 @@ class State:
         self.__update_batteries_capp()
 
     def __update_batteries_capp(self):
-        # time
         for pe in self._PEs.values():
             if pe["type"] == "mec" or pe["type"] == "cloud":
                 continue

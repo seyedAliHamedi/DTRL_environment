@@ -12,6 +12,7 @@ class DeviceScheduler:
         self.max_tree_depth = 5
         self.agent = DeviceDDTNode(self.devices,0, self.max_tree_depth)
         self.optimizer = optim.Adam(self.agent.parameters(), lr=0.005)
+        self.selected_device_group = None
 
 
 class DeviceDDTNode(nn.Module):
@@ -38,6 +39,7 @@ class DeviceDDTNode(nn.Module):
 
     def forward(self, x):
         if self.depth == self.max_depth:
+            self.selected_device_group=self.devices
             return self.prob_dist
 
         val = torch.sigmoid(self.alpha * (torch.matmul(x, self.weights.t()) + self.bias))

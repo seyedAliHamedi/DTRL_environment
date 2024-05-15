@@ -10,9 +10,9 @@ class Generator:
     _task_id_counter = 0
     _device_id_counter = 0
     _job_id_counter = 0
-    _devices_path = os.path.join(os.path.dirname(__file__), "devices.csv")
-    _job_path = os.path.join(os.path.dirname(__file__), "jobs.csv")
-    _tasks_path = os.path.join(os.path.dirname(__file__), "tasks.csv")
+    _devices_path = os.path.join(os.path.dirname(__file__), "resources","devices.csv")
+    _job_path = os.path.join(os.path.dirname(__file__),"resources", "jobs.csv")
+    _tasks_path = os.path.join(os.path.dirname(__file__),"resources", "tasks.csv")
 
     @classmethod
     def get_devices(cls, file_path=_devices_path):

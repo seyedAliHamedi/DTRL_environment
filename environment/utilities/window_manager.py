@@ -42,9 +42,6 @@ class WindowManager:
         return window
 
     def __slice(self):
-        self.active_jobs_ID.clear()
-        for i in range(self.__max_jobs):
-            self.active_jobs_ID.append(self.__head_index + i)
         sliced_jobs = Database.get_jobs_window(self.__head_index, self.__max_jobs)
         self.__head_index = self.__head_index + self.__max_jobs
         selected_tasks = []
@@ -54,18 +51,13 @@ class WindowManager:
         random.shuffle(selected_tasks)
         return selected_tasks
 
-    def __update_active_jobs(self):
-        jobs_from_list = []
-        for job_ID in self.active_jobs_ID:
-            jobs_from_list.append(Database.get_job(job_ID))
-        State().init_jobs(jobs_from_list)
 
 
 class PreProccesing:
     def __init__(self):
         self.max_jobs = 5
-        self.active_jobs = {}
-        self.job_pool = {}
+        self.active_jobs_id = []
+        self.job_pool = []
         
 
         ####################
@@ -74,7 +66,7 @@ class PreProccesing:
 
 
     def process(self):
-        for job in self.active_jobs:
+        for job in self.active_jobs_id:
             for task in job['remainingTasks']:
                 if task not in self.agent_queue:
                     #TODO : preprocess             | amin
@@ -82,20 +74,20 @@ class PreProccesing:
 
     def update_active_jobs(self,state_jobs):
         for job in state_jobs :
-            if job not in self.active_jobs:
-                self.active_jobs.append(job)
+            if job not in self.active_jobs_id:
+                self.active_jobs_id.append(State().get_job(job))
 
-        while len(self.active_jobs)>self.max_jobs:
-            job = self.active_jobs.pop()
+        while len(self.active_jobs_id)>self.max_jobs:
+            job = self.active_jobs_id.pop()
             self.job_pool.append(job)
 
-        while len(self.active_jobs)<self.max_jobs and len(self.job_pool)>0:
+        while len(self.active_jobs_id)<self.max_jobs and len(self.job_pool)>0:
             job = self.job_pool.pop(0)
-            self.active_jobs.append(job)
+            self.active_jobs_id.append(job)
 
-    @classmethod
+
     def run(self):
         jobs, _ = State().get()
         self.update_active_jobs(jobs)
         self.process()
-        return self.agent_queue
+        State().set_agent_queue(self.agent_queue)

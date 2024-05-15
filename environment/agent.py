@@ -33,7 +33,8 @@ class Agent:
 
         return cls._instance
 
-    def run(self, task_queue):
+    def run(self ):
+        task_queue = State().get_agent_queue()
         if len(task_queue) == 0:
             return
         job_state, pe_state = State().get()
