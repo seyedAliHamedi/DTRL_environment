@@ -31,14 +31,24 @@ class State:
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
         if queue_index == -1:
             return False
+        
         # apply on queue
         print(task_ID, Database.get_task(task_ID)["computational_load"], freq, execution_time)
+
+
+        self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
         self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
         job_ID = Database.get_task(task_ID)["job_id"]
         self._jobs[job_ID]["assignedTask"] = task_ID
+        
+
         # apply energyConsumption
-        capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
-        self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
+        if self._PEs[pe_ID]['type'] == 'cloud':
+            self._PEs[pe_ID]["energyConsumption"][core_index] = volt 
+        else:
+            capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
+            self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
+        
         return True
 
     def _init_PEs(self, PEs):

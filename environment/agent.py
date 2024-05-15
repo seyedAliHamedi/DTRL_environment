@@ -51,14 +51,21 @@ class Agent:
         selected_device = current_devices[option]
         selected_device_index = self.devices.index(selected_device)
 
-        sub_state = get_input(current_task, {0: pe_state[selected_device['id']]})
-        action_logits = self.core(sub_state, selected_device_index)
-        action_probs = F.softmax(action_logits, dim=-1)
-        selected_core_index = action = torch.multinomial(action_probs, num_samples=1).squeeze().item()
-        selected_core = selected_device["voltages_frequencies"][selected_core_index]
+        if selected_device['type']!="cloud":
+            sub_state = get_input(current_task, {0: pe_state[selected_device['id']]})
+            action_logits = self.core(sub_state, selected_device_index)
+            action_probs = F.softmax(action_logits, dim=-1)
+            selected_core_index = action = torch.multinomial(action_probs, num_samples=1).squeeze().item()
+            selected_core = selected_device["voltages_frequencies"][selected_core_index]
+            dvfs = selected_core[np.random.randint(0, 3)]
+      
+
 
         # TODO : local scheduler
-        dvfs = selected_core[np.random.randint(0, 3)]
+        if selected_device['type']=="cloud":
+            selected_core_index = -1
+            i = np.random.randint(0,1)
+            dvfs = [(50000, 13.85), (80000, 24.28)][i]
         print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
         reward = State().apply_action(selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
         return
