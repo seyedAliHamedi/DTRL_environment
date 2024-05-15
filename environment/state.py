@@ -29,26 +29,24 @@ class State:
         execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq) * 10
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
+        print(
+            f"assigned task{task_ID}(cl={Database.get_task(task_ID)['computational_load']},et={execution_time}) on core {core_index}(fq={freq}) queue_index {queue_index}")
         if queue_index == -1:
             return False
-        
+
         # apply on queue
-        print(task_ID, Database.get_task(task_ID)["computational_load"], freq, execution_time)
 
-
-        self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
         self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
         job_ID = Database.get_task(task_ID)["job_id"]
         self._jobs[job_ID]["assignedTask"] = task_ID
-        
 
         # apply energyConsumption
         if self._PEs[pe_ID]['type'] == 'cloud':
-            self._PEs[pe_ID]["energyConsumption"][core_index] = volt 
+            self._PEs[pe_ID]["energyConsumption"][core_index] = volt
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
-        
+
         return True
 
     def _init_PEs(self, PEs):
@@ -171,17 +169,20 @@ class State:
                 current_queue = pe["queue"][core_index]
                 # if time of this slot in queue is 0
                 if current_queue[0][0] == 0:
+                    if current_queue[0][1] != -1:
+                        finished_task_ID = current_queue[0][1]
+                        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",finished_task_ID)
+                        self.__task_finished(finished_task_ID)
                     if pe["type"] == "cloud":
                         deleting_queues_on_pe.append(core_index)
                         continue
-                    if current_queue[0][1] != -1:
-                        finished_task_ID = current_queue[0][1]
-                        self.__task_finished(finished_task_ID)
                     queue_shift_left(current_queue)
                 else:
                     current_queue[0] = (current_queue[0][0] - 1, current_queue[0][1])
             for item in deleting_queues_on_pe:
                 del pe["queue"][item]
+                del pe["occupiedCores"][item]
+                del pe["energyConsumption"][item]
 
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
@@ -202,6 +203,9 @@ class State:
 def find_place(pe, core_i):
     if pe["type"] == "cloud":
         pe["queue"].append([])
+        pe["queue"][-1].append((0, -1))
+        pe["energyConsumption"].append(0)
+        pe["occupiedCores"].append(1)
         return 0, len(pe["queue"]) - 1
     else:
         for i, slot in enumerate(pe["queue"][core_i]):
