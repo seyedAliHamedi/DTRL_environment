@@ -17,9 +17,9 @@ class Environment:
         self.__runner_flag = True
 
     def run(self):
-        
+        pre_processing = PreProccesing()
         while self.__runner_flag:
-            Agent().run(PreProccesing.process())
+            Agent().run(pre_processing.process())
             WindowManager().run()
             State().update()
             time.sleep(self.cycle_wait)

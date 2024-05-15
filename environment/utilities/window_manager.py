@@ -16,13 +16,14 @@ class WindowManager:
             cls._instance.__max_jobs = config["max_jobs"]
             cls._instance.__window_size = config["size"]
             cls._instance.current_cycle = 1
-            cls._instance.__cycle = 3
+            cls._instance.__cycle = config["clock"]
             cls._instance.active_jobs_ID = []
         return cls._instance
 
     def run(self):
         if self.current_cycle != self.__cycle:
             self.current_cycle += 1
+            State().set_task_window([])
         else:
             self.current_cycle = 0
             State().set_task_window(self.get_window())
@@ -54,48 +55,18 @@ class WindowManager:
         random.shuffle(selected_tasks)
         return selected_tasks
 
-    def __update_active_jobs(self):
-        jobs_from_list = []
-        for job_ID in self.active_jobs_ID:
-            jobs_from_list.append(Database.get_job(job_ID))
-        State().init_jobs(jobs_from_list)
-
 
 class PreProccesing:
     def __init__(self):
-        self.max_jobs = 5
-        self.active_jobs = {}
-        self.job_pool = {}
-        
-
-        ####################
-        self.wait_queue = []
-        self.agent_queue = []
-
-
-    def process(self):
-        for job in self.active_jobs:
-            for task in job['remainingTasks']:
-                if task not in self.agent_queue:
-                    #TODO : preprocess             | amin
-                    self.agent_queue.append(task)
-
-    def update_active_jobs(self,state_jobs):
-        for job in state_jobs :
-            if job not in self.active_jobs:
-                self.active_jobs.append(job)
-
-        while len(self.active_jobs)>self.max_jobs:
-            job = self.active_jobs.pop()
-            self.job_pool.append(job)
-
-        while len(self.active_jobs)<self.max_jobs and len(self.job_pool)>0:
-            job = self.job_pool.pop(0)
-            self.active_jobs.append(job)
+        pass
 
     @classmethod
-    def run(self):
+    def process(cls):
         jobs, _ = State().get()
-        self.update_active_jobs(jobs)
-        self.process()
-        return self.agent_queue
+
+        task_list = []
+        for id in jobs.keys():
+            for task in jobs[id]['remainingTasks']:
+                task_list.append(task)
+
+        return task_list
