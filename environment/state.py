@@ -89,7 +89,7 @@ class State:
         print(pd.DataFrame(self._PEs), '\n')
         print("Jobs::")
         print(pd.DataFrame(self._jobs), "\n")
-        print("|||||||||||||||||||||||||||||||")
+        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
     ########  UPDATE JOBS ####### 
     def __update_jobs(self):
@@ -171,7 +171,6 @@ class State:
                 if current_queue[0][0] == 0:
                     if current_queue[0][1] != -1:
                         finished_task_ID = current_queue[0][1]
-                        print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",finished_task_ID)
                         self.__task_finished(finished_task_ID)
                     if pe["type"] == "cloud":
                         deleting_queues_on_pe.append(core_index)
@@ -179,14 +178,15 @@ class State:
                     queue_shift_left(current_queue)
                 else:
                     current_queue[0] = (current_queue[0][0] - 1, current_queue[0][1])
-            for item in deleting_queues_on_pe:
-                del pe["queue"][item]
-                del pe["occupiedCores"][item]
-                del pe["energyConsumption"][item]
+            for i, item in enumerate(deleting_queues_on_pe):
+                del pe["queue"][item - i]
+                del pe["occupiedCores"][item - i]
+                del pe["energyConsumption"][item - i]
 
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
         self._jobs[job_ID]["finishedTasks"].append(task_ID)
+        print(f"removing task{task_ID} from running task on job{job_ID}")
         self._jobs[job_ID]["runningTasks"].remove(task_ID)
 
     def __update_occupied_cores(self):
