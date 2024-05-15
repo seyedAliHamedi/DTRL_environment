@@ -33,8 +33,6 @@ class State:
         return self._agent_queue 
 
     def get_job(self,job_id):
-        print(job_id)
-        # print(self._jobs)
         return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):

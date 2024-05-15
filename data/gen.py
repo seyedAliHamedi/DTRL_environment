@@ -42,7 +42,7 @@ class Generator:
     #   battery capacity in W*micro-second : 36000 Ws - Equivalent to 36000*10^3 W*milli-second, 10Wh or
 
     @classmethod
-    def _generate_device(cls, config=devices_config):
+    def _generate_device(cls, config=devices_config,file_path=_devices_path):
         devices_data = []
         for type in ("iot", "mec", "cloud"):
             config = devices_config[type]
@@ -108,9 +108,7 @@ class Generator:
 
         devices = pd.DataFrame(devices_data)
         devices['name'] = devices.apply(lambda row: row['type'] + str(row.name), axis=1)
-        devices.to_csv(
-            os.path.join(os.path.dirname(__file__), "devices.csv"), index=False
-        )
+        devices.to_csv(file_path)
         return devices
 
     @classmethod
@@ -128,7 +126,7 @@ class Generator:
             return Generator._generate_jobs()
 
     @classmethod
-    def _generate_jobs(cls, config=jobs_config):
+    def _generate_jobs(cls, config=jobs_config,file_path_jobs=_job_path, file_path_tasks=_tasks_path):
 
         max_deadline = config["max_deadline"]
         max_task_per_depth = config["max_task_per_depth"]
@@ -199,8 +197,8 @@ class Generator:
         jobs = pd.DataFrame(jobs_data)
         tasks = pd.DataFrame(tasks_data)
         tasks.set_index("id", inplace=True)
-        jobs.to_csv(os.path.join(os.path.dirname(__file__), "jobs.csv"), index=False)
-        tasks.to_csv(os.path.join(os.path.dirname(__file__), "tasks.csv"), index=False)
+        jobs.to_csv(file_path_jobs, index=False)
+        tasks.to_csv(file_path_tasks, index=False)
         return jobs, tasks
 
     @classmethod

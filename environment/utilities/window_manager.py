@@ -57,38 +57,48 @@ class WindowManager:
 class PreProccesing:
     def __init__(self):
         self.max_jobs = 5
-        self.active_jobs_id = []
+        self.active_jobs = []
         self.job_pool = []
         
 
         ####################
         self.wait_queue = []
-        self.agent_queue = []
+        self.queue = []
 
 
     def process(self):
+        #TODO dependecy --> wait_queuq
+        #TODO mobility --> order in agent_queue
+        # agent pop from the agent_queue in state
         for job in self.active_jobs_id:
             for task in job['remainingTasks']:
-                if task not in self.agent_queue:
-                    #TODO : preprocess             | amin
-                    self.agent_queue.append(task)
+                if task not in self.queue:
+                    self.queue.append(task)
 
     def update_active_jobs(self,state_jobs):
-        for job in state_jobs :
-            if job not in self.active_jobs_id:
-                self.active_jobs_id.append(State().get_job(job))
+        # add to active jobs
+        for job_id in state_jobs :
+            if State().get_job(job_id) not in self.active_jobs:
+                self.active_jobs.append(State().get_job(job))
 
-        while len(self.active_jobs_id)>self.max_jobs:
-            job = self.active_jobs_id.pop()
+        # add to job_pool
+        while len(self.active_jobs)>self.max_jobs:
+            job = self.active_jobs.pop()
             self.job_pool.append(job)
 
-        while len(self.active_jobs_id)<self.max_jobs and len(self.job_pool)>0:
+        # remove from job_pool
+        while len(self.active_jobs)<self.max_jobs and len(self.job_pool)>0:
             job = self.job_pool.pop(0)
-            self.active_jobs_id.append(job)
+            self.active_jobs.append(job)
+
+        # remove from active jobs
+        for job in self.active_jobs:
+            if len(job['remainingTasks'])==0:
+                self.active_jobs.remove(job)
 
 
     def run(self):
         jobs, _ = State().get()
         self.update_active_jobs(jobs)
         self.process()
-        State().set_agent_queue(self.agent_queue)
+        State().set_agent_queue(self.queue)
