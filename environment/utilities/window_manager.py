@@ -53,52 +53,60 @@ class WindowManager:
         return selected_tasks
 
 
-
-class PreProccesing:
+class Preprocessing:
     def __init__(self):
         self.max_jobs = 5
-        self.active_jobs = []
-        self.job_pool = []
-        
+        self.active_jobs = {}
+        self.job_pool = {}
 
         ####################
         self.wait_queue = []
         self.queue = []
 
-
     def process(self):
-        #TODO dependecy --> wait_queuq
-        #TODO mobility --> order in agent_queue
+        # TODO dependecy --> wait_queuq
+        # TODO mobility --> order in agent_queue
         # agent pop from the agent_queue in state
-        for job in self.active_jobs_id:
+        for job in self.active_jobs.values():
             for task in job['remainingTasks']:
                 if task not in self.queue:
                     self.queue.append(task)
 
-    def update_active_jobs(self,state_jobs):
+    def update_active_jobs(self, state_jobs):
         # add to active jobs
-        for job_id in state_jobs :
-            if State().get_job(job_id) not in self.active_jobs:
-                self.active_jobs.append(State().get_job(job))
-
-        # add to job_pool
-        while len(self.active_jobs)>self.max_jobs:
-            job = self.active_jobs.pop()
-            self.job_pool.append(job)
-
-        # remove from job_pool
-        while len(self.active_jobs)<self.max_jobs and len(self.job_pool)>0:
-            job = self.job_pool.pop(0)
-            self.active_jobs.append(job)
+        for job_ID in state_jobs.keys():
+            if job_ID not in self.active_jobs.keys():
+                self.active_jobs[job_ID] = state_jobs[job_ID]
+            else:
+                # update job values from state
+                self.active_jobs[job_ID] = state_jobs[job_ID]
 
         # remove from active jobs
-        for job in self.active_jobs:
-            if len(job['remainingTasks'])==0:
-                self.active_jobs.remove(job)
+        deleting_list = []
+        for job_ID in self.active_jobs.keys():
+            job = self.active_jobs[job_ID]
+            if len(job['finishedTasks']) + len(job["runningTasks"]) == job["task_count"]:
+                deleting_list.append(job_ID)
+        for item in deleting_list:
+            self.active_jobs.pop(item)
+
+        # add to job_pool
+        while len(self.active_jobs.keys()) > self.max_jobs:
+            job_ID, job = self.active_jobs.popitem()
+            self.job_pool[job_ID] = job
+
+        # remove from job_pool
+        while (len(self.active_jobs.keys()) < self.max_jobs) and len(self.job_pool.keys()) > 0:
+            job_ID, job = self.job_pool.popitem()
+            self.active_jobs[job_ID] = job
 
 
     def run(self):
         jobs, _ = State().get()
         self.update_active_jobs(jobs)
         self.process()
+        print(f"active_jobs: {self.active_jobs.keys()}")
+        print(f"job_pool: {self.job_pool.keys()}")
+        print(f"wait_queue: {self.wait_queue}")
+        print(f"queue: {self.queue}")
         State().set_agent_queue(self.queue)

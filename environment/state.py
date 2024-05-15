@@ -25,14 +25,14 @@ class State:
 
     def set_task_window(self, task_window):
         self._task_window = task_window
-    
-    def set_agent_queue(self, agent_queue):
-        self._agent_queue = agent_queue    
-    
-    def get_agent_queue(self):
-        return self._agent_queue 
 
-    def get_job(self,job_id):
+    def set_agent_queue(self, agent_queue):
+        self._agent_queue = agent_queue
+
+    def get_agent_queue(self):
+        return self._agent_queue
+
+    def get_job(self, job_id):
         return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
@@ -40,10 +40,8 @@ class State:
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
 
-        print(f"assigned task{task_ID}(cl={Database.get_task(task_ID)['computational_load']},et={execution_time}) on core {core_index}(fq={freq}) queue_index {queue_index}")
-        
         if queue_index == -1:
-            #! punishment exceed queue
+            # ! punishment exceed queue
             return False
 
         # apply on queue
@@ -58,7 +56,7 @@ class State:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
 
-        #! reward: e+t
+        # ! reward: e+t
         return True
 
     def _init_PEs(self, PEs):
@@ -73,7 +71,7 @@ class State:
                 # core 1 queue ...
                 # core 2 queue ...
                 # each queue element: (execution_time,task_id)
-                "queue": [[(0, -1) for _ in range(pe["maxQueue"])]for core in range(pe["num_cores"])],
+                "queue": [[(0, -1) for _ in range(pe["maxQueue"])] for core in range(pe["num_cores"])],
             }
 
     def _set_jobs(self, jobs):
@@ -154,7 +152,7 @@ class State:
         # TODO : if < 0 return punishment ????
         for job in self._jobs.values():
             job["remainingDeadline"] -= 1
-            
+
     def __remove_assigned_task(self):
         for job in self._jobs.values():
             job["assignedTask"] = None
@@ -206,7 +204,6 @@ class State:
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
         self._jobs[job_ID]["finishedTasks"].append(task_ID)
-        print(f"removing task{task_ID} from running task on job{job_ID}")
         self._jobs[job_ID]["runningTasks"].remove(task_ID)
 
     def __update_occupied_cores(self):
