@@ -63,15 +63,39 @@ class WindowManager:
 
 class PreProccesing:
     def __init__(self):
-        pass
+        self.max_jobs = 5
+        self.active_jobs = {}
+        self.job_pool = {}
+        
+
+        ####################
+        self.wait_queue = []
+        self.agent_queue = []
+
+
+    def process(self):
+        for job in self.active_jobs:
+            for task in job['remainingTasks']:
+                if task not in self.agent_queue:
+                    #TODO : preprocess             | amin
+                    self.agent_queue.append(task)
+
+    def update_active_jobs(self,state_jobs):
+        for job in state_jobs :
+            if job not in self.active_jobs:
+                self.active_jobs.append(job)
+
+        while len(self.active_jobs)>self.max_jobs:
+            job = self.active_jobs.pop()
+            self.job_pool.append(job)
+
+        while len(self.active_jobs)<self.max_jobs and len(self.job_pool)>0:
+            job = self.job_pool.pop(0)
+            self.active_jobs.append(job)
 
     @classmethod
-    def process(self):
+    def run(self):
         jobs, _ = State().get()
-
-        task_list = []
-        for id in jobs.keys():
-            for task in jobs[id]['remainingTasks']:
-                task_list.append(task)
-
-        return task_list
+        self.update_active_jobs(jobs)
+        self.process()
+        return self.agent_queue
