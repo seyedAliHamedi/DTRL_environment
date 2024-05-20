@@ -8,10 +8,11 @@ class Database:
 
     @classmethod
     def load(cls):
-        if not Database._devices: 
+        if not Database._devices:
             Database._devices = Generator.get_devices()
         if not Database._jobs or not Database._tasks:
             Database._jobs, Database._tasks = Generator.get_jobs()
+
     # ------------ all ----------
     @classmethod
     def get_all_devices(cls):
@@ -24,7 +25,6 @@ class Database:
     @classmethod
     def get_all_tasks(cls):
         return cls._tasks.to_dict(orient='records')
-
 
     # ---------- multiple ------------
     @classmethod
@@ -54,5 +54,17 @@ class Database:
 
     # ---------- helper  ------------
     @classmethod
-    def get_jobs_window(cls,head,count):
-        return cls._jobs.iloc[head:head+count].to_dict(orient='records')
+    def get_jobs_window(cls, head, count):
+        return cls._jobs.iloc[head:head + count].to_dict(orient='records')
+
+    @classmethod
+    def get_task_successors(cls, task_ID):
+        owner_job = Database.get_job(Database.get_task(task_ID)['job_id'])
+        job_task_list = owner_job['tasks_ID']
+        successor_list = []
+        for task in job_task_list:
+            selected_task = Database.get_task(task)
+            if task_ID in selected_task["predecessors"]:
+                successor_list.append(task)
+        return successor_list
+

@@ -34,11 +34,12 @@ class Agent:
         return cls._instance
 
     def run(self ):
-        job_state, pe_state = State().get()
         task_queue = State().get_agent_queue()
         if len(task_queue) == 0:
             return
-        current_task_id =task_queue.pop(0)
+        job_state, pe_state = State().get()
+
+        current_task_id = task_queue.pop(0)
         current_task = Database().get_task(current_task_id)
         input_state = get_input(current_task, pe_state)
         input_state = torch.tensor(input_state, dtype=torch.float32)

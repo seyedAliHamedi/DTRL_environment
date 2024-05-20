@@ -68,25 +68,36 @@ class Preprocessing:
         return cls._instance
 
     def process(self):
-        # TODO mobility --> order in agent_queue
-
+        # add window tasks to wait queue
         for task in State().get_task_window():
             self.wait_queue.append(task)
 
+        # add ready task from wait queue to main queue
         for task in self.wait_queue:
-            current_task =Database.get_task(task)
-            task_job =self.active_jobs[current_task['job_id']]
-            if self._is_ready_task(current_task,task_job):
+            if self._is_ready_task(task):
                 self.queue.append(task)
                 self.wait_queue.remove(task)
-    def _sort_by_mobility(self):
+
+        # sort main queue by mobility
+        self.__sort_by_mobility()
+
+    def __sort_by_mobility(self):
+        mobility_dict = {}
         for task in self.queue:
-            # sort based on mobility
-            # mobility = num_of_successores
-            pass
-    def _is_ready_task(self, task, state_job):
-        if set(task['predecessors']) <=  set(state_job['finishedTasks']):
-            print(f" task : {task['id']} pred : { task['predecessors']} in job {state_job}")
+            mobility_dict[task] = len(Database.get_task_successors(task))
+        self.queue = list({k: v for k, v in sorted(mobility_dict.items(), key=lambda item: item[1])}.keys())
+
+    def _is_ready_task(self, task):
+        selected_task = Database.get_task(task)
+        task_job_id = selected_task['job_id']
+        if task_job_id not in self.active_jobs:
+            return False
+        state_job = self.active_jobs[task_job_id]
+        task_pred = copy(selected_task['predecessors'])
+        for task in state_job['finishedTasks']:
+            if task in task_pred:
+                task_pred.remove(task)
+        if len(task_pred) == 0:
             return True
         else:
             return False
