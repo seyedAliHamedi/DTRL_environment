@@ -1,4 +1,5 @@
 import random
+from copy import copy
 
 from data.db import Database
 from data.configs import environment_config
@@ -54,23 +55,55 @@ class WindowManager:
 
 
 class Preprocessing:
-    def __init__(self):
-        self.max_jobs = 5
-        self.active_jobs = {}
-        self.job_pool = {}
+    _instance = None
 
-        ####################
-        self.wait_queue = []
-        self.queue = []
+    def __new__(cls, config=environment_config['window']):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance.max_jobs = 5
+            cls._instance.active_jobs = {}
+            cls._instance.job_pool = {}
+            cls._instance.wait_queue = []
+            cls._instance.queue = []
+        return cls._instance
 
     def process(self):
         # TODO dependecy --> wait_queuq
         # TODO mobility --> order in agent_queue
         # agent pop from the agent_queue in state
-        for job in self.active_jobs.values():
-            for task in job['remainingTasks']:
-                if task not in self.queue:
-                    self.queue.append(task)
+        # for job in self.active_jobs.values():
+        #     for task in job['remainingTasks']:
+        #         if task not in self.queue:
+        #             if self.__is_runnable_task(task, job):
+        #                 print(f"task{task} added to queue with pred(){Database.get_task(task)['predecessors']}")
+        #                 self.queue.append(task)
+        #             else:
+        #                 self.wait_queue.append(task)
+        #
+        # for task in self.wait_queue:
+        #     if self.__is_runnable_task(task, self.active_jobs[Database.get_task(task)['job_id']]):
+        #         print(f"removed task{task} from waiting queue to main queue (pred flag True)")
+        #         self.queue.append(task)
+        #         self.wait_queue.remove(task)
+
+        for task in State().get_task_window():
+            self.wait_queue.append(task)
+
+        for task in self.wait_queue:
+            if self.__is_runnable_task(task, self.active_jobs[Database.get_task(task)['job_id']]):
+                self.queue.append(task)
+                self.wait_queue.remove(task)
+
+    def __is_runnable_task(self, task_ID, state_job):
+        task = Database.get_task(task_ID)
+        task_pred = copy(task['predecessors'])
+        for task in state_job['finishedTasks']:
+            if task in task_pred:
+                task_pred.remove(task)
+        if len(task_pred) == 0:
+            return True
+        else:
+            return False
 
     def update_active_jobs(self, state_jobs):
         # add to active jobs
@@ -99,7 +132,6 @@ class Preprocessing:
         while (len(self.active_jobs.keys()) < self.max_jobs) and len(self.job_pool.keys()) > 0:
             job_ID, job = self.job_pool.popitem()
             self.active_jobs[job_ID] = job
-
 
     def run(self):
         jobs, _ = State().get()

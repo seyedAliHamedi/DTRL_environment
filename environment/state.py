@@ -26,6 +26,9 @@ class State:
     def set_task_window(self, task_window):
         self._task_window = task_window
 
+    def get_task_window(self):
+        return self._task_window
+
     def set_agent_queue(self, agent_queue):
         self._agent_queue = agent_queue
 
@@ -36,7 +39,7 @@ class State:
         return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq) * 10
+        execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
 
