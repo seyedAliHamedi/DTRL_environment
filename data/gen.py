@@ -196,7 +196,6 @@ class Generator:
 
         jobs = pd.DataFrame(jobs_data)
         tasks = pd.DataFrame(tasks_data)
-        tasks.set_index("id", inplace=True)
         jobs.to_csv(file_path_jobs, index=False)
         tasks.to_csv(file_path_tasks, index=False)
         return jobs, tasks

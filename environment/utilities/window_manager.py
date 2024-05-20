@@ -68,39 +68,25 @@ class Preprocessing:
         return cls._instance
 
     def process(self):
-        # TODO dependecy --> wait_queuq
         # TODO mobility --> order in agent_queue
-        # agent pop from the agent_queue in state
-        # for job in self.active_jobs.values():
-        #     for task in job['remainingTasks']:
-        #         if task not in self.queue:
-        #             if self.__is_runnable_task(task, job):
-        #                 print(f"task{task} added to queue with pred(){Database.get_task(task)['predecessors']}")
-        #                 self.queue.append(task)
-        #             else:
-        #                 self.wait_queue.append(task)
-        #
-        # for task in self.wait_queue:
-        #     if self.__is_runnable_task(task, self.active_jobs[Database.get_task(task)['job_id']]):
-        #         print(f"removed task{task} from waiting queue to main queue (pred flag True)")
-        #         self.queue.append(task)
-        #         self.wait_queue.remove(task)
 
         for task in State().get_task_window():
             self.wait_queue.append(task)
 
         for task in self.wait_queue:
-            if self.__is_runnable_task(task, self.active_jobs[Database.get_task(task)['job_id']]):
+            current_task =Database.get_task(task)
+            task_job =self.active_jobs[current_task['job_id']]
+            if self._is_ready_task(current_task,task_job):
                 self.queue.append(task)
                 self.wait_queue.remove(task)
-
-    def __is_runnable_task(self, task_ID, state_job):
-        task = Database.get_task(task_ID)
-        task_pred = copy(task['predecessors'])
-        for task in state_job['finishedTasks']:
-            if task in task_pred:
-                task_pred.remove(task)
-        if len(task_pred) == 0:
+    def _sort_by_mobility(self):
+        for task in self.queue:
+            # sort based on mobility
+            # mobility = num_of_successores
+            pass
+    def _is_ready_task(self, task, state_job):
+        if set(task['predecessors']) <=  set(state_job['finishedTasks']):
+            print(f" task : {task['id']} pred : { task['predecessors']} in job {state_job}")
             return True
         else:
             return False
