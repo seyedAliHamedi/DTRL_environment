@@ -138,4 +138,14 @@ class Preprocessing:
         print(f"job_pool: {self.job_pool.keys()}")
         print(f"wait_queue: {self.wait_queue}")
         print(f"queue: {self.queue}")
-        State().set_agent_queue(self.queue)
+
+        
+    def get_agent_queue(self):
+        agent_queue ={}
+        for job_ID in self.active_jobs.keys():
+            agent_queue[job_ID] = []
+            for task_ID in self.queue:
+                task = Database().get_task(task_ID)
+                if task['job_id'] == job_ID:
+                    agent_queue[job_ID].append(task_ID)
+        return agent_queue

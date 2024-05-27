@@ -9,6 +9,7 @@ from data.db import Database
 from environment.dtrl.core_scheduler import CoreScheduler
 from environment.dtrl.device_scheduler import DeviceScheduler
 from environment.state import State
+from environment.utilities.window_manager import Preprocessing
 
 
 class Agent:
@@ -33,10 +34,20 @@ class Agent:
 
         return cls._instance
 
-    def run(self ):
-        task_queue = State().get_agent_queue()
+    def run(self):
+        queue = Preprocessing().get_agent_queue()
+        for job_ID in queue.keys():
+            task_queue = queue[job_ID]
+            self.schedule(task_queue,job_ID
+                          )
+    def schedule(self,task_queue,job_id):
         if len(task_queue) == 0:
             return
+        if job_id not in self.log_probs: 
+            self.log_probs[job_id] = []
+            self.device_values[job_id] = []
+            self.core_values[job_id] = []
+            self.rewards[job_id] = []
         job_state, pe_state = State().get()
 
         current_task_id = task_queue.pop(0)
@@ -52,6 +63,7 @@ class Agent:
         selected_device = current_devices[option]
         selected_device_index = self.devices.index(selected_device)
 
+        # TODO : local scheduler
         if selected_device['type']!="cloud":
             sub_state = get_input(current_task, {0: pe_state[selected_device['id']]})
             action_logits = self.core(sub_state, selected_device_index)
@@ -59,32 +71,30 @@ class Agent:
             selected_core_index = action = torch.multinomial(action_probs, num_samples=1).squeeze().item()
             selected_core = selected_device["voltages_frequencies"][selected_core_index]
             dvfs = selected_core[np.random.randint(0, 3)]
-      
-
-
-        # TODO : local scheduler
         if selected_device['type']=="cloud":
             selected_core_index = -1
             i = np.random.randint(0,1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
+
         print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
         reward = State().apply_action(selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
-        return
+        
+        device_value, core_value = 0,0
+        # self.value_net()
 
-        device_value, core_value = self.value_net()
+        self.log_probs[job_id].append(action_probs)
+        self.device_values[job_id].append(device_value)
+        self.core_values[job_id].append(core_value)
+        self.rewards[job_id].append(reward)
 
-        self.log_probs[current_task["job_ID"]].append(action_probs)
-        self.device_values[current_task["job_ID"]].append(device_value)
-        self.core_values[current_task["job_ID"]].append(core_value)
-        self.rewards[current_task["job_ID"]].append(reward)
 
-        for job in job_state:
-            if len(job["remainingTasks"]) == 0:
-                self.update_params(job["id"])
-                del self.log_probs[job["id"]]
-                del self.device_values[job["id"]]
-                del self.core_values[job["id"]]
-                del self.rewards[job["id"]]
+        job_state = State().get_job(job_id)
+        if len(job_state["remainingTasks"]) == 0:
+            self.update_params(job_id)
+            del self.log_probs[job_id]
+            del self.device_values[job_id]
+            del self.core_values[job_id]
+            del self.rewards[job_id]
 
     def updata_params(self, job_id, log_probs, core_values, rewards):
 

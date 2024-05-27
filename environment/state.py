@@ -14,7 +14,6 @@ class State:
             cls._instance._PEs = {}
             cls._instance._jobs = {}
             cls._instance._task_window = {}
-            cls._instance._agent_queue = []
         return cls._instance
 
     def initialize(self):
@@ -28,12 +27,6 @@ class State:
 
     def get_task_window(self):
         return self._task_window
-
-    def set_agent_queue(self, agent_queue):
-        self._agent_queue = agent_queue
-
-    def get_agent_queue(self):
-        return self._agent_queue
 
     def get_job(self, job_id):
         return self._jobs[job_id]

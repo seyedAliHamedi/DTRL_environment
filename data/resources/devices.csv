@@ -1,0 +1,2 @@
+,id,type,num_cores,voltages_frequencies,ISL,capacitance,powerIdle,battery_capacity,error_rate,acceptableTasks,handleSafeTask,maxQueue,name
+0,0,cloud,-1,[],-1,[],[],-1,0.013772681077298007,"[3, 1, 2, 4]",1,100,cloud0
