@@ -1,6 +1,6 @@
 devices_config = {
     "iot": {
-        "num_devices": 0,
+        "num_devices": 10,
         "num_cores": [4, 2],
         "voltage_frequencies": [
             (1e6, 1.8),
@@ -22,7 +22,7 @@ devices_config = {
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 0,
+        "num_devices": 5,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (6 * 1e8, 0.8),
@@ -43,7 +43,7 @@ devices_config = {
         "maxQueue": 50
     },
     "cloud": {
-        "num_devices": 1,
+        "num_devices": 0,
         "num_cores": -1,
         "voltage_frequencies": ((50000, 13.85), (80000, 24.28)),
         "isl": -1,

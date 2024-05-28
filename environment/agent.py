@@ -10,6 +10,7 @@ from environment.dtrl.core_scheduler import CoreScheduler
 from environment.dtrl.device_scheduler import DeviceScheduler
 from environment.state import State
 from environment.utilities.window_manager import Preprocessing
+import torch.optim as optim
 
 
 class Agent:
@@ -23,13 +24,14 @@ class Agent:
             cls._instance.devices = devices
             cls._instance.core = CoreScheduler(devices)
             cls._instance.device = DeviceScheduler(devices)
-            # cls._instance.value_net = ValueNetwork()
+            cls._instance.value_net = ValueNetwork(input_size=4*len(devices)+5)
+            cls._instance.value_optimizer =optim.Adam(cls._instance.value_net.parameters(), lr=0.005) 
+            cls._instance.criterion = nn.MSELoss()
 
             cls._instance.gamma = 0.95
 
             cls._instance.log_probs = {}
-            cls._instance.device_values = {}
-            cls._instance.core_values = {}
+            cls._instance.values = {}
             cls._instance.rewards = {}
 
         return cls._instance
@@ -38,16 +40,16 @@ class Agent:
         queue = Preprocessing().get_agent_queue()
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
-            self.schedule(task_queue,job_ID
-                          )
+            self.schedule(task_queue,job_ID)
     def schedule(self,task_queue,job_id):
         if len(task_queue) == 0:
             return
+        
         if job_id not in self.log_probs: 
             self.log_probs[job_id] = []
-            self.device_values[job_id] = []
-            self.core_values[job_id] = []
+            self.values[job_id] = []
             self.rewards[job_id] = []
+            
         job_state, pe_state = State().get()
 
         current_task_id = task_queue.pop(0)
@@ -57,44 +59,79 @@ class Agent:
 
         option_logits = self.device.agent(input_state)
         current_devices = self.device.agent.get_devices(input_state)
-        option_probs = F.softmax(option_logits, dim=-1)
-        option = torch.multinomial(option_probs, num_samples=1).squeeze().item()
+        option_dist = torch.distributions.Categorical(F.softmax(option_logits, dim=-1))
+        option = option_dist.sample().item()
 
         selected_device = current_devices[option]
         selected_device_index = self.devices.index(selected_device)
 
-        # TODO : local scheduler
         if selected_device['type']!="cloud":
+
             sub_state = get_input(current_task, {0: pe_state[selected_device['id']]})
-            action_logits = self.core(sub_state, selected_device_index)
-            action_probs = F.softmax(action_logits, dim=-1)
-            selected_core_index = action = torch.multinomial(action_probs, num_samples=1).squeeze().item()
+            action_logits = self.core.forest[selected_device_index](sub_state)
+            action_dist = torch.distributions.Categorical(F.softmax(action_logits, dim=-1))
+            action = action_dist.sample().item()
+            selected_core_index = action
             selected_core = selected_device["voltages_frequencies"][selected_core_index]
             dvfs = selected_core[np.random.randint(0, 3)]
+
         if selected_device['type']=="cloud":
             selected_core_index = -1
             i = np.random.randint(0,1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
 
-        print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
+        # print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
         reward = State().apply_action(selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
         
-        device_value, core_value = 0,0
-        # self.value_net()
+        value=self.value_net(input_state)
+        if len(task_queue)<= 0:
+            temp_features = [0,0,0,0,0]
+            _,next_pe_state = State().get()
+            for pe in next_pe_state.values():
+                temp_features.extend(get_pe_data(pe))
+            next_input_state = torch.tensor(temp_features, dtype=torch.float32)    
+            next_value=self.value_net(next_input_state)
+        else:
+            next_current_task_id = task_queue[0]
+            next_current_task = Database().get_task(current_task_id)
+            _,next_pe_state = State().get()
+            next_input_state = get_input(next_current_task, next_pe_state)
+            next_input_state = torch.tensor(next_input_state, dtype=torch.float32)
+            next_value=self.value_net(next_input_state)
 
-        self.log_probs[job_id].append(action_probs)
-        self.device_values[job_id].append(device_value)
-        self.core_values[job_id].append(core_value)
-        self.rewards[job_id].append(reward)
+        target = reward + self.gamma * next_value.item()
+        target = torch.tensor([target])
+        advantage = target - value
+
+        option_loss = -option_dist.log_prob(torch.tensor(option)) * advantage
+        actor_loss = -action_dist.log_prob(torch.tensor(action)) * advantage
+
+        print(f"loss : {actor_loss+option_loss}")
+
+        critic_loss = self.criterion(value, target)
+
+        self.device.optimizer.zero_grad()
+        option_loss.backward(retain_graph=True)
+        self.device.optimizer.step()
+
+        self.core.optimizers[selected_device_index].zero_grad()
+        actor_loss.backward()
+        self.core.optimizers[selected_device_index].step()
+
+        # Update critic network
+        self.value_optimizer.zero_grad()
+        critic_loss.backward(retain_graph=True)
+        self.value_optimizer.step()
 
 
         job_state = State().get_job(job_id)
         if len(job_state["remainingTasks"]) == 0:
-            self.update_params(job_id)
             del self.log_probs[job_id]
             del self.device_values[job_id]
             del self.core_values[job_id]
             del self.rewards[job_id]
+
+        # TODO : local scheduler
 
     def updata_params(self, job_id, log_probs, core_values, rewards):
 

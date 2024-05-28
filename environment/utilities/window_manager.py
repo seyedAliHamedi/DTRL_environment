@@ -134,10 +134,10 @@ class Preprocessing:
         jobs, _ = State().get()
         self.update_active_jobs(jobs)
         self.process()
-        print(f"active_jobs: {self.active_jobs.keys()}")
-        print(f"job_pool: {self.job_pool.keys()}")
-        print(f"wait_queue: {self.wait_queue}")
-        print(f"queue: {self.queue}")
+        # print(f"active_jobs: {self.active_jobs.keys()}")
+        # print(f"job_pool: {self.job_pool.keys()}")
+        # print(f"wait_queue: {self.wait_queue}")
+        # print(f"queue: {self.queue}")
 
         
     def get_agent_queue(self):

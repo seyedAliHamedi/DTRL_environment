@@ -11,14 +11,12 @@ class CoreScheduler(nn.Module):
         self.num_features = 9
         self.exploration_factor = 0.10
         self.forest = [self.createTree(device) for device in devices if device['type']!='cloud']
-        self.optimizers = [optim.Adam(tree.parameters(), lr=0.01) for tree in self.forest]
+        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005) for tree in self.forest] 
 
     def createTree(self, device):
         return DDTNode(self.num_features, device['num_cores'], 0, np.log2(device['num_cores']),
                                     self.exploration_factor)
 
-    def forward(self, x, device_index):
-        return self.forest[device_index](x)
 
 
 class DDTNode(nn.Module):
