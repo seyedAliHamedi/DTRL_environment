@@ -24,8 +24,9 @@ class Agent:
             cls._instance.devices = devices
             cls._instance.core = CoreScheduler(devices)
             cls._instance.device = DeviceScheduler(devices)
-            cls._instance.value_net = ValueNetwork(input_size=4*len(devices)+5)
-            cls._instance.value_optimizer =optim.Adam(cls._instance.value_net.parameters(), lr=0.005) 
+            net = ValueNetwork(input_size=4*len(devices)+5)
+            cls._instance.value_net =net
+            cls._instance.value_optimizer =optim.Adam(net.parameters(), lr=0.005) 
             cls._instance.criterion = nn.MSELoss()
 
             cls._instance.gamma = 0.95
@@ -82,7 +83,8 @@ class Agent:
 
         # print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
         reward = State().apply_action(selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
-        
+        return
+
         value=self.value_net(input_state)
         if len(task_queue)<= 0:
             temp_features = [0,0,0,0,0]

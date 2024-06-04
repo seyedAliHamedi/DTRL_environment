@@ -11,13 +11,7 @@ class ValueNetwork(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(self.input_size, 256),
             nn.ReLU(),
-            nn.Linear(256, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512,1024),
-            nn.ReLU(),
-            nn.Linear(1024,1),
+            nn.Linear(256,1),
         )
 
     def forward(self,x):
