@@ -1,8 +1,9 @@
 import math
 
 import pandas as pd
-
+import numpy as np
 from data.db import Database
+from environment.utilities.monitor import Monitor
 
 
 class State:
@@ -14,6 +15,7 @@ class State:
             cls._instance._PEs = {}
             cls._instance._jobs = {}
             cls._instance._task_window = {}
+            cls._instance._window_data = {}
         return cls._instance
 
     def initialize(self):
@@ -32,13 +34,13 @@ class State:
         return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        execution_time = math.ceil(Database.get_task(task_ID)["computational_load"] / freq)
+        e = 0
+        execution_time = t = math.ceil(Database.get_task(task_ID)["computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
 
         if queue_index == -1:
-            # ! punishment exceed queue
-            return False
+            return self.reward_function(punish=-100)
 
         # apply on queue
         self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
@@ -48,12 +50,20 @@ class State:
         # apply energyConsumption
         if self._PEs[pe_ID]['type'] == 'cloud':
             self._PEs[pe_ID]["energyConsumption"][core_index] = volt
+            e = volt * t
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
+            e = capacitance * (volt * volt) * freq * t
 
         # ! reward: e+t
-        return True
+        return self.reward_function(e=e, alpha=1, t=t, beta=1)
+
+    def reward_function(self, e=0, alpha=0, t=0, beta=0, punish=0):
+        if punish == 0:
+            return -np.log((e * alpha) + (t * beta))
+        else:
+            return punish
 
     def _init_PEs(self, PEs):
         for pe in PEs:
@@ -82,7 +92,7 @@ class State:
             }
 
     ####### ENVIRONMENT #######
-    def update(self):
+    def update(self, iteration):
 
         # process 1
         self.__update_jobs()
@@ -91,13 +101,13 @@ class State:
 
         self.__remove_assigned_task()
 
-        print("PEs::")
-        print(pd.DataFrame(self._PEs), '\n')
-        print("Jobs::")
-        print(pd.DataFrame(self._jobs), "\n")
-        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+        Monitor().add_log(iteration, log_type='header', content='PES')
+        Monitor().add_log(iteration, log_type='data', content=self._PEs)
+        Monitor().add_log(iteration, log_type='header', content='Jobs')
+        Monitor().add_log(iteration, log_type='data', content=self._jobs)
+        Monitor().add_log(iteration)
 
-    ########  UPDATE JOBS ####### 
+    ########  UPDATE JOBS #######
     def __update_jobs(self):
         self.__update_deadlines()
         self.__add_new_active_jobs(self._task_window)
@@ -106,7 +116,7 @@ class State:
         self.__remove_finished_active_jobs()
 
     def __add_new_active_jobs(self, new_tasks):
-        print(f"new window{new_tasks}")
+        #print(f"new window{new_tasks}")
         for task in new_tasks:
             job_id = Database.get_task(task)["job_id"]
             if not self.__is_active_job(job_id):

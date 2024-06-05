@@ -40,7 +40,7 @@ class Agent:
     def run(self):
         queue = Preprocessing().get_agent_queue()
 
-        print(f"Agent  queue: {queue}")
+        # print(f"Agent  queue: {queue}")
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
             self.schedule(task_queue, job_ID)
@@ -85,8 +85,7 @@ class Agent:
             i = np.random.randint(0, 1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
 
-        print(
-            f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
+        # print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
         reward = State().apply_action(selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
 
         return
@@ -113,7 +112,7 @@ class Agent:
         option_loss = -option_dist.log_prob(torch.tensor(option)) * advantage
         actor_loss = -action_dist.log_prob(torch.tensor(action)) * advantage
 
-        print(f"loss : {actor_loss + option_loss}")
+        # print(f"loss : {actor_loss + option_loss}")
 
         critic_loss = self.criterion(value, target)
 
@@ -162,7 +161,7 @@ class Agent:
         core_values_loss.backward()
         # optimizer_value.step()
 
-        print(f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}")
+        # print(f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}")
 
     def compute_advantages(self, rewards, values, gamma=0.99, normalize=True):
         advantages = []

@@ -53,6 +53,13 @@ class WindowManager:
         random.shuffle(selected_tasks)
         return selected_tasks
 
+    def get_log(self):
+        return {
+            'pool': self._instance.__pool,
+            'current_cycle': self._instance.current_cycle,
+            'active_jobs_ID': self._instance.active_jobs_ID,
+        }
+
 
 class Preprocessing:
     _instance = None
@@ -67,6 +74,14 @@ class Preprocessing:
             cls._instance.queue = []
         return cls._instance
 
+    def get_log(self):
+        return {
+            'active_jobs_ID': self.active_jobs,
+            'job_pool': self.job_pool,
+            'ready_queue': self.queue,
+            'wait_queue': self.wait_queue,
+        }
+
     def process(self):
         # add window tasks to wait queue
         for task in State().get_task_window():
@@ -80,6 +95,7 @@ class Preprocessing:
 
         # sort main queue by mobility
         self.__sort_by_mobility()
+
 
     def __sort_by_mobility(self):
         mobility_dict = {}
