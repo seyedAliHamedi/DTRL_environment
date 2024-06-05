@@ -24,9 +24,9 @@ class Agent:
             cls._instance.devices = devices
             cls._instance.core = CoreScheduler(devices)
             cls._instance.device = DeviceScheduler(devices)
-            net = ValueNetwork(input_size=4*len(devices)+5)
-            cls._instance.value_net =net
-            cls._instance.value_optimizer =optim.Adam(net.parameters(), lr=0.005) 
+            net = ValueNetwork(input_size=4 * len(devices) + 5)
+            cls._instance.value_net = net
+            cls._instance.value_optimizer = optim.Adam(net.parameters(), lr=0.005)
             cls._instance.criterion = nn.MSELoss()
 
             cls._instance.gamma = 0.95
@@ -39,21 +39,26 @@ class Agent:
 
     def run(self):
         queue = Preprocessing().get_agent_queue()
+
+        print(f"Agent  queue: {queue}")
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
-            self.schedule(task_queue,job_ID)
-    def schedule(self,task_queue,job_id):
+            self.schedule(task_queue, job_ID)
+
+    def schedule(self, task_queue, job_id):
         if len(task_queue) == 0:
             return
-        
-        if job_id not in self.log_probs: 
+
+        if job_id not in self.log_probs:
             self.log_probs[job_id] = []
             self.values[job_id] = []
             self.rewards[job_id] = []
-            
+
         job_state, pe_state = State().get()
 
         current_task_id = task_queue.pop(0)
+        Preprocessing().remove_from_queue(current_task_id)
+
         current_task = Database().get_task(current_task_id)
         input_state = get_input(current_task, pe_state)
         input_state = torch.tensor(input_state, dtype=torch.float32)
@@ -66,8 +71,7 @@ class Agent:
         selected_device = current_devices[option]
         selected_device_index = self.devices.index(selected_device)
 
-        if selected_device['type']!="cloud":
-
+        if selected_device['type'] != "cloud":
             sub_state = get_input(current_task, {0: pe_state[selected_device['id']]})
             action_logits = self.core.forest[selected_device_index](sub_state)
             action_dist = torch.distributions.Categorical(F.softmax(action_logits, dim=-1))
@@ -76,30 +80,31 @@ class Agent:
             selected_core = selected_device["voltages_frequencies"][selected_core_index]
             dvfs = selected_core[np.random.randint(0, 3)]
 
-        if selected_device['type']=="cloud":
+        if selected_device['type'] == "cloud":
             selected_core_index = -1
-            i = np.random.randint(0,1)
+            i = np.random.randint(0, 1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
 
-        # print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
+        print(
+            f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
         reward = State().apply_action(selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
-        return
 
-        value=self.value_net(input_state)
-        if len(task_queue)<= 0:
-            temp_features = [0,0,0,0,0]
-            _,next_pe_state = State().get()
+        return
+        value = self.value_net(input_state)
+        if len(task_queue) <= 0:
+            temp_features = [0, 0, 0, 0, 0]
+            _, next_pe_state = State().get()
             for pe in next_pe_state.values():
                 temp_features.extend(get_pe_data(pe))
-            next_input_state = torch.tensor(temp_features, dtype=torch.float32)    
-            next_value=self.value_net(next_input_state)
+            next_input_state = torch.tensor(temp_features, dtype=torch.float32)
+            next_value = self.value_net(next_input_state)
         else:
             next_current_task_id = task_queue[0]
             next_current_task = Database().get_task(current_task_id)
-            _,next_pe_state = State().get()
+            _, next_pe_state = State().get()
             next_input_state = get_input(next_current_task, next_pe_state)
             next_input_state = torch.tensor(next_input_state, dtype=torch.float32)
-            next_value=self.value_net(next_input_state)
+            next_value = self.value_net(next_input_state)
 
         target = reward + self.gamma * next_value.item()
         target = torch.tensor([target])
@@ -108,7 +113,7 @@ class Agent:
         option_loss = -option_dist.log_prob(torch.tensor(option)) * advantage
         actor_loss = -action_dist.log_prob(torch.tensor(action)) * advantage
 
-        print(f"loss : {actor_loss+option_loss}")
+        print(f"loss : {actor_loss + option_loss}")
 
         critic_loss = self.criterion(value, target)
 
@@ -124,7 +129,6 @@ class Agent:
         self.value_optimizer.zero_grad()
         critic_loss.backward(retain_graph=True)
         self.value_optimizer.step()
-
 
         job_state = State().get_job(job_id)
         if len(job_state["remainingTasks"]) == 0:

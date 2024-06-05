@@ -91,11 +91,11 @@ class State:
 
         self.__remove_assigned_task()
 
-        # print("PEs::")
-        # print(pd.DataFrame(self._PEs), '\n')
-        # print("Jobs::")
-        # print(pd.DataFrame(self._jobs), "\n")
-        # print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+        print("PEs::")
+        print(pd.DataFrame(self._PEs), '\n')
+        print("Jobs::")
+        print(pd.DataFrame(self._jobs), "\n")
+        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
     ########  UPDATE JOBS ####### 
     def __update_jobs(self):
