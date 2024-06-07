@@ -2,8 +2,8 @@ import time
 from data.db import Database
 from environment.agent import Agent
 from environment.state import State
-from environment.utilities.monitor import Monitor
-from environment.utilities.window_manager import Preprocessing, WindowManager
+from utilities.monitor import Monitor
+from environment.window_manager import Preprocessing, WindowManager
 from data.configs import environment_config
 
 

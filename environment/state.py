@@ -3,7 +3,7 @@ from data.configs import summary_log_string
 import pandas as pd
 import numpy as np
 from data.db import Database
-from environment.utilities.monitor import Monitor
+from utilities.monitor import Monitor
 
 
 class State:

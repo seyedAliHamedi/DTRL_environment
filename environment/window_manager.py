@@ -4,7 +4,7 @@ from copy import copy
 from data.db import Database
 from data.configs import environment_config
 from environment.state import State
-from environment.utilities.monitor import Monitor
+from utilities.monitor import Monitor
 
 
 class WindowManager:
