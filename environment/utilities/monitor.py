@@ -1,6 +1,7 @@
 import json
 import os
 
+import pandas as pd
 from matplotlib import pyplot as plt
 
 from data.configs import monitor_config
@@ -21,7 +22,7 @@ class Monitor:
 
     def init(self, n_iterations):
         self._init_time_log(n_iterations)
-        self._init_main_log(n_iterations)
+        self._init_main_log()
 
     def _init_time_log(self, n_iterations):
         self.time_log = {
@@ -33,8 +34,11 @@ class Monitor:
             'cycle-time': environment_config['environment']['cycle'],
         }
 
-    def _init_main_log(self, n_iterations):
-        pass
+    def _init_main_log(self):
+        self.env_log['pes'] = {}
+        self.env_log['jobs'] = {}
+        self.env_log['window'] = {}
+        self.env_log['preprocessing'] = {}
 
     def add_env_log(self, iteration, key, new_content):
         self.env_log[key][iteration] = new_content
@@ -50,7 +54,7 @@ class Monitor:
         # average time per iteration
         self.time_log['avg_iteration_time'] = sum(y_values) / len(y_values)
         x_values = self.time_log['time_values'].keys()
-        plt.figure(figsize=(10, 5))  # Optional: Set the figure size
+        plt.figure(figsize=(10, 5))
         plt.plot(x_values, y_values, marker='o', linestyle='-')
         plt.axhline(y=environment_config['environment']['cycle'], color='red', linestyle='--', label='-set-cycle-time')
         plt.title("Sleeping time on each iteration")
@@ -65,17 +69,39 @@ class Monitor:
             json.dump(self.time_log, f, indent=4)
 
     def _save_main_log(self):
-        main_path = monitor_config['path']['main']
+        main_path = monitor_config['paths']['main']
         os.makedirs(os.path.dirname(main_path['pes']), exist_ok=True)
         os.makedirs(os.path.dirname(main_path['jobs']), exist_ok=True)
         os.makedirs(os.path.dirname(main_path['window']), exist_ok=True)
         os.makedirs(os.path.dirname(main_path['preprocessing']), exist_ok=True)
+        self._save_pes_log(main_path['pes'])
+        self._save_active_jobs_log(main_path['jobs'])
+        self._save_window_log(main_path['window'])
+        self._save_preprocessing_log(main_path['preprocessing'])
 
-    def _save_pes_log(self, path, pe_ID, iteration):
+    def _save_pes_log(self, path):
         with open(path, 'w') as f:
-            json.dump(self.env_log['pes'][iteration]['pe_ID'], f, indent=4)
+            f.write(pd.DataFrame(self.env_log['pes']).to_string())
+            # json.dump(self.env_log['pes'], f, indent=4)
 
+    def _save_active_jobs_log(self, path):
+        with open(path, 'w') as f:
+            f.write(pd.DataFrame(self.env_log['jobs']).to_string())
+            # json.dump(self.env_log['jobs'], f, indent=4)
 
+    def _save_window_log(self, path):
+        with open(path, 'w') as f:
+            f.write(pd.DataFrame(self.env_log['window']).to_string())
+
+    def _save_preprocessing_log(self, path):
+        with open(path, 'w') as f:
+            f.write(pd.DataFrame(self.env_log['preprocessing']).to_string())
+
+    def set_env_log(self, state, window_log, preprocessing_log, iteration):
+        self.env_log['pes'][iteration] = state[1]
+        self.env_log['jobs'][iteration] = state[0]
+        self.env_log['window'][iteration] = window_log
+        self.env_log['preprocessing'][iteration] = preprocessing_log
 
     def save_logs(self, time=True, main=True):
         if time:

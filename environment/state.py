@@ -15,7 +15,6 @@ class State:
             cls._instance._PEs = {}
             cls._instance._jobs = {}
             cls._instance._task_window = {}
-            cls._instance._window_data = {}
         return cls._instance
 
     def initialize(self):
@@ -101,11 +100,11 @@ class State:
 
         self.__remove_assigned_task()
 
-        Monitor().add_log(iteration, log_type='header', content='PES')
-        Monitor().add_log(iteration, log_type='data', content=self._PEs)
-        Monitor().add_log(iteration, log_type='header', content='Jobs')
-        Monitor().add_log(iteration, log_type='data', content=self._jobs)
-        Monitor().add_log(iteration)
+        print("PEs::")
+        print(pd.DataFrame(self._PEs), '\n')
+        print("Jobs::")
+        print(pd.DataFrame(self._jobs), "\n")
+        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
     ########  UPDATE JOBS #######
     def __update_jobs(self):

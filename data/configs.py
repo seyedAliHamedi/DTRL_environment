@@ -76,18 +76,16 @@ environment_config = {
 
 }
 monitor_config = {
-    'cycle_log_content': '#################################################',
-    'header_log_content': '|||||||||||||',
     'paths': {
         'time': {
             'plot': './logs/time/time_plot.png',
             'summery': './logs/time/summery.txt',
         },
         'main': {
-            'pes': './logs/main/pe',
-            'job': './logs/main/job',
-            'window': './logs/main/window',
-            'preprocessing': './logs/main/preprocessing',
+            'pes': './logs/main/pe.txt',
+            'jobs': './logs/main/job.txt',
+            'window': './logs/main/window.txt',
+            'preprocessing': './logs/main/preprocessing.txt',
         }
     }
 }

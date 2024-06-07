@@ -28,6 +28,9 @@ class Environment:
             Preprocessing().run()
             Agent().run()
 
+            # Monitor logging
+            Monitor().set_env_log(State().get(), WindowManager().get_log(), Preprocessing().get_log(), iteration)
+
             # Calculating time passed in iteration and saving log
             time_len = time.time() - starting_time
 
