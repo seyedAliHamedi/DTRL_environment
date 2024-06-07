@@ -1,5 +1,5 @@
 import math
-
+from data.configs import summary_log_string
 import pandas as pd
 import numpy as np
 from data.db import Database
@@ -100,11 +100,11 @@ class State:
 
         self.__remove_assigned_task()
 
-        print("PEs::")
-        print(pd.DataFrame(self._PEs), '\n')
-        print("Jobs::")
-        print(pd.DataFrame(self._jobs), "\n")
-        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+        Monitor().add_log('PEs::', start='\n\n', end='')
+        Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
+        Monitor().add_log("Jobs::", start='\n', end='')
+        Monitor().add_log(f'{pd.DataFrame(self._jobs).to_string()}')
+        Monitor().add_log(summary_log_string,start='\n')
 
     ########  UPDATE JOBS #######
     def __update_jobs(self):
@@ -115,7 +115,7 @@ class State:
         self.__remove_finished_active_jobs()
 
     def __add_new_active_jobs(self, new_tasks):
-        #print(f"new window{new_tasks}")
+        # print(f"new window{new_tasks}")
         for task in new_tasks:
             job_id = Database.get_task(task)["job_id"]
             if not self.__is_active_job(job_id):

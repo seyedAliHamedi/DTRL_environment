@@ -18,6 +18,7 @@ class Monitor:
             cls._instance.env = None
             cls.env_log = {}
             cls.time_log = {}
+            cls.summery = []
         return cls._instance
 
     def init(self, n_iterations):
@@ -103,8 +104,22 @@ class Monitor:
         self.env_log['window'][iteration] = window_log
         self.env_log['preprocessing'][iteration] = preprocessing_log
 
-    def save_logs(self, time=True, main=True):
+    def save_logs(self, time=True, main=True, summery=True):
         if time:
             self._save_time_log()
         if main:
             self._save_main_log()
+        if summery:
+            self._save_summery_log()
+
+    def _save_summery_log(self):
+        path = self._config['paths']['summary']
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            for i in range(len(self.summery)):
+                f.write(f'{self.summery[i]}')
+
+    def add_log(self, log, start='', end='\n'):
+        self.summery.append(start)
+        self.summery.append(log)
+        self.summery.append(end)

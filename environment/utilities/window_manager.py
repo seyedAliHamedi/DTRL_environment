@@ -4,6 +4,7 @@ from copy import copy
 from data.db import Database
 from data.configs import environment_config
 from environment.state import State
+from environment.utilities.monitor import Monitor
 
 
 class WindowManager:
@@ -96,7 +97,6 @@ class Preprocessing:
         # sort main queue by mobility
         self.__sort_by_mobility()
 
-
     def __sort_by_mobility(self):
         mobility_dict = {}
         for task in self.queue:
@@ -150,10 +150,11 @@ class Preprocessing:
         jobs, _ = State().get()
         self.update_active_jobs(jobs)
         self.process()
-        # print(f"active_jobs: {self.active_jobs.keys()}")
-        # print(f"job_pool: {self.job_pool.keys()}")
-        # print(f"wait_queue: {self.wait_queue}")
-        # print(f"queue: {self.queue}")
+
+        Monitor().add_log(f"active_jobs: {self.active_jobs.keys()}")
+        Monitor().add_log(f"job_pool: {self.job_pool.keys()}")
+        Monitor().add_log(f"wait_queue: {self.wait_queue}")
+        Monitor().add_log(f"queue: {self.queue}")
 
     def get_agent_queue(self):
         agent_queue = {}

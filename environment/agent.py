@@ -9,6 +9,7 @@ from data.db import Database
 from environment.dtrl.core_scheduler import CoreScheduler
 from environment.dtrl.device_scheduler import DeviceScheduler
 from environment.state import State
+from environment.utilities.monitor import Monitor
 from environment.utilities.window_manager import Preprocessing
 import torch.optim as optim
 
@@ -85,7 +86,12 @@ class Agent:
             i = np.random.randint(0, 1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
 
-        # print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
+        Monitor().add_log(
+            f"Agent Action::Device: {selected_device_index} |"
+            f" Core: {selected_core_index} | freq: {dvfs[0]} |"
+            f" vol: {dvfs[1]} | task_id: {current_task_id} |"
+            f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n',end='')
+
         reward = State().apply_action(selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
 
         return
