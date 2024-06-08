@@ -1,10 +1,11 @@
 import json
 import os
 
+import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from data.configs import monitor_config
+from data.configs import monitor_config, agent_config
 from data.configs import environment_config
 
 
@@ -19,11 +20,13 @@ class Monitor:
             cls.env_log = {}
             cls.time_log = {}
             cls.summery = []
+            cls.agent_log = {}
         return cls._instance
 
     def init(self, n_iterations):
         self._init_time_log(n_iterations)
         self._init_main_log()
+        self._init_agent_log()
 
     def _init_time_log(self, n_iterations):
         self.time_log = {
@@ -41,8 +44,21 @@ class Monitor:
         self.env_log['window'] = {}
         self.env_log['preprocessing'] = {}
 
-    def add_env_log(self, iteration, key, new_content):
-        self.env_log[key][iteration] = new_content
+    def _init_agent_log(self):
+        self.agent_log['live-log'] = {}
+        self.agent_log['live-log']['loss'] = []
+        self.agent_log['live-log']['reward'] = []
+        self.agent_log['live-log']['energy'] = []
+        self.agent_log['live-log']['time'] = []
+        self.agent_log['live-log']['action'] = []
+        self.agent_log['summary'] = {}
+
+    def add_agent_log(self, log):
+        self.agent_log['live-log']['loss'].append(log['loss'])
+        self.agent_log['live-log']['reward'].append(log['reward'])
+        self.agent_log['live-log']['energy'].append(log['energy'])
+        self.agent_log['live-log']['time'].append(log['time'])
+        self.agent_log['live-log']['action'].append(log['action'])
 
     def add_time(self, time, iteration):
         if time > 0.5:
@@ -83,12 +99,10 @@ class Monitor:
     def _save_pes_log(self, path):
         with open(path, 'w') as f:
             f.write(pd.DataFrame(self.env_log['pes']).to_string())
-            # json.dump(self.env_log['pes'], f, indent=4)
 
     def _save_active_jobs_log(self, path):
         with open(path, 'w') as f:
             f.write(pd.DataFrame(self.env_log['jobs']).to_string())
-            # json.dump(self.env_log['jobs'], f, indent=4)
 
     def _save_window_log(self, path):
         with open(path, 'w') as f:
@@ -104,13 +118,29 @@ class Monitor:
         self.env_log['window'][iteration] = window_log
         self.env_log['preprocessing'][iteration] = preprocessing_log
 
-    def save_logs(self, time=True, main=True, summery=True):
+    def save_logs(self, time=True, main=True, summery=True, agent=True):
         if time:
             self._save_time_log()
         if main:
             self._save_main_log()
         if summery:
             self._save_summery_log()
+        if agent:
+            self._save_agent_log()
+
+    def _save_agent_log(self):
+        self.agent_log['summary']['avg-time'] = np.sum(self.agent_log['live-log']['time']) / len(
+            self.agent_log['live-log']['time'])
+        self.agent_log['summary']['avg-energy'] = np.sum(self.agent_log['live-log']['energy']) / len(
+            self.agent_log['live-log']['energy'])
+        path = self._config['paths']['agent']['summary']
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'w') as f:
+            f.write('Agent-config\n')
+            json.dump(agent_config, f, indent=4)
+            f.write('\n')
+            f.write(f'avg-time: {self.agent_log["summary"]["avg-time"]}\n')
+            f.write(f'avg-energy: {self.agent_log["summary"]["avg-energy"]}\n')
 
     def _save_summery_log(self):
         path = self._config['paths']['summary']

@@ -13,8 +13,8 @@ class Environment:
         self.n_iterations = n_iterations
         # ! important load db first
         Database().load()
-        State().initialize()
         Monitor().init(n_iterations)
+        State().initialize()
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
 

@@ -77,8 +77,8 @@ class Preprocessing:
 
     def get_log(self):
         return {
-            'active_jobs_ID': self.active_jobs,
-            'job_pool': self.job_pool,
+            'active_jobs_ID': list(self.active_jobs.keys()),
+            'job_pool': list(self.job_pool.keys()),
             'ready_queue': self.queue,
             'wait_queue': self.wait_queue,
         }

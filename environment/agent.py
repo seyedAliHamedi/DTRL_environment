@@ -70,6 +70,7 @@ class Agent:
 
         selected_device = current_devices[option]
         selected_device_index = self.devices.index(selected_device)
+        # test
 
         if selected_device['type'] != "cloud":
             sub_state = get_input(current_task, {0: pe_state[selected_device['id']]})
@@ -89,10 +90,19 @@ class Agent:
             f"Agent Action::Device: {selected_device_index} |"
             f" Core: {selected_core_index} | freq: {dvfs[0]} |"
             f" vol: {dvfs[1]} | task_id: {current_task_id} |"
-            f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n',end='')
+            f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n', end='')
 
         reward = State().apply_action(selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
-
+        Monitor().add_agent_log(
+            {
+                'reward': reward,
+                'action': f'device_ID={selected_device_index} | core={selected_core_index}  | task={current_task_id}',
+                'loss': 0,
+                'energy': 0,
+                'time': 0,
+                'punishment': 0
+            }
+        )
         return
         value = self.value_net(input_state)
         if len(task_queue) <= 0:
