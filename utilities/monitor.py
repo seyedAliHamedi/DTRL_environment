@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 
@@ -41,8 +42,17 @@ class Monitor:
     def _init_main_log(self):
         self.env_log['pes'] = {}
         self.env_log['jobs'] = {}
-        self.env_log['window'] = {}
-        self.env_log['preprocessing'] = {}
+        self.env_log['window'] = {
+            'current_cycle': [],
+            'pool': [],
+            'active_jobs_ID': []
+        }
+        self.env_log['preprocessing'] = {
+            'active_jobs_ID': [],
+            'job_pool': [],
+            'ready_queue': [],
+            'wait_queue': []
+        }
 
     def _init_agent_log(self):
         self.agent_log['live-log'] = {}
@@ -115,8 +125,13 @@ class Monitor:
     def set_env_log(self, state, window_log, preprocessing_log, iteration):
         self.env_log['pes'][iteration] = state[1]
         self.env_log['jobs'][iteration] = state[0]
-        self.env_log['window'][iteration] = window_log
-        self.env_log['preprocessing'][iteration] = preprocessing_log
+        self.env_log['window']['pool'].append(window_log['pool'])
+        self.env_log['window']['current_cycle'].append(window_log['current_cycle'])
+        self.env_log['window']['active_jobs_ID'].append(window_log['active_jobs_ID'])
+        self.env_log['preprocessing']['active_jobs_ID'].append(preprocessing_log['active_jobs_ID'])
+        self.env_log['preprocessing']['job_pool'].append(preprocessing_log['job_pool'])
+        self.env_log['preprocessing']['ready_queue'].append(preprocessing_log['ready_queue'])
+        self.env_log['preprocessing']['wait_queue'].append(preprocessing_log['wait_queue'])
 
     def save_logs(self, time=True, main=True, summery=True, agent=True):
         if time:

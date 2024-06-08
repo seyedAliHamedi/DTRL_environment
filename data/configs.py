@@ -78,14 +78,14 @@ environment_config = {
 monitor_config = {
     'paths': {
         'time': {
-            'plot': './logs/time/time_plot.png',
-            'summery': './logs/time/summery.txt',
+            'plot': './logs/simulation/time_plot.png',
+            'summery': './logs/simulation/summery.csv',
         },
         'main': {
-            'pes': './logs/main/pe.txt',
-            'jobs': './logs/main/job.txt',
-            'window': './logs/main/window.txt',
-            'preprocessing': './logs/main/preprocessing.txt',
+            'pes': './logs/main/pe.csv',
+            'jobs': './logs/main/job.csv',
+            'window': './logs/main/window.csv',
+            'preprocessing': './logs/main/preprocessing.csv',
         },
         'summary': './logs/summary.txt',
         'agent': {
