@@ -30,13 +30,13 @@ class State:
         return self._task_window
 
     def get_job(self, job_id):
-        if job_id in self._jobs:
-            return self._jobs[job_id]
+        return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
+        print(f"ACTION task{task_ID}")
         e = 0
         execution_time = t = math.ceil(Database.get_task(task_ID)[
-                                       "computational_load"] / freq)
+                                           "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
 
@@ -55,7 +55,7 @@ class State:
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * \
-                (volt * volt) * freq
+                                                                (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
 
         # ! reward: e+t
@@ -103,6 +103,12 @@ class State:
 
         self.__remove_assigned_task()
 
+        print("PEs::")
+        print(pd.DataFrame(self._PEs), '\n')
+        print("Jobs::")
+        print(pd.DataFrame(self._jobs), "\n")
+        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+
         Monitor().add_log('PEs::', start='\n\n', end='')
         Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
         Monitor().add_log("Jobs::", start='\n', end='')
@@ -118,7 +124,7 @@ class State:
         self.__remove_finished_active_jobs()
 
     def __add_new_active_jobs(self, new_tasks):
-        # print(f"new window{new_tasks}")
+        print(f"new window{new_tasks}")
         for task in new_tasks:
             job_id = Database.get_task(task)["job_id"]
             if not self.__is_active_job(job_id):
@@ -213,12 +219,12 @@ class State:
 
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
-        print("herrrrre : ", job_ID)
-        print("herrrrre : ", task_ID)
-        print("herrrrre finishedTasks : ", self._jobs[job_ID]["finishedTasks"])
-        print("herrrrre runningTasks : ", self._jobs[job_ID]["runningTasks"])
-        self._jobs[job_ID]["finishedTasks"].append(task_ID)
-        self._jobs[job_ID]["runningTasks"].remove(task_ID)
+        try:
+            self._jobs[job_ID]["finishedTasks"].append(task_ID)
+            self._jobs[job_ID]["runningTasks"].remove(task_ID)
+        except:
+            print(f"error {task_ID} | job {job_ID}")
+            raise
 
     def __update_occupied_cores(self):
         # based on pe queue

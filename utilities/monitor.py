@@ -133,7 +133,7 @@ class Monitor:
         self.env_log['preprocessing']['ready_queue'].append(preprocessing_log['ready_queue'])
         self.env_log['preprocessing']['wait_queue'].append(preprocessing_log['wait_queue'])
 
-    def save_logs(self, time=True, main=True, summery=True, agent=True):
+    def save_logs(self, time=False, main=True, summery=True, agent=True):
         if time:
             self._save_time_log()
         if main:

@@ -45,7 +45,7 @@ class Agent:
     def run(self):
         queue = Preprocessing().get_agent_queue()
 
-        # print(f"Agent  queue: {queue}")
+        print(f"Agent  queue: {queue}")
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
             self.schedule(task_queue, job_ID)
@@ -96,8 +96,6 @@ class Agent:
             i = np.random.randint(0, 1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
 
-        reward = State().apply_action(selected_device_index,
-                                      selected_core_index, dvfs[0], dvfs[1], current_task_id)
         self.done_tasks += 1
 
         if (self.done_tasks / 100000 * 100) % 2 == 1:
@@ -123,7 +121,9 @@ class Agent:
                 'punishment': 0
             }
         )
+        print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
         return
+
         value = self.value_net(input_state)
         if len(task_queue) <= 0:
             temp_features = [0, 0, 0, 0, 0]
@@ -149,10 +149,10 @@ class Agent:
         advantage = target - value
 
         option_loss = - \
-            option_dist.log_prob(option.clone().detach()) * advantage
+                          option_dist.log_prob(option.clone().detach()) * advantage
         if action_dist is not None and action is not None:
             actor_loss = - \
-                action_dist.log_prob(action.clone().detach()) * advantage
+                             action_dist.log_prob(action.clone().detach()) * advantage
         else:
             # Placeholder for cases without action_dist/action
             actor_loss = torch.tensor(0.0)
@@ -161,7 +161,7 @@ class Agent:
 
         # print(f"loss : {actor_loss + option_loss}")
 
-        critic_loss = self.loss-criterion(value, target)
+        critic_loss = self.loss - criterion(value, target)
 
         self.device.optimizer.zero_grad()
         option_loss.backward(retain_graph=True)
@@ -206,8 +206,7 @@ class Agent:
             optimizer.step()
 
         core_values_loss.backward()
-        print(f"Job: {job_id} Finished, Policy Loss: {
-              policy_loss.item()}, Value Loss: {core_values_loss.item()}")
+        print(f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}")
 
     def compute_advantages(self, rewards, values, gamma=0.99, normalize=True):
         advantages = []
@@ -216,7 +215,7 @@ class Agent:
 
         for t in reversed(range(len(rewards))):
             td_error = (rewards[t] + gamma * (0 if t ==
-                        len(rewards) - 1 else values[t + 1]) - values[t])
+                                                   len(rewards) - 1 else values[t + 1]) - values[t])
             advantage = td_error + gamma * 0.95 * advantage
             advantages.insert(0, advantage)
             returns.inser
