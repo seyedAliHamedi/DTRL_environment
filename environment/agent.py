@@ -19,22 +19,18 @@ class Agent:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.learning_device = torch.device(
-                "mps" if torch.backends.mps.is_available() else "cpu")
             devices = Database.get_all_devices()
             cls._instance.devices = devices
             cls._instance.core = CoreScheduler(devices)
             cls._instance.device = DeviceScheduler(devices)
 
-            net = ValueNetwork(input_size=4 * len(devices) +
-                               5).to(cls._instance.learning_device)
             net = ValueNetwork(input_size=4 * len(devices) + 5)
             cls._instance.value_net = net
             cls._instance.value_optimizer = optim.Adam(
                 net.parameters(), lr=0.005)
-            cls._instance.criterion = nn.MSELoss()
+            cls._instance.loss_criterion = nn.MSELoss()
 
-            cls._instance.gamma = 0.95
+            cls._instance.return_gamma = 0.95
 
             cls._instance.log_probs = {}
             cls._instance.values = {}
@@ -70,8 +66,7 @@ class Agent:
 
         current_task = Database().get_task(current_task_id)
         input_state = get_input(current_task, pe_state)
-        input_state = torch.tensor(
-            input_state, dtype=torch.float32).to(self.learning_device)
+        input_state = torch.tensor(input_state, dtype=torch.float32)
 
         option_logits = self.device.agent(input_state)
         current_devices = self.device.agent.get_devices(input_state)
@@ -87,7 +82,7 @@ class Agent:
             sub_state = get_input(
                 current_task, {0: pe_state[selected_device['id']]})
             sub_state = torch.tensor(
-                sub_state, dtype=torch.float32).to(self.learning_device)
+                sub_state, dtype=torch.float32)
             action_logits = self.core.forest[selected_device_index](sub_state)
             action_dist = torch.distributions.Categorical(
                 F.softmax(action_logits, dim=-1))
@@ -105,7 +100,6 @@ class Agent:
                                       selected_core_index, dvfs[0], dvfs[1], current_task_id)
         self.done_tasks += 1
 
-        # print(self.done_tasks / 100000 *100g)
         if (self.done_tasks / 100000 * 100) % 2 == 1:
             print(self.done_tasks / 100000 * 100)
 
@@ -138,7 +132,7 @@ class Agent:
                 temp_features.extend(get_pe_data(pe))
 
             next_input_state = torch.tensor(
-                temp_features, dtype=torch.float32).to(self.learning_device)
+                temp_features, dtype=torch.float32)
             next_value = self.value_net(next_input_state)
         else:
             next_current_task_id = task_queue[0]
@@ -146,12 +140,12 @@ class Agent:
             _, next_pe_state = State().get()
             next_input_state = get_input(next_current_task, next_pe_state)
             next_input_state = torch.tensor(
-                next_input_state, dtype=torch.float32).to(self.learning_device)
+                next_input_state, dtype=torch.float32)
             next_input_state = torch.tensor(temp_features, dtype=torch.float32)
             next_value = self.value_net(next_input_state)
 
         target = reward + self.gamma * next_value.item()
-        target = torch.tensor([target]).to(self.learning_device)
+        target = torch.tensor([target])
         advantage = target - value
 
         option_loss = - \
@@ -167,7 +161,7 @@ class Agent:
 
         # print(f"loss : {actor_loss + option_loss}")
 
-        critic_loss = self.criterion(value, target)
+        critic_loss = self.loss-criterion(value, target)
 
         self.device.optimizer.zero_grad()
         option_loss.backward(retain_graph=True)

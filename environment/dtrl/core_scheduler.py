@@ -9,48 +9,37 @@ class CoreScheduler(nn.Module):
         super(CoreScheduler, self).__init__()
         self.devices = devices
         self.num_features = 9
-        self.exploration_factor = 0.10
-        self.learning_device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-        self.forest = [self.createTree(device) for device in devices if device['type']!='cloud']
-        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005) for tree in self.forest] 
+        self.forest = [self.createTree(
+            device) for device in devices if device['type'] != 'cloud']
+        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005)
+                           for tree in self.forest]
 
     def createTree(self, device):
-        return DDTNode(self.num_features, device['num_cores'], 0, np.log2(device['num_cores']),
-                                    self.exploration_factor).to(self.learning_device)
-
+        return DDTNode(num_input=self.num_features, num_output=device['num_cores'], depth=0, max_depth=np.log2(device['num_cores']))
 
 
 class DDTNode(nn.Module):
-    def __init__(
-            self, num_input, num_output, depth, max_depth, tree_exploration_facotr
-    ):
+    def __init__(self, num_input, num_output, depth, max_depth):
         super(DDTNode, self).__init__()
         self.depth = depth
         self.max_depth = max_depth
-        self.tree_exploration_facotr = tree_exploration_facotr
-        self.epsilon = 1e-9
+
         if depth != max_depth:
-            self.weights = nn.Parameter(torch.zeros(num_input))
+            self.weights = nn.Parameter(torch.empty(
+                num_input).normal_(mean=0, std=0.1))
             self.bias = nn.Parameter(torch.zeros(1))
             self.alpha = nn.Parameter(torch.zeros(1))
         if depth == max_depth:
             self.prob_dist = nn.Parameter(torch.zeros(num_output))
-
         if depth < max_depth:
-            self.left = DDTNode(num_input, num_output, depth + 1, max_depth, tree_exploration_facotr)
-            self.right = DDTNode(num_input, num_output, depth + 1, max_depth, tree_exploration_facotr)
+            self.left = DDTNode(num_input, num_output, depth + 1, max_depth)
+            self.right = DDTNode(num_input, num_output, depth + 1, max_depth)
 
     def forward(self, x):
         if self.depth == self.max_depth:
             return self.prob_dist
-
-        val = torch.sigmoid(self.alpha * (torch.matmul(x, self.weights.t()) + self.bias))
-        
-        a = np.random.uniform(0, 1)
-        self.tree_exploration_facotr -= self.epsilon
-        
-        if a < self.tree_exploration_facotr:
-            val = 1 - val
+        val = torch.sigmoid(
+            self.alpha * (torch.matmul(x, self.weights) + self.bias))
 
         if val >= 0.5:
             return val * self.right(x)

@@ -213,6 +213,10 @@ class State:
 
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
+        print("herrrrre : ", job_ID)
+        print("herrrrre : ", task_ID)
+        print("herrrrre finishedTasks : ", self._jobs[job_ID]["finishedTasks"])
+        print("herrrrre runningTasks : ", self._jobs[job_ID]["runningTasks"])
         self._jobs[job_ID]["finishedTasks"].append(task_ID)
         self._jobs[job_ID]["runningTasks"].remove(task_ID)
 

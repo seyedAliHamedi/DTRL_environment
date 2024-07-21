@@ -1,6 +1,6 @@
 devices_config = {
     "iot": {
-        "num_devices": 10,
+        "num_devices": 100,
         "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
@@ -17,11 +17,11 @@ devices_config = {
         # battery_capacity in Watt-second
         "battery_capacity": (36, 41),
         "error_rate": (0.01, 0.06),
-        "safe": (0.1, 0.9),
+        "safe": (0.25, 0.75),
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 0,
+        "num_devices": 50,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -36,12 +36,12 @@ devices_config = {
         "powerIdle": [550000, 650000, 750000],
         "battery_capacity": -1,
         "error_rate": (0.5, 0.11),
-        "safe": (0.25, 0.75),
+        "safe": (0.5, 0.5),
         "maxQueue": 5
 
     },
     "cloud": {
-        "num_devices": 0,
+        "num_devices": 1,
         "num_cores": -1,
         "voltage_frequencies": ((2.8e9, 13.85), (3.9e9, 24.28)),
         "isl": -1,
@@ -60,10 +60,11 @@ jobs_config = {
     "max_task_per_depth": 5,
     "max_depth": 3,
     "task": {
-        "input_size": [1000, 1000000],
-        "output_size": [1000, 1000000],
-        "computational_load": [1000, 1000000],
-        "safe_measurement": [0.95, 0.05],
+        # input_size ,output_size ,computational_load in MB --> * 10^6
+        "input_size": [1, 1001],
+        "output_size": [1, 1001],
+        "computational_load": [1, 1001],
+        "safe_measurement": [0.5, 0.5],
         "task_kinds": [1, 2, 3, 4],
     },
 }

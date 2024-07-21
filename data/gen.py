@@ -10,15 +10,19 @@ class Generator:
     _task_id_counter = 0
     _device_id_counter = 0
     _job_id_counter = 0
-    _devices_path = os.path.join(os.path.dirname(__file__), "resources", "devices.csv")
-    _job_path = os.path.join(os.path.dirname(__file__), "resources", "jobs.csv")
-    _tasks_path = os.path.join(os.path.dirname(__file__), "resources", "tasks.csv")
+    _devices_path = os.path.join(os.path.dirname(
+        __file__), "resources", "devices.csv")
+    _job_path = os.path.join(os.path.dirname(
+        __file__), "resources", "jobs.csv")
+    _tasks_path = os.path.join(os.path.dirname(
+        __file__), "resources", "tasks.csv")
 
     @classmethod
     def get_devices(cls, file_path=_devices_path):
         if os.path.exists(file_path):
             devices = pd.read_csv(file_path)
-            devices["voltages_frequencies"] = devices["voltages_frequencies"].apply(lambda x: ast.literal_eval(x))
+            devices["voltages_frequencies"] = devices["voltages_frequencies"].apply(
+                lambda x: ast.literal_eval(x))
             devices["capacitance"] = devices["capacitance"].apply(
                 lambda x: ast.literal_eval(x)
             )
@@ -51,7 +55,7 @@ class Generator:
                 cpu_cores = (
                     -1
                     if config["num_cores"]
-                       == -1 else int(np.random.choice(config["num_cores"]))
+                    == -1 else int(np.random.choice(config["num_cores"]))
                 )
                 device_info = {
                     "id": Generator._device_id_counter,
@@ -60,7 +64,7 @@ class Generator:
                     "voltages_frequencies": [
                         [
                             config["voltage_frequencies"][i]
-                            for i in np.random.choice(5 if type =="iot" else 4, size=3, replace=False)
+                            for i in np.random.choice(5 if type == "iot" else 4, size=3, replace=False)
                         ]
                         for _ in range(cpu_cores)
                     ],
@@ -107,7 +111,8 @@ class Generator:
                 devices_data.append(device_info)
 
         devices = pd.DataFrame(devices_data)
-        devices['name'] = devices.apply(lambda row: row['type'] + str(row.name), axis=1)
+        devices['name'] = devices.apply(
+            lambda row: row['type'] + str(row.name), axis=1)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         devices.to_csv(file_path)
         return devices
@@ -116,12 +121,14 @@ class Generator:
     def get_jobs(cls, file_path_jobs=_job_path, file_path_tasks=_tasks_path):
         if os.path.exists(file_path_jobs):
             jobs = pd.read_csv(file_path_jobs)
-            jobs["tasks_ID"] = jobs["tasks_ID"].apply(lambda x: ast.literal_eval(x))
+            jobs["tasks_ID"] = jobs["tasks_ID"].apply(
+                lambda x: ast.literal_eval(x))
             jobs["heads"] = jobs["heads"].apply(lambda x: ast.literal_eval(x))
             jobs["tails"] = jobs["tails"].apply(lambda x: ast.literal_eval(x))
             jobs["tree"] = jobs["tree"].apply(lambda x: ast.literal_eval(x))
             tasks = pd.read_csv(file_path_tasks)
-            tasks["predecessors"] = tasks["predecessors"].apply(lambda x: ast.literal_eval(x))
+            tasks["predecessors"] = tasks["predecessors"].apply(
+                lambda x: ast.literal_eval(x))
             return jobs, tasks
         else:
             return Generator._generate_jobs()
@@ -159,17 +166,22 @@ class Generator:
 
             for j in range(depth):
                 current_depth_task_list = []
-                current_depth_task_count = np.random.randint(1, max_task_per_depth + 1)
+                current_depth_task_count = np.random.randint(
+                    1, max_task_per_depth + 1)
                 for j in range(current_depth_task_count):
-                    predecessors = Generator._choose_random_tasks(last_depth_task_list)
-                    new_task = Generator._generate_random_task(i, False, False, predecessors)
+                    predecessors = Generator._choose_random_tasks(
+                        last_depth_task_list)
+                    new_task = Generator._generate_random_task(
+                        i, False, False, predecessors)
                     task_list.append(new_task)
                     current_depth_task_list.append(new_task)
                 last_depth_task_list = current_depth_task_list
 
             for j in range(tail_count):
-                predecessors = Generator._choose_random_tasks(last_depth_task_list)
-                new_task = Generator._generate_random_task(i, False, True, predecessors)
+                predecessors = Generator._choose_random_tasks(
+                    last_depth_task_list)
+                new_task = Generator._generate_random_task(
+                    i, False, True, predecessors)
                 tail_tasks_list.append(new_task)
                 task_list.append(new_task)
             deadline = np.random.randint(1, max_deadline)
@@ -220,8 +232,10 @@ class Generator:
         task_id = Generator._task_id_counter
         Generator._task_id_counter += 1
         # generate tasks based on the attribute ranges and bounds defind in the config file
-        input_size = np.random.randint(config["input_size"][0], config["input_size"][1])
-        output_size = np.random.randint(config["output_size"][0], config["output_size"][1])
+        input_size = np.random.randint(
+            config["input_size"][0], config["input_size"][1])
+        output_size = np.random.randint(
+            config["output_size"][0], config["output_size"][1])
         task_kind = np.random.choice(config["task_kinds"])
         safe = int(np.random.choice([0, 1], p=[config["safe_measurement"][0],
                                                config["safe_measurement"][1]]))
