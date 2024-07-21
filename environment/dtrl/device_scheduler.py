@@ -9,7 +9,8 @@ class DeviceScheduler:
     def __init__(self, devices):
         self.devices = devices
         self.max_tree_depth = 5
-        self.agent = DeviceDDTNode(self.devices,0, self.max_tree_depth)
+        self.learning_device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
+        self.agent = DeviceDDTNode(self.devices,0, self.max_tree_depth).to(self.learning_device)
         self.optimizer = optim.Adam(self.agent.parameters(), lr=0.005)
         self.selected_device_group = None
 

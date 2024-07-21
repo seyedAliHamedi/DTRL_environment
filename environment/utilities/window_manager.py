@@ -149,3 +149,9 @@ class Preprocessing:
                 if task['job_id'] == job_ID:
                     agent_queue[job_ID].append(task_ID)
         return agent_queue
+    
+    def remove_from_queue(self,task_ID):
+        try:
+            self.queue.remove(task_ID)
+        except ValueError:
+            raise f"task{task_ID} is not in window-manager queue"

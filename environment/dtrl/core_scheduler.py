@@ -10,12 +10,13 @@ class CoreScheduler(nn.Module):
         self.devices = devices
         self.num_features = 9
         self.exploration_factor = 0.10
+        self.learning_device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
         self.forest = [self.createTree(device) for device in devices if device['type']!='cloud']
         self.optimizers = [optim.Adam(tree.parameters(), lr=0.005) for tree in self.forest] 
 
     def createTree(self, device):
         return DDTNode(self.num_features, device['num_cores'], 0, np.log2(device['num_cores']),
-                                    self.exploration_factor)
+                                    self.exploration_factor).to(self.learning_device)
 
 
 
@@ -43,7 +44,7 @@ class DDTNode(nn.Module):
         if self.depth == self.max_depth:
             return self.prob_dist
 
-        val = torch.sigmoid(self.alpha * (torch.matmul(torch.tensor(x), self.weights.t()) + self.bias))
+        val = torch.sigmoid(self.alpha * (torch.matmul(x, self.weights.t()) + self.bias))
         
         a = np.random.uniform(0, 1)
         self.tree_exploration_facotr -= self.epsilon

@@ -9,9 +9,9 @@ class ValueNetwork(nn.Module):
         super(ValueNetwork, self).__init__()
         self.input_size= input_size
         self.net = nn.Sequential(
-            nn.Linear(self.input_size, 256),
+            nn.Linear(self.input_size, 512),
             nn.ReLU(),
-            nn.Linear(256,1),
+            nn.Linear(512,1),
         )
 
     def forward(self,x):

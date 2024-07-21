@@ -60,7 +60,7 @@ class Generator:
                     "voltages_frequencies": [
                         [
                             config["voltage_frequencies"][i]
-                            for i in np.random.choice(6, size=3, replace=False)
+                            for i in np.random.choice(5 if type =="iot" else 4, size=3, replace=False)
                         ]
                         for _ in range(cpu_cores)
                     ],
@@ -85,14 +85,14 @@ class Generator:
                         if config["battery_capacity"] == -1
                         else np.random.uniform(
                             config["battery_capacity"][0], config["battery_capacity"][1]
-                        )
+                        )*1e3
                     ),
                     "error_rate": np.random.uniform(
                         config["error_rate"][0], config["error_rate"][1]
                     ),
                     "acceptableTasks":list(np.random.choice(
                         jobs_config["task"]["task_kinds"],
-                        size=np.random.randint(2, 5),
+                        size=np.random.randint(3, 5),
                         replace=False,
                     )),
                     "handleSafeTask": int(
