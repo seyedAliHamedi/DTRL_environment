@@ -1,8 +1,9 @@
 import math
-
+from data.configs import summary_log_string
 import pandas as pd
-
+import numpy as np
 from data.db import Database
+from utilities.monitor import Monitor
 
 
 class State:
@@ -33,15 +34,14 @@ class State:
             return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        t=e=0
-
-        execution_time = e = math.ceil(Database.get_task(task_ID)["computational_load"] / freq)
-        
+        e = 0
+        execution_time = t = math.ceil(Database.get_task(task_ID)[
+                                       "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
 
         if queue_index == -1:
-            return -6
+            return self.reward_function(punish=-100)
 
         # apply on queue
         self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
@@ -51,13 +51,21 @@ class State:
         # apply energyConsumption
         if self._PEs[pe_ID]['type'] == 'cloud':
             self._PEs[pe_ID]["energyConsumption"][core_index] = volt
-            e =  volt * t
+            e = volt * t
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
-            self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
-            e =  capacitance * (volt * volt) * freq * t
+            self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * \
+                (volt * volt) * freq
+            e = capacitance * (volt * volt) * freq * t
 
-        return -(e+t)
+        # ! reward: e+t
+        return self.reward_function(e=e, alpha=1, t=t, beta=1)
+
+    def reward_function(self, e=0, alpha=0, t=0, beta=0, punish=0):
+        if punish == 0:
+            return -np.log((e * alpha) + (t * beta))
+        else:
+            return punish
 
     def _init_PEs(self, PEs):
         for pe in PEs:
@@ -86,7 +94,7 @@ class State:
             }
 
     ####### ENVIRONMENT #######
-    def update(self):
+    def update(self, iteration):
 
         # process 1
         self.__update_jobs()
@@ -95,13 +103,13 @@ class State:
 
         self.__remove_assigned_task()
 
-        # print("PEs::")
-        # print(pd.DataFrame(self._PEs), '\n')
-        # print("Jobs::")
-        # print(pd.DataFrame(self._jobs), "\n")
-        # print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+        Monitor().add_log('PEs::', start='\n\n', end='')
+        Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
+        Monitor().add_log("Jobs::", start='\n', end='')
+        Monitor().add_log(f'{pd.DataFrame(self._jobs).to_string()}')
+        Monitor().add_log(summary_log_string, start='\n')
 
-    ########  UPDATE JOBS ####### 
+    ########  UPDATE JOBS #######
     def __update_jobs(self):
         self.__update_deadlines()
         self.__add_new_active_jobs(self._task_window)
@@ -137,7 +145,8 @@ class State:
     def __update_running_tasks(self):
         for job_ID in self._jobs.keys():
             if self._jobs[job_ID]["assignedTask"] or self._jobs[job_ID]["assignedTask"] == 0:
-                self._jobs[job_ID]["runningTasks"].append(self._jobs[job_ID]["assignedTask"])
+                self._jobs[job_ID]["runningTasks"].append(
+                    self._jobs[job_ID]["assignedTask"])
 
     def __remove_finished_active_jobs(self):
         removing_items = []
@@ -157,7 +166,7 @@ class State:
         for job in self._jobs.values():
             job["assignedTask"] = None
 
-    ####### UPDATE PEs ####### 
+    ####### UPDATE PEs #######
     def __update_PEs(self):
         self.__update_PEs_queue()
         self.__update_occupied_cores()
@@ -192,7 +201,8 @@ class State:
                         continue
                     queue_shift_left(current_queue)
                 else:
-                    current_queue[0] = (current_queue[0][0] - 1, current_queue[0][1])
+                    current_queue[0] = (
+                        current_queue[0][0] - 1, current_queue[0][1])
             self.__remove_unused_cores_cloud(pe, deleting_queues_on_pe)
 
     def __remove_unused_cores_cloud(self, pe, core_list):
@@ -216,7 +226,7 @@ class State:
                     pe["occupiedCores"][core_index] = 1
 
 
-####### UTILITY #######     
+####### UTILITY #######
 def find_place(pe, core_i):
     if pe["type"] == "cloud":
         pe["queue"].append([])

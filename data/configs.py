@@ -1,7 +1,7 @@
 devices_config = {
     "iot": {
         "num_devices": 10,
-        "num_cores": [4,8,16],
+        "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -21,7 +21,7 @@ devices_config = {
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 5,
+        "num_devices": 0,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -33,12 +33,12 @@ devices_config = {
         # capacitance in nano-Farad --> * 1e-9
         "capacitance": (1.5, 2),
         # powerIdle in micro-Watt --> * 1e-6
-        "powerIdle": [550000, 650000,750000],
+        "powerIdle": [550000, 650000, 750000],
         "battery_capacity": -1,
         "error_rate": (0.5, 0.11),
         "safe": (0.25, 0.75),
         "maxQueue": 5
-        
+
     },
     "cloud": {
         "num_devices": 0,
@@ -73,3 +73,31 @@ environment_config = {
     "environment": {"cycle": 0.01}
 
 }
+monitor_config = {
+    'paths': {
+        'time': {
+            'plot': './logs/simulation/time_plot.png',
+            'summery': './logs/simulation/summery.csv',
+        },
+        'main': {
+            'pes': './logs/main/pe.csv',
+            'jobs': './logs/main/job.csv',
+            'window': './logs/main/window.csv',
+            'preprocessing': './logs/main/preprocessing.csv',
+        },
+        'summary': './logs/summary.txt',
+        'agent': {
+            'summary': './logs/agent/summary.txt',
+        }
+    }
+}
+
+agent_config = {
+    'learning_mod': 1,
+    'alpha': 1,
+    'beta': 1,
+    'learning_rate': 0.1,
+    'gamma': 0.99
+}
+
+summary_log_string = '|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||'

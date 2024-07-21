@@ -10,9 +10,9 @@ class Generator:
     _task_id_counter = 0
     _device_id_counter = 0
     _job_id_counter = 0
-    _devices_path = os.path.join(os.path.dirname(__file__), "resources","devices.csv")
-    _job_path = os.path.join(os.path.dirname(__file__),"resources", "jobs.csv")
-    _tasks_path = os.path.join(os.path.dirname(__file__),"resources", "tasks.csv")
+    _devices_path = os.path.join(os.path.dirname(__file__), "resources", "devices.csv")
+    _job_path = os.path.join(os.path.dirname(__file__), "resources", "jobs.csv")
+    _tasks_path = os.path.join(os.path.dirname(__file__), "resources", "tasks.csv")
 
     @classmethod
     def get_devices(cls, file_path=_devices_path):
@@ -42,7 +42,7 @@ class Generator:
     #   battery capacity in W*micro-second : 36000 Ws - Equivalent to 36000*10^3 W*milli-second, 10Wh or
 
     @classmethod
-    def _generate_device(cls, config=devices_config,file_path=_devices_path):
+    def _generate_device(cls, config=devices_config, file_path=_devices_path):
         devices_data = []
         for type in ("iot", "mec", "cloud"):
             config = devices_config[type]
@@ -51,7 +51,7 @@ class Generator:
                 cpu_cores = (
                     -1
                     if config["num_cores"]
-                    == -1 else int(np.random.choice(config["num_cores"]))
+                       == -1 else int(np.random.choice(config["num_cores"]))
                 )
                 device_info = {
                     "id": Generator._device_id_counter,
@@ -90,7 +90,7 @@ class Generator:
                     "error_rate": np.random.uniform(
                         config["error_rate"][0], config["error_rate"][1]
                     ),
-                    "acceptableTasks":list(np.random.choice(
+                    "acceptableTasks": list(np.random.choice(
                         jobs_config["task"]["task_kinds"],
                         size=np.random.randint(3, 5),
                         replace=False,
@@ -108,6 +108,7 @@ class Generator:
 
         devices = pd.DataFrame(devices_data)
         devices['name'] = devices.apply(lambda row: row['type'] + str(row.name), axis=1)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         devices.to_csv(file_path)
         return devices
 
@@ -126,7 +127,7 @@ class Generator:
             return Generator._generate_jobs()
 
     @classmethod
-    def _generate_jobs(cls, config=jobs_config,file_path_jobs=_job_path, file_path_tasks=_tasks_path):
+    def _generate_jobs(cls, config=jobs_config, file_path_jobs=_job_path, file_path_tasks=_tasks_path):
 
         max_deadline = config["max_deadline"]
         max_task_per_depth = config["max_task_per_depth"]
