@@ -57,8 +57,8 @@ devices_config = {
 jobs_config = {
     "num_jobs": 10000,
     "max_deadline": 2000,
-    "max_task_per_depth": 5,
-    "max_depth": 3,
+    "max_task_per_depth": 2,
+    "max_depth": 2,
     "task": {
         # input_size ,output_size ,computational_load in MB --> * 10^6
         "input_size": [1, 1001],
@@ -89,6 +89,7 @@ monitor_config = {
         'summary': './logs/summary.txt',
         'agent': {
             'summary': './logs/agent/summary.txt',
+            'plots': './logs/agent/plots.png'
         }
     }
 }

@@ -60,7 +60,7 @@ class Monitor:
         self.agent_log['live-log']['reward'] = []
         self.agent_log['live-log']['energy'] = []
         self.agent_log['live-log']['time'] = []
-        self.agent_log['live-log']['action'] = []
+        self.agent_log['live-log']['fail'] = []
         self.agent_log['summary'] = {}
 
     def add_agent_log(self, log):
@@ -68,7 +68,6 @@ class Monitor:
         self.agent_log['live-log']['reward'].append(log['reward'])
         self.agent_log['live-log']['energy'].append(log['energy'])
         self.agent_log['live-log']['time'].append(log['time'])
-        self.agent_log['live-log']['action'].append(log['action'])
 
     def add_time(self, time, iteration):
         if time > 0.5:
@@ -155,16 +154,56 @@ class Monitor:
     def _save_agent_log(self):
         self.agent_log['summary']['avg-time'] = np.sum(self.agent_log['live-log']['time']) / len(
             self.agent_log['live-log']['time'])
-        self.agent_log['summary']['avg-energy'] = np.sum(
-            self.agent_log['live-log']['energy']) / len(self.agent_log['live-log']['energy'])
-        path = self._config['paths']['agent']['summary']
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, 'w') as f:
+        self.agent_log['summary']['avg-energy'] = np.sum(self.agent_log['live-log']['energy']) / len(
+            self.agent_log['live-log']['energy'])
+        self.agent_log['summary']['avg-fail'] = np.sum(
+            self.agent_log['live-log']['fail'])
+        summary_path = self._config['paths']['agent']['summary']
+        os.makedirs(os.path.dirname(summary_path), exist_ok=True)
+        self.__make_agents_plots(self._config['paths']['agent']['plots'])
+        with open(summary_path, 'w') as f:
             f.write('Agent-config\n')
             json.dump(agent_config, f, indent=4)
             f.write('\n')
             f.write(f'avg-time: {self.agent_log["summary"]["avg-time"]}\n')
             f.write(f'avg-energy: {self.agent_log["summary"]["avg-energy"]}\n')
+
+    def __make_agents_plots(self, path):
+        if len(self.agent_log['live-log']['time']) == 0:
+            print("Zero job done, no plot to be shown")
+            return
+        fig, axs = plt.subplots(3, 2, figsize=(10, 20))
+        # Plot each column in a separate plot
+        # Plot for loss
+        axs[0].plot(self.agent_log['live-log']["loss"], label='Loss')
+        axs[0].set_title('Loss')
+        axs[0].legend()
+
+        # Plot for reward
+        axs[1].plot(self.agent_log['live-log']["reward"], label='Reward')
+        axs[1].set_title('Reward')
+        axs[1].legend()
+
+        # Plot for time
+        axs[2].plot(self.agent_log['live-log']["time"], label='Time')
+        axs[2].set_title('Time')
+        axs[2].legend()
+
+        # Plot for energy
+        axs[3].plot(self.agent_log['live-log']["energy"], label='Energy')
+        axs[3].set_title('Energy')
+        axs[3].legend()
+
+        # Plot for fail
+        axs[4].plot(self.agent_log['live-log']["fail"], label='Fail')
+        axs[4].set_title('Fail')
+        axs[4].legend()
+
+        # Adjust layout to prevent overlap
+        plt.tight_layout()
+
+        # Save the plots to an image file
+        plt.savefig(path)
 
     def _save_summery_log(self):
         path = self._config['paths']['summary']
