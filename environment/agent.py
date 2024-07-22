@@ -144,11 +144,22 @@ class Agent:
         self.energy[job_id].append(energy)
         self.fail[job_id].append(fail_flag)
         self.selected_devices[job_id].append(selected_device_index)
-
+        print("999999999")
         job_state = State().get_job(job_id)
         if job_state and len(job_state["remainingTasks"]) == 0:
             total_loss = self.update(self.main_log_probs[job_id], self.sub_log_probs[job_id],
                                      self.rewards[job_id], self.selected_devices[job_id])
+
+            Monitor().add_agent_log(
+                {
+                    'loss': total_loss,
+                    'reward': sum(self.rewards[job_id]) / len(self.rewards[job_id]),
+                    'time': sum(self.time[job_id]) / len(self.time[job_id]),
+                    'energy': sum(self.energy[job_id]) / len(self.energy[job_id]),
+                    'fail': sum(self.fail[job_id]) / len(self.fail[job_id]),
+                }
+            )
+
             del self.main_log_probs[job_id]
             del self.sub_log_probs[job_id]
             del self.rewards[job_id]
@@ -177,7 +188,7 @@ class Agent:
         self.device_optimizer.step()
         for i, _ in enumerate(rewards):
             self.core.optimizers[indices[i]].zero_grad()
-            sub_loss = -sub_log_probs[i]*rewards[i]
+            sub_loss = -sub_log_probs[i] * rewards[i]
             sub_loss.backward()
             self.core.optimizers[indices[i]].step()
         total_loss = -torch.sum(sub_log_probs * returns) + - \
@@ -200,8 +211,7 @@ class Agent:
             optimizer.step()
 
         core_values_loss.backward()
-        print(f"Job: {job_id} Finished, Policy Loss: {
-              policy_loss.item()}, Value Loss: {core_values_loss.item()}")
+        print(f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}")
 
     def compute_advantages(self, rewards, values, gamma=0.99, normalize=True):
         advantages = []
@@ -209,8 +219,8 @@ class Agent:
         advantage = 0
 
         for t in reversed(range(len(rewards))):
-            td_error = (rewards[t] + gamma * (0 if t ==
-                                              len(rewards) - 1 else values[t + 1]) - values[t])
+            td_error = (rewards[t] + gamma *
+                        (0 if t == len(rewards) - 1 else values[t + 1]) - values[t])
             advantage = td_error + gamma * 0.95 * advantage
             advantages.insert(0, advantage)
             returns.inser

@@ -174,6 +174,7 @@ class State:
             selected_job = self._jobs[job_ID]
             if len(selected_job["finishedTasks"]) == selected_job["task_count"]:
                 removing_items.append(job_ID)
+                print("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAa")
         for item in removing_items:
             del self._jobs[item]
 
