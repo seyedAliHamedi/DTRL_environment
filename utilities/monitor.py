@@ -68,6 +68,7 @@ class Monitor:
         self.agent_log['live-log']['reward'].append(log['reward'])
         self.agent_log['live-log']['energy'].append(log['energy'])
         self.agent_log['live-log']['time'].append(log['time'])
+        self.agent_log['live-log']['fail'].append(log['fail'])
 
     def add_time(self, time, iteration):
         if time > 0.5:
@@ -141,7 +142,7 @@ class Monitor:
         self.env_log['preprocessing']['wait_queue'].append(
             preprocessing_log['wait_queue'])
 
-    def save_logs(self, time=True, main=True, summery=True, agent=True):
+    def save_logs(self, time=True, main=False, summery=False, agent=True):
         if time:
             self._save_time_log()
         if main:
@@ -175,29 +176,29 @@ class Monitor:
         fig, axs = plt.subplots(3, 2, figsize=(10, 20))
         # Plot each column in a separate plot
         # Plot for loss
-        axs[0].plot(self.agent_log['live-log']["loss"], label='Loss')
-        axs[0].set_title('Loss')
-        axs[0].legend()
+        axs[0, 0].plot(self.agent_log['live-log']["loss"], label='Loss')
+        axs[0, 0].set_title('Loss')
+        axs[0, 0].legend()
 
         # Plot for reward
-        axs[1].plot(self.agent_log['live-log']["reward"], label='Reward')
-        axs[1].set_title('Reward')
-        axs[1].legend()
+        axs[0, 1].plot(self.agent_log['live-log']["reward"], label='Reward')
+        axs[0, 1].set_title('Reward')
+        axs[0, 1].legend()
 
         # Plot for time
-        axs[2].plot(self.agent_log['live-log']["time"], label='Time')
-        axs[2].set_title('Time')
-        axs[2].legend()
+        axs[1, 0].plot(self.agent_log['live-log']["time"], label='Time')
+        axs[1, 0].set_title('Time')
+        axs[1, 0].legend()
 
         # Plot for energy
-        axs[3].plot(self.agent_log['live-log']["energy"], label='Energy')
-        axs[3].set_title('Energy')
-        axs[3].legend()
+        axs[1, 1].plot(self.agent_log['live-log']["energy"], label='Energy')
+        axs[1, 1].set_title('Energy')
+        axs[1, 1].legend()
 
         # Plot for fail
-        axs[4].plot(self.agent_log['live-log']["fail"], label='Fail')
-        axs[4].set_title('Fail')
-        axs[4].legend()
+        axs[2, 0].plot(self.agent_log['live-log']["fail"], label='Fail')
+        axs[2, 0].set_title('Fail')
+        axs[2, 0].legend()
 
         # Adjust layout to prevent overlap
         plt.tight_layout()

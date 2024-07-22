@@ -7,7 +7,6 @@ from utilities.monitor import Monitor
 
 
 class State:
-
     _instance = None
 
     def __new__(cls):
@@ -16,9 +15,11 @@ class State:
             cls._instance._PEs = {}
             cls._instance._jobs = {}
             cls._instance._task_window = {}
+            cls._instance.display = False
         return cls._instance
 
-    def initialize(self):
+    def initialize(self, display):
+        self.display = display
         self._init_PEs(Database.get_all_devices())
 
     def get(self):
@@ -40,13 +41,13 @@ class State:
 
         fail_flag = 0
         if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe['handleSafeTask']):
-            fail_flag = 1
-            return self.reward_function(punish=True), fail_flag, 0, 0
-        elif Database.get_task(task_ID)["is_safe"] and not pe['handleSafeTask']:
             fail_flag = 2
             return self.reward_function(punish=True), fail_flag, 0, 0
+        elif Database.get_task(task_ID)["is_safe"] and not pe['handleSafeTask']:
+            fail_flag = 1
+            return self.reward_function(punish=True), fail_flag, 0, 0
         elif task["task_kind"] not in acceptable_tasks:
-            fail_flag = 3
+            fail_flag = 1
             return self.reward_function(punish=True), fail_flag, 0, 0
 
         execution_time = t = math.ceil(task["computational_load"] / freq)
@@ -68,7 +69,7 @@ class State:
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * \
-                (volt * volt) * freq
+                                                                (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
 
         # ! reward: e+t
@@ -117,11 +118,12 @@ class State:
 
         self.__remove_assigned_task()
 
-        print("PEs::")
-        print(pd.DataFrame(self._PEs), '\n')
-        print("Jobs::")
-        print(pd.DataFrame(self._jobs), "\n")
-        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+        if self.display:
+            print("PEs::")
+            print(pd.DataFrame(self._PEs), '\n')
+            print("Jobs::")
+            print(pd.DataFrame(self._jobs), "\n")
+            print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
         Monitor().add_log('PEs::', start='\n\n', end='')
         Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
@@ -138,7 +140,8 @@ class State:
         self.__remove_finished_active_jobs()
 
     def __add_new_active_jobs(self, new_tasks):
-        print(f"new window{new_tasks}")
+        if self.display:
+            print(f"new window{new_tasks}")
         for task in new_tasks:
             job_id = Database.get_task(task)["job_id"]
             if not self.__is_active_job(job_id):

@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+
 torch.autograd.set_detect_anomaly(True)
 
 
@@ -50,10 +51,10 @@ class Agent:
 
         return cls._instance
 
-    def run(self):
+    def run(self, display):
         queue = Preprocessing().get_agent_queue()
-
-        print(f"Agent  queue: {queue}")
+        if display:
+            print(f"Agent  queue: {queue}")
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
             self.schedule(task_queue, job_ID)
@@ -185,13 +186,12 @@ class Agent:
         #     padding_len = len(returns) - len(sub_log_probs)
         #     sub_log_probs = F.pad(sub_log_probs, (0, padding_len), value=0)
 
-
         main_loss = -torch.sum(main_log_probs.mul(returns))
         # sub_loss = -torch.sum(sub_log_probs.mul(returns))
 
-        self.device_optimizer.zero_grad()
-        main_loss.backward()
-        self.device_optimizer.step()
+        # self.device_optimizer.zero_grad()
+        # main_loss.backward()
+        # self.device_optimizer.step()
 
         # for optimizer in self.core.optimizers:
         #     optimizer.zero_grad()

@@ -11,12 +11,13 @@ from data.configs import environment_config
 
 class Environment:
 
-    def __init__(self, n_iterations, save_log):
+    def __init__(self, n_iterations, save_log, display):
         self.n_iterations = n_iterations
+        self.display = display
         # ! important load db first
         Database().load()
         Monitor().init(n_iterations)
-        State().initialize()
+        State().initialize(display)
         self.__monitor_flag = save_log
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
@@ -32,7 +33,7 @@ class Environment:
                 WindowManager().run()
                 State().update(iteration)
                 Preprocessing().run()
-                Agent().run()
+                Agent().run(self.display)
 
                 # Monitor logging
                 if self.__monitor_flag:
