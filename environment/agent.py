@@ -12,6 +12,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+torch.autograd.set_detect_anomaly(True)
 
 
 class Agent:
@@ -51,8 +52,7 @@ class Agent:
 
     def run(self):
         queue = Preprocessing().get_agent_queue()
-
-        # print(f"Agent  queue: {queue}")
+        print(queue)
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
             self.schedule(task_queue, job_ID)
@@ -143,9 +143,9 @@ class Agent:
         self.energy[job_id].append(energy)
         self.fail[job_id].append(fail_flag)
         self.selected_devices[job_id].append(selected_device_index)
-        print("999999999")
         job_state = State().get_job(job_id)
-        if job_state and len(job_state["remainingTasks"]) == 0:
+        if job_state and len(job_state["remainingTasks"]) == 1:
+            print("--------")
             total_loss = self.update(self.main_log_probs[job_id], self.sub_log_probs[job_id],
                                      self.rewards[job_id], self.selected_devices[job_id])
 
@@ -177,21 +177,29 @@ class Agent:
             returns.insert(0, G)
 
         returns = torch.tensor(returns, dtype=torch.float32)
-        # returns = (returns - returns.mean()) / (returns.std() + 1e-5)
-        returns = returns * torch.ones_like(returns, requires_grad=True)
-        saved_log_probs_epoch = torch.stack(saved_log_probs_epoch)
+
+        main_log_probs = torch.stack(main_log_probs)
+        if len(sub_log_probs) < len(returns):
+            sub_log_probs = torch.Tensor(sub_log_probs, reqired_grad=True)
+            padding_len = len(returns) - len(sub_log_probs)
+            sub_log_probs = F.pad(sub_log_probs, (0, padding_len), value=0)
+
+        sub_log_probs = torch.stack(sub_log_probs)
+
         main_loss = -torch.sum(main_log_probs * returns)
+        sub_loss = -torch.sum(sub_log_probs * returns)
 
         self.device_optimizer.zero_grad()
-        main_loss.backward()
+        main_loss.backward(retain_graph=True)
         self.device_optimizer.step()
-        for i, _ in enumerate(rewards):
-            self.core.optimizers[indices[i]].zero_grad()
-            sub_loss = -sub_log_probs[i] * rewards[i]
-            sub_loss.backward()
-            self.core.optimizers[indices[i]].step()
-        total_loss = -torch.sum(sub_log_probs * returns) + - \
-            torch.sum(main_log_probs * returns)
+
+        for optimizer in self.core.optimizers:
+            optimizer.zero_grad()
+        sub_loss.backward()
+        for optimizer in self.core.optimizers:
+            optimizer.step()
+
+        total_loss = main_loss + sub_loss
         return total_loss
 
     def updata_params(self, job_id, log_probs, core_values, rewards):
@@ -210,7 +218,8 @@ class Agent:
             optimizer.step()
 
         core_values_loss.backward()
-        print(f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}")
+        print(f"Job: {job_id} Finished, Policy Loss: {
+              policy_loss.item()}, Value Loss: {core_values_loss.item()}")
 
     def compute_advantages(self, rewards, values, gamma=0.99, normalize=True):
         advantages = []

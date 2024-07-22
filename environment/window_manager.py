@@ -69,7 +69,7 @@ class Preprocessing:
     def __new__(cls, config=environment_config['window']):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.max_jobs = 5
+            cls._instance.max_jobs = config["max_jobs"]
             cls._instance.active_jobs = {}
             cls._instance.job_pool = {}
             cls._instance.wait_queue = []
