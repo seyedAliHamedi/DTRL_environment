@@ -45,7 +45,7 @@ class Agent:
     def run(self):
         queue = Preprocessing().get_agent_queue()
 
-        print(f"Agent  queue: {queue}")
+        # print(f"Agent  queue: {queue}")
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
             self.schedule(task_queue, job_ID)
@@ -121,7 +121,7 @@ class Agent:
                 'punishment': 0
             }
         )
-        print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
+        # print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
         return
 
         value = self.value_net(input_state)

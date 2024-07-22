@@ -33,7 +33,6 @@ class State:
         return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        print(f"ACTION task{task_ID}")
         e = 0
         execution_time = t = math.ceil(Database.get_task(task_ID)[
                                            "computational_load"] / freq)
@@ -103,11 +102,11 @@ class State:
 
         self.__remove_assigned_task()
 
-        print("PEs::")
-        print(pd.DataFrame(self._PEs), '\n')
-        print("Jobs::")
-        print(pd.DataFrame(self._jobs), "\n")
-        print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+        # print("PEs::")
+        # print(pd.DataFrame(self._PEs), '\n')
+        # print("Jobs::")
+        # print(pd.DataFrame(self._jobs), "\n")
+        # print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
         Monitor().add_log('PEs::', start='\n\n', end='')
         Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
@@ -124,7 +123,7 @@ class State:
         self.__remove_finished_active_jobs()
 
     def __add_new_active_jobs(self, new_tasks):
-        print(f"new window{new_tasks}")
+        # print(f"new window{new_tasks}")
         for task in new_tasks:
             job_id = Database.get_task(task)["job_id"]
             if not self.__is_active_job(job_id):

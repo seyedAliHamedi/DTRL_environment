@@ -80,7 +80,9 @@ class Monitor:
         y_values = self.time_log['time_values'].values()
         # average time per iteration
         self.time_log['avg_iteration_time'] = sum(y_values) / len(y_values)
+        self.time_log['total_time'] = sum(y_values)
         x_values = self.time_log['time_values'].keys()
+        del self.time_log['time_values']
         plt.figure(figsize=(10, 5))
         plt.plot(x_values, y_values, marker='o', linestyle='-')
         plt.axhline(y=environment_config['environment']['cycle'], color='red', linestyle='--', label='-set-cycle-time')
@@ -133,7 +135,7 @@ class Monitor:
         self.env_log['preprocessing']['ready_queue'].append(preprocessing_log['ready_queue'])
         self.env_log['preprocessing']['wait_queue'].append(preprocessing_log['wait_queue'])
 
-    def save_logs(self, time=False, main=True, summery=True, agent=True):
+    def save_logs(self, time=True, main=True, summery=True, agent=True):
         if time:
             self._save_time_log()
         if main:

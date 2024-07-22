@@ -1,7 +1,7 @@
 devices_config = {
     "iot": {
-        "num_devices": 20,
-        "num_cores": [2],
+        "num_devices": 10,
+        "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -71,7 +71,7 @@ jobs_config = {
 environment_config = {
     "generator": {"iot": 1, "mec": 0, "cloud": 0, "jobs_count": 100},
     "window": {"size": 10, "max_jobs": 5, "clock": 3},
-    "environment": {"cycle": 0.01}
+    "environment": {"cycle": 0.001}
 
 }
 monitor_config = {

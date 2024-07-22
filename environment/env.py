@@ -1,4 +1,6 @@
 import time
+import traceback
+
 from data.db import Database
 from environment.agent import Agent
 from environment.state import State
@@ -9,12 +11,13 @@ from data.configs import environment_config
 
 class Environment:
 
-    def __init__(self, n_iterations):
+    def __init__(self, n_iterations, save_log):
         self.n_iterations = n_iterations
         # ! important load db first
         Database().load()
         Monitor().init(n_iterations)
         State().initialize()
+        self.__monitor_flag = save_log
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
 
@@ -22,6 +25,8 @@ class Environment:
         iteration = 0
         try:
             while iteration <= self.n_iterations:
+                if iteration % 500 == 0:
+                    print(f"iteration : {iteration}")
                 starting_time = time.time()
 
                 WindowManager().run()
@@ -30,7 +35,8 @@ class Environment:
                 Agent().run()
 
                 # Monitor logging
-                Monitor().set_env_log(State().get(), WindowManager().get_log(), Preprocessing().get_log(), iteration)
+                if self.__monitor_flag:
+                    Monitor().set_env_log(State().get(), WindowManager().get_log(), Preprocessing().get_log(), iteration)
 
                 # Calculating time passed in iteration and saving log
                 time_len = time.time() - starting_time
@@ -39,11 +45,17 @@ class Environment:
                 sleeping_time = self.cycle_wait - time_len
                 if sleeping_time < 0:
                     sleeping_time = 0
-                    Monitor().add_time(time_len, iteration)
+                    if self.__monitor_flag:
+                        Monitor().add_time(time_len, iteration)
                 else:
-                    Monitor().add_time(self.cycle_wait, iteration)
+                    if self.__monitor_flag:
+                        Monitor().add_time(self.cycle_wait, iteration)
                 time.sleep(sleeping_time)
 
                 iteration += 1
+        except:
+            traceback.print_exc()
+            print("An error has occurred")
         finally:
-            Monitor().save_logs()
+            if self.__monitor_flag:
+                Monitor().save_logs()
