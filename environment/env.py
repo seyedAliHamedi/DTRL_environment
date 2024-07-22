@@ -36,7 +36,8 @@ class Environment:
 
                 # Monitor logging
                 if self.__monitor_flag:
-                    Monitor().set_env_log(State().get(), WindowManager().get_log(), Preprocessing().get_log(), iteration)
+                    Monitor().set_env_log(State().get(), WindowManager().get_log(),
+                                          Preprocessing().get_log(), iteration)
 
                 # Calculating time passed in iteration and saving log
                 time_len = time.time() - starting_time

@@ -35,21 +35,20 @@ class State:
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
         pe = Database.get_device(pe_ID)
         acceptable_tasks = pe["acceptableTasks"]
-        task_kind = Database.get_task(task_ID)["task_kind"]
+        task = Database.get_task(task_ID)
 
         fail_flag = 0
-        if (task_kind not in acceptable_tasks) and (Database.get_task(task_ID)["is_safe"] and not pe['handleSafeTask']):
+        if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe['handleSafeTask']):
             fail_flag = 1
             return self.reward_function(punish=True), fail_flag, 0, 0
         elif Database.get_task(task_ID)["is_safe"] and not pe['handleSafeTask']:
             fail_flag = 2
             return self.reward_function(punish=True), fail_flag, 0, 0
-        elif task_kind not in acceptable_tasks:
+        elif task["task_kind"] not in acceptable_tasks:
             fail_flag = 3
             return self.reward_function(punish=True), fail_flag, 0, 0
 
-        execution_time = t = math.ceil(Database.get_task(task_ID)[
-            "computational_load"] / freq)
+        execution_time = t = math.ceil(task["computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
 
@@ -58,7 +57,7 @@ class State:
 
         # apply on queue
         self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
-        job_ID = Database.get_task(task_ID)["job_id"]
+        job_ID = task["job_id"]
         self._jobs[job_ID]["assignedTask"] = task_ID
 
         # apply energyConsumption

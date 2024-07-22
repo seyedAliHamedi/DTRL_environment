@@ -136,8 +136,7 @@ class Agent:
         #     actor_loss.backward(retain_graph=True)
         #     self.core.optimizers[selected_device_index].step()
 
-        self.main_log_probs[job_id].append(
-            option_dist.log_prob(option))
+        self.main_log_probs[job_id].append(option_dist.log_prob(option))
 
         self.rewards[job_id].append(reward)
         self.time[job_id].append(time)

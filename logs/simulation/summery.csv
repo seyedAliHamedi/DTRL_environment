@@ -1,10 +1,10 @@
 {
-    "iterations": 100,
+    "iterations": 500,
     "anomalies": {
-        "0": 1.09206223487854
+        "0": 0.7673909664154053
     },
     "time_plot": null,
-    "avg_iteration_time": 0.15314484119415284,
+    "avg_iteration_time": 0.17716464281082153,
     "cycle-time": 0.001,
-    "total_time": 15.314484119415283
+    "total_time": 88.58232140541077
 }

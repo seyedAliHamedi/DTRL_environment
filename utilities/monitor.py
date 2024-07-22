@@ -155,8 +155,8 @@ class Monitor:
     def _save_agent_log(self):
         self.agent_log['summary']['avg-time'] = np.sum(self.agent_log['live-log']['time']) / len(
             self.agent_log['live-log']['time'])
-        self.agent_log['summary']['avg-energy'] = np.sum(self.agent_log['live-log']['energy']) / len(
-            self.agent_log['live-log']['energy'])
+        self.agent_log['summary']['avg-energy'] = np.sum(
+            self.agent_log['live-log']['energy']) / len(self.agent_log['live-log']['energy'])
         path = self._config['paths']['agent']['summary']
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, 'w') as f:
