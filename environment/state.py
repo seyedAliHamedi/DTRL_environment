@@ -40,16 +40,16 @@ class State:
         fail_flag = 0
         if (task_kind not in acceptable_tasks) and (Database.get_task(task_ID)["is_safe"] and not pe['handleSafeTask']):
             fail_flag = 1
-            return self.reward_function(punish=True), fail_flag
+            return self.reward_function(punish=True), fail_flag, 0, 0
         elif Database.get_task(task_ID)["is_safe"] and not pe['handleSafeTask']:
             fail_flag = 2
-            return self.reward_function(punish=True), fail_flag
+            return self.reward_function(punish=True), fail_flag, 0, 0
         elif task_kind not in acceptable_tasks:
             fail_flag = 3
-            return self.reward_function(punish=True), fail_flag
+            return self.reward_function(punish=True), fail_flag, 0, 0
 
         execution_time = t = math.ceil(Database.get_task(task_ID)[
-                                           "computational_load"] / freq)
+            "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
 
@@ -68,7 +68,7 @@ class State:
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * \
-                                                                (volt * volt) * freq
+                (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
 
         # ! reward: e+t

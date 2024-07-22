@@ -24,7 +24,10 @@ class Agent:
             cls._instance.devices = devices
             cls._instance.core = CoreScheduler(devices)
             # cls._instance.device = DeviceScheduler(devices)
-            cls._instance.device = OGTree(5, len(devices), 0, 3)
+            d = OGTree(5, len(devices), 0, 3)
+            cls._instance.device = d
+            cls._instance.device_optimizer = optim.Adam(
+                d.parameters(), lr=0.005)
 
             net = ValueNetwork(input_size=4 * len(devices) + 5)
             cls._instance.value_net = net
@@ -32,14 +35,13 @@ class Agent:
                 net.parameters(), lr=0.005)
             cls._instance.loss_criterion = nn.MSELoss()
 
-            cls._instance.return_gamma = 0.95
-
             cls._instance.main_log_probs = {}
             cls._instance.sub_log_probs = {}
             cls._instance.rewards = {}
             cls._instance.energy = {}
             cls._instance.time = {}
             cls._instance.fail = {}
+            cls._instance.selected_devices = {}
 
             cls._instance.done_tasks = 0
             cls._instance.first_t_loss = None
@@ -59,12 +61,14 @@ class Agent:
         if len(task_queue) == 0:
             return
 
-        if job_id not in self.log_probs:
-            self.log_probs[job_id] = []
+        if job_id not in self.main_log_probs:
+            self.main_log_probs[job_id] = []
+            self.sub_log_probs[job_id] = []
             self.rewards[job_id] = []
             self.time[job_id] = []
             self.energy[job_id] = []
             self.fail[job_id] = []
+            self.selected_devices[job_id] = []
 
         job_state, pe_state = State().get()
 
@@ -99,6 +103,7 @@ class Agent:
             selected_core_index = action.item()
             selected_core = selected_device["voltages_frequencies"][selected_core_index]
             dvfs = selected_core[np.random.randint(0, 3)]
+            self.sub_log_probs[job_id].append(action_dist.log_prob(action))
 
         if selected_device['type'] == "cloud":
             selected_core_index = -1
@@ -131,28 +136,52 @@ class Agent:
         #     actor_loss.backward(retain_graph=True)
         #     self.core.optimizers[selected_device_index].step()
 
-        self.main_log_probs[job_id].add(
-            option_dist.log_prob(torch.tensor(option)))
-        self.sub_log_probs[job_id].add(
-            action_dist.log_prob(torch.tensor(action)))
-        self.rewards[job_id].add(reward)
-        self.time[job_id].add(time)
-        self.energy[job_id].add(energy)
-        self.fail[job_id].add(fail_flag)
+        self.main_log_probs[job_id].append(
+            option_dist.log_prob(option))
+
+        self.rewards[job_id].append(reward)
+        self.time[job_id].append(time)
+        self.energy[job_id].append(energy)
+        self.fail[job_id].append(fail_flag)
+        self.selected_devices[job_id].append(selected_device_index)
 
         job_state = State().get_job(job_id)
         if job_state and len(job_state["remainingTasks"]) == 0:
-            self.update(
-                self.main_log_probs[job_id], self.sub_log_probs[job_id], self.rewards[job_id])
+            total_loss = self.update(self.main_log_probs[job_id], self.sub_log_probs[job_id],
+                                     self.rewards[job_id], self.selected_devices[job_id])
             del self.log_probs[job_id]
             del self.rewards[job_id]
             del self.time[job_id]
             del self.energy[job_id]
             del self.fail[job_id]
+            del self.selected_devices[job_id]
 
-    def update(self, main_log_probs, sub_log_probs, rewards):
+    def update(self, main_log_probs, sub_log_probs, rewards, indices):
+        gamma = 0.99
 
-        pass
+        returns = []
+        G = 0
+        for reward in reversed(rewards):
+            G = reward + gamma * G
+            returns.insert(0, G)
+
+        returns = torch.tensor(returns, dtype=torch.float32)
+        # returns = (returns - returns.mean()) / (returns.std() + 1e-5)
+        returns = returns * torch.ones_like(returns, requires_grad=True)
+        saved_log_probs_epoch = torch.stack(saved_log_probs_epoch)
+        main_loss = -torch.sum(main_log_probs * returns)
+
+        self.device_optimizer.zero_grad()
+        main_loss.backward()
+        self.device_optimizer.step()
+        for i, _ in enumerate(rewards):
+            self.core.optimizers[indices[i]].zero_grad()
+            sub_loss = -sub_log_probs[i]*rewards[i]
+            sub_loss.backward()
+            self.core.optimizers[indices[i]].step()
+        total_loss = -torch.sum(sub_log_probs * returns) + - \
+            torch.sum(main_log_probs * returns)
+        return total_loss
 
     def updata_params(self, job_id, log_probs, core_values, rewards):
         advantages, returns = self.compute_advantages(rewards, core_values)
