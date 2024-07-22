@@ -34,9 +34,12 @@ class Agent:
 
             cls._instance.return_gamma = 0.95
 
-            cls._instance.log_probs = {}
-            cls._instance.values = {}
+            cls._instance.main_log_probs = {}
+            cls._instance.sub_log_probs = {}
             cls._instance.rewards = {}
+            cls._instance.energy = {}
+            cls._instance.time = {}
+            cls._instance.fail = {}
 
             cls._instance.done_tasks = 0
             cls._instance.first_t_loss = None
@@ -58,8 +61,10 @@ class Agent:
 
         if job_id not in self.log_probs:
             self.log_probs[job_id] = []
-            self.values[job_id] = []
             self.rewards[job_id] = []
+            self.time[job_id] = []
+            self.energy[job_id] = []
+            self.fail[job_id] = []
 
         job_state, pe_state = State().get()
 
@@ -105,94 +110,49 @@ class Agent:
         if (self.done_tasks / 100000 * 100) % 2 == 1:
             print(self.done_tasks / 100000 * 100)
 
-        # value = self.value_net(input_state)
-
         Monitor().add_log(
             f"Agent Action::Device: {selected_device_index} |"
             f" Core: {selected_core_index} | freq: {dvfs[0]} |"
             f" vol: {dvfs[1]} | task_id: {current_task_id} |"
             f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n', end='')
 
-        reward = State().apply_action(selected_device_index,
-                                      selected_core_index, dvfs[0], dvfs[1], current_task_id)
-        Monitor().add_agent_log(
-            {
-                'reward': reward,
-                'action': f'device_ID={selected_device_index} | core={selected_core_index}  | task={current_task_id}',
-                'loss': 0,
-                'energy': 0,
-                'time': 0,
-                'punishment': 0
-            }
-        )
-        # print(f"Agent Action::Device: {selected_device_index} | Core: {selected_core_index} | freq: {dvfs[0]} | vol: {dvfs[1]} | task_id: {current_task_id} | cl: {Database.get_task(current_task_id)['computational_load']} \n")
-        return
+        reward, fail_flag, energy, time = State().apply_action(selected_device_index,
+                                                               selected_core_index, dvfs[0], dvfs[1], current_task_id)
 
-        value = self.value_net(input_state)
-        if len(task_queue) <= 0:
-            temp_features = [0, 0, 0, 0, 0]
-            _, next_pe_state = State().get()
-            for pe in next_pe_state.values():
-                temp_features.extend(get_pe_data(pe))
+        # option_loss = -option_dist.log_prob(torch.tensor(option)) * reward
+        # actor_loss = -action_dist.log_prob(torch.tensor(action)) * reward
 
-            next_input_state = torch.tensor(
-                temp_features, dtype=torch.float32)
-            next_value = self.value_net(next_input_state)
-        else:
-            next_current_task_id = task_queue[0]
-            next_current_task = Database().get_task(next_current_task_id)
-            _, next_pe_state = State().get()
-            next_input_state = get_input(next_current_task, next_pe_state)
-            next_input_state = torch.tensor(
-                next_input_state, dtype=torch.float32)
-            next_input_state = torch.tensor(temp_features, dtype=torch.float32)
-            next_value = self.value_net(next_input_state)
+        # self.device.optimizer.zero_grad()
+        # option_loss.backward(retain_graph=True)
+        # self.device.optimizer.step()
 
-        target = reward + self.gamma * next_value.item()
-        target = torch.tensor([target])
-        advantage = target - value
+        # if action_dist is not None and action is not None:
+        #     self.core.optimizers[selected_device_index].zero_grad()
+        #     actor_loss.backward(retain_graph=True)
+        #     self.core.optimizers[selected_device_index].step()
 
-        option_loss = - \
-            option_dist.log_prob(option.clone().detach()) * advantage
-        if action_dist is not None and action is not None:
-            actor_loss = - \
-                action_dist.log_prob(action.clone().detach()) * advantage
-        else:
-            # Placeholder for cases without action_dist/action
-            actor_loss = torch.tensor(0.0)
-        option_loss = -option_dist.log_prob(torch.tensor(option)) * advantage
-        actor_loss = -action_dist.log_prob(torch.tensor(action)) * advantage
-
-        # print(f"loss : {actor_loss + option_loss}")
-
-        critic_loss = self.loss - criterion(value, target)
-
-        self.device.optimizer.zero_grad()
-        option_loss.backward(retain_graph=True)
-        self.device.optimizer.step()
-
-        if action_dist is not None and action is not None:
-            self.core.optimizers[selected_device_index].zero_grad()
-            actor_loss.backward(retain_graph=True)
-            self.core.optimizers[selected_device_index].step()
-
-        self.value_optimizer.zero_grad()
-        critic_loss.backward()
-        self.value_optimizer.step()
-
-        if not self.first_t_loss:
-            first_t_loss = (option_loss, actor_loss, critic_loss)
-        if self.done_tasks % 100 == 0:
-            print(option_loss, actor_loss, critic_loss)
-        if self.done_tasks == 100000:
-            print("||||||||||", option_loss, actor_loss, critic_loss)
-            self.last_t_loss = (option_loss, actor_loss, critic_loss)
+        self.main_log_probs[job_id].add(
+            option_dist.log_prob(torch.tensor(option)))
+        self.sub_log_probs[job_id].add(
+            action_dist.log_prob(torch.tensor(action)))
+        self.rewards[job_id].add(reward)
+        self.time[job_id].add(time)
+        self.energy[job_id].add(energy)
+        self.fail[job_id].add(fail_flag)
 
         job_state = State().get_job(job_id)
         if job_state and len(job_state["remainingTasks"]) == 0:
+            self.update(
+                self.main_log_probs[job_id], self.sub_log_probs[job_id], self.rewards[job_id])
             del self.log_probs[job_id]
-            del self.values[job_id]
             del self.rewards[job_id]
+            del self.time[job_id]
+            del self.energy[job_id]
+            del self.fail[job_id]
+
+    def update(self, main_log_probs, sub_log_probs, rewards):
+
+        pass
 
     def updata_params(self, job_id, log_probs, core_values, rewards):
         advantages, returns = self.compute_advantages(rewards, core_values)
