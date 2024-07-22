@@ -7,6 +7,7 @@ from utilities.monitor import Monitor
 
 
 class State:
+
     _instance = None
 
     def __new__(cls):

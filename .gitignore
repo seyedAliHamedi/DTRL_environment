@@ -3,6 +3,13 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+#specific for this repo
+data/resources/
+./data/resources/
+logs/
+./logs/
+
+
 # C extensions
 *.so
 
