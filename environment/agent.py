@@ -1,3 +1,4 @@
+from environment.dtrl.og_tree import OGTree
 from environment.dtrl.value_network import ValueNetwork
 import torch.optim as optim
 from environment.window_manager import Preprocessing
@@ -22,7 +23,8 @@ class Agent:
             devices = Database.get_all_devices()
             cls._instance.devices = devices
             cls._instance.core = CoreScheduler(devices)
-            cls._instance.device = DeviceScheduler(devices)
+            # cls._instance.device = DeviceScheduler(devices)
+            cls._instance.device = OGTree(5, len(devices), 0, 3)
 
             net = ValueNetwork(input_size=4 * len(devices) + 5)
             cls._instance.value_net = net
@@ -65,17 +67,19 @@ class Agent:
         Preprocessing().remove_from_queue(current_task_id)
 
         current_task = Database().get_task(current_task_id)
-        input_state = get_input(current_task, pe_state)
+        # input_state = get_input(current_task, pe_state)
+        input_state = get_input(current_task, {})
         input_state = torch.tensor(input_state, dtype=torch.float32)
 
-        option_logits = self.device.agent(input_state)
-        current_devices = self.device.agent.get_devices(input_state)
+        # option_logits = self.device.agent(input_state)
+        option_logits = self.device(input_state)
+        # current_devices = self.device.agent.get_devices(input_state)
         option_dist = torch.distributions.Categorical(
             F.softmax(option_logits, dim=-1))
         option = option_dist.sample()
 
-        selected_device = current_devices[option.item()]
-        selected_device_index = self.devices.index(selected_device)
+        selected_device = self.devices[option.item()]
+        selected_device_index = option.item()
         # test
 
         if selected_device['type'] != "cloud":
@@ -101,7 +105,7 @@ class Agent:
         if (self.done_tasks / 100000 * 100) % 2 == 1:
             print(self.done_tasks / 100000 * 100)
 
-        value = self.value_net(input_state)
+        # value = self.value_net(input_state)
 
         Monitor().add_log(
             f"Agent Action::Device: {selected_device_index} |"
@@ -149,10 +153,10 @@ class Agent:
         advantage = target - value
 
         option_loss = - \
-                          option_dist.log_prob(option.clone().detach()) * advantage
+            option_dist.log_prob(option.clone().detach()) * advantage
         if action_dist is not None and action is not None:
             actor_loss = - \
-                             action_dist.log_prob(action.clone().detach()) * advantage
+                action_dist.log_prob(action.clone().detach()) * advantage
         else:
             # Placeholder for cases without action_dist/action
             actor_loss = torch.tensor(0.0)
@@ -206,7 +210,8 @@ class Agent:
             optimizer.step()
 
         core_values_loss.backward()
-        print(f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}")
+        print(f"Job: {job_id} Finished, Policy Loss: {
+              policy_loss.item()}, Value Loss: {core_values_loss.item()}")
 
     def compute_advantages(self, rewards, values, gamma=0.99, normalize=True):
         advantages = []
@@ -215,7 +220,7 @@ class Agent:
 
         for t in reversed(range(len(rewards))):
             td_error = (rewards[t] + gamma * (0 if t ==
-                                                   len(rewards) - 1 else values[t + 1]) - values[t])
+                                              len(rewards) - 1 else values[t + 1]) - values[t])
             advantage = td_error + gamma * 0.95 * advantage
             advantages.insert(0, advantage)
             returns.inser

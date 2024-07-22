@@ -85,7 +85,8 @@ class Monitor:
         del self.time_log['time_values']
         plt.figure(figsize=(10, 5))
         plt.plot(x_values, y_values, marker='o', linestyle='-')
-        plt.axhline(y=environment_config['environment']['cycle'], color='red', linestyle='--', label='-set-cycle-time')
+        plt.axhline(y=environment_config['environment']['cycle'],
+                    color='red', linestyle='--', label='-set-cycle-time')
         plt.title("Sleeping time on each iteration")
         plt.xlabel("iteration")
         plt.ylabel("sleeping time")
@@ -128,12 +129,18 @@ class Monitor:
         self.env_log['pes'][iteration] = state[1]
         self.env_log['jobs'][iteration] = state[0]
         self.env_log['window']['pool'].append(window_log['pool'])
-        self.env_log['window']['current_cycle'].append(window_log['current_cycle'])
-        self.env_log['window']['active_jobs_ID'].append(window_log['active_jobs_ID'])
-        self.env_log['preprocessing']['active_jobs_ID'].append(preprocessing_log['active_jobs_ID'])
-        self.env_log['preprocessing']['job_pool'].append(preprocessing_log['job_pool'])
-        self.env_log['preprocessing']['ready_queue'].append(preprocessing_log['ready_queue'])
-        self.env_log['preprocessing']['wait_queue'].append(preprocessing_log['wait_queue'])
+        self.env_log['window']['current_cycle'].append(
+            window_log['current_cycle'])
+        self.env_log['window']['active_jobs_ID'].append(
+            window_log['active_jobs_ID'])
+        self.env_log['preprocessing']['active_jobs_ID'].append(
+            preprocessing_log['active_jobs_ID'])
+        self.env_log['preprocessing']['job_pool'].append(
+            preprocessing_log['job_pool'])
+        self.env_log['preprocessing']['ready_queue'].append(
+            preprocessing_log['ready_queue'])
+        self.env_log['preprocessing']['wait_queue'].append(
+            preprocessing_log['wait_queue'])
 
     def save_logs(self, time=True, main=True, summery=True, agent=True):
         if time:

@@ -1,0 +1,10 @@
+Agent-config
+{
+    "learning_mod": 1,
+    "alpha": 1,
+    "beta": 1,
+    "learning_rate": 0.1,
+    "gamma": 0.99
+}
+avg-time: 0.0
+avg-energy: 0.0
