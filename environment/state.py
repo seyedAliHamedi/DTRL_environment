@@ -33,14 +33,28 @@ class State:
         return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        e = 0
+        pe = Database.get_device(pe_ID)
+        acceptable_tasks = pe["acceptableTasks"]
+        task_kind = Database.get_task(task_ID)["task_kind"]
+
+        fail_flag = 0
+        if (task_kind not in acceptable_tasks) and (Database.get_task(task_ID)["is_safe"] and not pe['handleSafeTask']):
+            fail_flag = 1
+            return self.reward_function(punish=True), fail_flag
+        elif Database.get_task(task_ID)["is_safe"] and not pe['handleSafeTask']:
+            fail_flag = 2
+            return self.reward_function(punish=True), fail_flag
+        elif task_kind not in acceptable_tasks:
+            fail_flag = 3
+            return self.reward_function(punish=True), fail_flag
+
         execution_time = t = math.ceil(Database.get_task(task_ID)[
                                            "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
 
-        if queue_index == -1:
-            return self.reward_function(punish=-100)
+        # if queue_index == -1:
+        #     return self.reward_function(punish=-100)
 
         # apply on queue
         self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
@@ -58,13 +72,14 @@ class State:
             e = capacitance * (volt * volt) * freq * t
 
         # ! reward: e+t
-        return self.reward_function(e=e, alpha=1, t=t, beta=1)
+
+        return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
 
     def reward_function(self, e=0, alpha=0, t=0, beta=0, punish=0):
         if punish == 0:
-            return -np.log((e * alpha) + (t * beta))
+            return np.exp(-1 * (e + t))
         else:
-            return punish
+            return -100
 
     def _init_PEs(self, PEs):
         for pe in PEs:
