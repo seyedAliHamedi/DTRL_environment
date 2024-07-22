@@ -149,7 +149,8 @@ class Agent:
         if job_state and len(job_state["remainingTasks"]) == 0:
             total_loss = self.update(self.main_log_probs[job_id], self.sub_log_probs[job_id],
                                      self.rewards[job_id], self.selected_devices[job_id])
-            del self.log_probs[job_id]
+            del self.main_log_probs[job_id]
+            del self.sub_log_probs[job_id]
             del self.rewards[job_id]
             del self.time[job_id]
             del self.energy[job_id]
