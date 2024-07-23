@@ -69,8 +69,8 @@ jobs_config = {
     },
 }
 environment_config = {
-    "window": {"size": 10, "max_jobs": 10, "clock": 3},
-    "environment": {"cycle": 0.001}
+    "window": {"size": 10, "max_jobs": 1, "clock": 3},
+    "environment": {"cycle": 0.1}
 
 }
 monitor_config = {

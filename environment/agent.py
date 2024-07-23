@@ -74,8 +74,7 @@ class Agent:
 
         job_state, pe_state = State().get()
 
-        current_task_id = task_queue.pop(0)
-        Preprocessing().remove_from_queue(current_task_id)
+        current_task_id = task_queue[0]
 
         current_task = Database().get_task(current_task_id)
         # input_state = get_input(current_task, pe_state)
@@ -126,6 +125,10 @@ class Agent:
         reward, fail_flag, energy, time = State().apply_action(selected_device_index,
                                                                selected_core_index, dvfs[0], dvfs[1], current_task_id)
 
+        if fail_flag == 0:
+            # Remove scheduled task from Preprocessing queue if there were no fails
+            Preprocessing().remove_from_queue(current_task_id)
+
         # option_loss = -option_dist.log_prob(torch.tensor(option)) * reward
         # actor_loss = -action_dist.log_prob(torch.tensor(action)) * reward
 
@@ -149,7 +152,7 @@ class Agent:
         if job_state and len(job_state["remainingTasks"]) == 1:
             total_loss = self.update(self.main_log_probs[job_id], self.sub_log_probs[job_id],
                                      self.rewards[job_id], self.selected_devices[job_id])
-
+            print("DONE")
             Monitor().add_agent_log(
                 {
                     'loss': total_loss.item(),
@@ -189,9 +192,9 @@ class Agent:
         main_loss = -torch.sum(main_log_probs.mul(returns))
         # sub_loss = -torch.sum(sub_log_probs.mul(returns))
 
-        # self.device_optimizer.zero_grad()
-        # main_loss.backward()
-        # self.device_optimizer.step()
+        self.device_optimizer.zero_grad()
+        main_loss.backward()
+        self.device_optimizer.step()
 
         # for optimizer in self.core.optimizers:
         #     optimizer.zero_grad()
