@@ -233,16 +233,16 @@ class Generator:
         Generator._task_id_counter += 1
         # generate tasks based on the attribute ranges and bounds defind in the config file
         input_size = np.random.randint(
-            config["input_size"][0], config["input_size"][1])
+            config["input_size"][0], config["input_size"][1]) * 1e6
         output_size = np.random.randint(
-            config["output_size"][0], config["output_size"][1])
+            config["output_size"][0], config["output_size"][1]) * 1e6
         task_kind = np.random.choice(config["task_kinds"])
         safe = int(np.random.choice([0, 1], p=[config["safe_measurement"][0],
                                                config["safe_measurement"][1]]))
         computational_load = np.random.randint(
             config["computational_load"][0],
             config["computational_load"][1],
-        )
+        ) * 1e6
         return {
             "id": task_id,
             "job_id": job_id,

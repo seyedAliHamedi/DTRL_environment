@@ -50,8 +50,9 @@ class State:
             fail_flag = 1
             return self.reward_function(punish=True), fail_flag, 0, 0
 
-        execution_time = t = math.ceil(task["computational_load"] / freq)
+        execution_time = t = (task["computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
+        print(f"E{execution_time}")
         queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
 
         # if queue_index == -1:

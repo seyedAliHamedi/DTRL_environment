@@ -55,9 +55,8 @@ class Environment:
                 time.sleep(sleeping_time)
 
                 iteration += 1
-        except:
-            traceback.print_exc()
-            print("An error has occurred")
+        except KeyboardInterrupt:
+            print("Interrupted")
         finally:
             if self.__monitor_flag:
                 Monitor().save_logs()

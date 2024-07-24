@@ -152,7 +152,6 @@ class Agent:
         if job_state and len(job_state["remainingTasks"]) == 1:
             total_loss = self.update(self.main_log_probs[job_id], self.sub_log_probs[job_id],
                                      self.rewards[job_id], self.selected_devices[job_id])
-            print("DONE")
             Monitor().add_agent_log(
                 {
                     'loss': total_loss.item(),
