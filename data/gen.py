@@ -192,7 +192,7 @@ class Generator:
                 successor_list = []
                 for selected_task in task_list:
                     if task['id'] in selected_task["predecessors"]:
-                        successor_list.append(task['id'])
+                        successor_list.append(selected_task['id'])
                 task["successors"] = list(set(successor_list))
 
             # set the tasks and update the job.tasks_list
