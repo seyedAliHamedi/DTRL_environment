@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import numpy as np
 
 torch.autograd.set_detect_anomaly(True)
-
+from data.configs import monitor_config
 
 class Agent:
     _instance = None
@@ -116,11 +116,12 @@ class Agent:
         if (self.done_tasks / 100000 * 100) % 2 == 1:
             print(self.done_tasks / 100000 * 100)
 
-        Monitor().add_log(
-            f"Agent Action::Device: {selected_device_index} |"
-            f" Core: {selected_core_index} | freq: {dvfs[0]} |"
-            f" vol: {dvfs[1]} | task_id: {current_task_id} |"
-            f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n', end='')
+        if monitor_config['settings']['agent']:
+            Monitor().add_log(
+                f"Agent Action::Device: {selected_device_index} |"
+                f" Core: {selected_core_index} | freq: {dvfs[0]} |"
+                f" vol: {dvfs[1]} | task_id: {current_task_id} |"
+                f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n', end='')
 
         if display:
             print(f"Agen Action:: Device: {selected_device_index} | Core: {selected_core_index} | task: {current_task_id}")

@@ -1,5 +1,5 @@
 import math
-from data.configs import summary_log_string
+from data.configs import summary_log_string,monitor_config
 import pandas as pd
 import numpy as np
 from data.db import Database
@@ -130,11 +130,12 @@ class State:
             print(pd.DataFrame(self._jobs), "\n")
             print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
-        Monitor().add_log('PEs::', start='\n\n', end='')
-        Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
-        Monitor().add_log("Jobs::", start='\n', end='')
-        Monitor().add_log(f'{pd.DataFrame(self._jobs).to_string()}')
-        Monitor().add_log(summary_log_string, start='\n')
+        if monitor_config['settings']['main']:
+            Monitor().add_log('PEs::', start='\n\n', end='')
+            Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
+            Monitor().add_log("Jobs::", start='\n', end='')
+            Monitor().add_log(f'{pd.DataFrame(self._jobs).to_string()}')
+            Monitor().add_log(summary_log_string, start='\n')
 
     ########  UPDATE JOBS #######
     def __update_jobs(self):

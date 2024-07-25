@@ -74,6 +74,12 @@ environment_config = {
 
 }
 monitor_config = {
+    'settings': {
+        'time': True,
+        'main': False,
+        'summary': False,
+        'agent': True
+    },
     'paths': {
         'time': {
             'plot': './logs/simulation/time_plot.png',

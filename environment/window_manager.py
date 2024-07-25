@@ -2,7 +2,7 @@ import random
 from copy import copy
 
 from data.db import Database
-from data.configs import environment_config
+from data.configs import environment_config,monitor_config
 from environment.state import State
 from utilities.monitor import Monitor
 
@@ -153,10 +153,11 @@ class Preprocessing:
         self.update_active_jobs(jobs)
         self.process()
 
-        Monitor().add_log(f"active_jobs: {self.active_jobs.keys()}")
-        Monitor().add_log(f"job_pool: {self.job_pool.keys()}")
-        Monitor().add_log(f"wait_queue: {self.wait_queue}")
-        Monitor().add_log(f"queue: {self.queue}")
+        if monitor_config['settings']['main']:
+            Monitor().add_log(f"active_jobs: {self.active_jobs.keys()}")
+            Monitor().add_log(f"job_pool: {self.job_pool.keys()}")
+            Monitor().add_log(f"wait_queue: {self.wait_queue}")
+            Monitor().add_log(f"queue: {self.queue}")
 
     def get_agent_queue(self):
         agent_queue = {}
