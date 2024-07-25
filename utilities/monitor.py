@@ -71,7 +71,7 @@ class Monitor:
         self.agent_log['live-log']['fail'].append(log['fail'])
 
     def add_time(self, time, iteration):
-        if time > 0.5:
+        if time > environment_config["environment"]["anomaly_th"]:
             self.time_log['anomalies'][iteration] = time
         else:
             self.time_log['time_values'][iteration] = time
