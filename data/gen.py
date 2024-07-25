@@ -186,6 +186,15 @@ class Generator:
                 task_list.append(new_task)
             deadline = np.random.randint(1, max_deadline)
 
+            # find successors of each task
+
+            for task in task_list:
+                successor_list = []
+                for selected_task in task_list:
+                    if task['id'] in selected_task["predecessors"]:
+                        successor_list.append(task['id'])
+                task["successors"] = list(set(successor_list))
+
             # set the tasks and update the job.tasks_list
 
             job = {
@@ -254,7 +263,4 @@ class Generator:
             "task_kind": task_kind,
             "is_head": is_head,
             "is_tail": is_tail,
-            "execution_time": -1,
-            "energy_consumed": -1,
-            "status": "NOT_REGISTERED",
         }
