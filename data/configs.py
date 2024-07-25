@@ -1,7 +1,7 @@
 devices_config = {
     "iot": {
         "num_devices": 10,
-        "num_cores": [4],
+        "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -41,7 +41,7 @@ devices_config = {
 
     },
     "cloud": {
-        "num_devices": 1,
+        "num_devices": 0,
         "num_cores": -1,
         "voltage_frequencies": ((2.8e9, 13.85), (3.9e9, 24.28)),
         "isl": -1,
