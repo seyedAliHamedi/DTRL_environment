@@ -57,9 +57,9 @@ class Agent:
             print(f"Agent  queue: {queue}")
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
-            self.schedule(task_queue, job_ID)
+            self.schedule(task_queue, job_ID, display)
 
-    def schedule(self, task_queue, job_id):
+    def schedule(self, task_queue, job_id, display):
         if len(task_queue) == 0:
             return
 
@@ -121,6 +121,9 @@ class Agent:
             f" Core: {selected_core_index} | freq: {dvfs[0]} |"
             f" vol: {dvfs[1]} | task_id: {current_task_id} |"
             f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n', end='')
+
+        if display:
+            print(f"Agen Action:: Device: {selected_device_index} | Core: {selected_core_index} | task: {current_task_id}")
 
         reward, fail_flag, energy, time = State().apply_action(selected_device_index,
                                                                selected_core_index, dvfs[0], dvfs[1], current_task_id)

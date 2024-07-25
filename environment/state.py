@@ -172,7 +172,6 @@ class State:
                 return True
         return False
 
-
     def __remove_finished_active_jobs(self, removing_items):
         for item in removing_items:
             del self._jobs[item]
@@ -183,42 +182,40 @@ class State:
 
     ####### UPDATE PEs #######
     def __update_PEs(self):
-        self.__update_PEs_queue()
-        self.__update_occupied_cores()
-        self.__update_energy_consumption()
-        self.__update_batteries_capp()
-
-    def __update_batteries_capp(self):
-        for pe in self._PEs.values():
-            if pe["type"] == "mec" or pe["type"] == "cloud":
-                continue
-            pe["batteryLevel"] -= sum(pe["energyConsumption"])
-
-    def __update_energy_consumption(self):
         for pe_ID in self._PEs.keys():
-            for core_index, core_av in enumerate(self._PEs[pe_ID]["occupiedCores"]):
-                if core_av == 0:
-                    self._PEs[pe_ID]["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
-                        core_index]
+            pe = self._PEs[pe_ID]
+            self.__update_PEs_queue(pe)
+            self.__update_occupied_cores(pe, pe_ID)
+            self.__update_batteries_capp(pe)
 
-    def __update_PEs_queue(self):
-        for pe in self._PEs.values():
-            deleting_queues_on_pe = []
-            for core_index, core_queue in enumerate(pe["queue"]):
-                current_queue = core_queue
-                # if time of this slot in queue is 0
-                if current_queue[0][0] == 0:
-                    if current_queue[0][1] != -1:
-                        finished_task_ID = current_queue[0][1]
-                        self.__task_finished(finished_task_ID)
-                    if pe["type"] == "cloud":
-                        deleting_queues_on_pe.append(core_index)
-                        continue
-                    queue_shift_left(current_queue)
-                else:
-                    current_queue[0] = (
-                        current_queue[0][0] - 1, current_queue[0][1])
-            self.__remove_unused_cores_cloud(pe, deleting_queues_on_pe)
+    def __update_batteries_capp(self, pe):
+        if pe["type"] == "mec" or pe["type"] == "cloud":
+            return
+        pe["batteryLevel"] -= sum(pe["energyConsumption"])
+
+    def __update_energy_consumption(self, pe, pe_ID):
+        for core_index, core_av in enumerate(pe["occupiedCores"]):
+            if core_av == 0:
+                pe["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
+                    core_index]
+
+    def __update_PEs_queue(self, pe):
+        deleting_queues_on_pe = []
+        for core_index, core_queue in enumerate(pe["queue"]):
+            current_queue = core_queue
+            # if time of this slot in queue is 0
+            if current_queue[0][0] == 0:
+                if current_queue[0][1] != -1:
+                    finished_task_ID = current_queue[0][1]
+                    self.__task_finished(finished_task_ID)
+                if pe["type"] == "cloud":
+                    deleting_queues_on_pe.append(core_index)
+                    continue
+                queue_shift_left(current_queue)
+            else:
+                current_queue[0] = (
+                    current_queue[0][0] - 1, current_queue[0][1])
+        self.__remove_unused_cores_cloud(pe, deleting_queues_on_pe)
 
     def __remove_unused_cores_cloud(self, pe, core_list):
         for i, item in enumerate(core_list):
@@ -235,14 +232,15 @@ class State:
             print(f"error {task_ID} | job {job_ID}")
             raise
 
-    def __update_occupied_cores(self):
-        # based on pe queue
-        for pe in self._PEs.values():
-            for core_index, core in enumerate(pe["occupiedCores"]):
-                if is_core_free(pe["queue"][core_index]):
-                    pe["occupiedCores"][core_index] = 0
-                else:
-                    pe["occupiedCores"][core_index] = 1
+    def __update_occupied_cores(self, pe, pe_ID):
+        for core_index, core in enumerate(pe["occupiedCores"]):
+            if is_core_free(pe["queue"][core_index]):
+                pe["occupiedCores"][core_index] = 0
+                # set default energy cons for idle cores
+                pe["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
+                    core_index]
+            else:
+                pe["occupiedCores"][core_index] = 1
 
 
 ####### UTILITY #######

@@ -1,7 +1,7 @@
 devices_config = {
     "iot": {
         "num_devices": 10,
-        "num_cores": [4, 8, 16],
+        "num_cores": [4],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -70,7 +70,7 @@ jobs_config = {
 }
 environment_config = {
     "window": {"size": 10, "max_jobs": 1, "clock": 3},
-    "environment": {"cycle": 0.1}
+    "environment": {"cycle": 0.001, "anomaly_th": 0.5}
 
 }
 monitor_config = {

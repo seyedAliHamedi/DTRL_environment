@@ -28,6 +28,7 @@ class Environment:
             while iteration <= self.n_iterations:
                 if iteration % 500 == 0:
                     print(f"iteration : {iteration}")
+
                 starting_time = time.time()
 
                 WindowManager().run()
@@ -35,24 +36,15 @@ class Environment:
                 Preprocessing().run()
                 Agent().run(self.display)
 
-                # Monitor logging
-                if self.__monitor_flag:
-                    Monitor().set_env_log(State().get(), WindowManager().get_log(),
-                                          Preprocessing().get_log(), iteration)
-
-                # Calculating time passed in iteration and saving log
                 time_len = time.time() - starting_time
 
+                # Monitor logging
+                self.monitor_log(iteration)
+
+                # Calculating time passed in iteration and saving log
+
                 # Calculate sleeping time
-                sleeping_time = self.cycle_wait - time_len
-                if sleeping_time < 0:
-                    sleeping_time = 0
-                    if self.__monitor_flag:
-                        Monitor().add_time(time_len, iteration)
-                else:
-                    if self.__monitor_flag:
-                        Monitor().add_time(self.cycle_wait, iteration)
-                time.sleep(sleeping_time)
+                self.sleep(time_len, iteration)
 
                 iteration += 1
         except KeyboardInterrupt:
@@ -60,3 +52,19 @@ class Environment:
         finally:
             if self.__monitor_flag:
                 Monitor().save_logs()
+
+    def sleep(self, time_len, iteration):
+        sleeping_time = self.cycle_wait - time_len
+        if sleeping_time < 0:
+            sleeping_time = 0
+            if self.__monitor_flag:
+                Monitor().add_time(time_len, iteration)
+        else:
+            if self.__monitor_flag:
+                Monitor().add_time(self.cycle_wait, iteration)
+        time.sleep(sleeping_time)
+
+    def monitor_log(self, iteration):
+        if self.__monitor_flag:
+            Monitor().set_env_log(State().get(), WindowManager().get_log(),
+                                  Preprocessing().get_log(), iteration)
