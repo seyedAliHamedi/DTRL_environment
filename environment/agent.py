@@ -45,10 +45,6 @@ class Agent:
             cls._instance.fail = {}
             cls._instance.selected_devices = {}
 
-            cls._instance.done_tasks = 0
-            cls._instance.first_t_loss = None
-            cls._instance.last_t_loss = None
-
         return cls._instance
 
     def run(self, display):
@@ -110,11 +106,6 @@ class Agent:
             selected_core_index = -1
             i = np.random.randint(0, 1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
-
-        self.done_tasks += 1
-
-        if (self.done_tasks / 100000 * 100) % 2 == 1:
-            print(self.done_tasks / 100000 * 100)
 
         Monitor().add_log(
             f"Agent Action::Device: {selected_device_index} |"
@@ -184,25 +175,25 @@ class Agent:
 
         main_log_probs = torch.stack(main_log_probs)
 
-        # sub_log_probs = torch.tensor(sub_log_probs, requires_grad=True)
-        # if len(sub_log_probs) < len(returns):
-        #     padding_len = len(returns) - len(sub_log_probs)
-        #     sub_log_probs = F.pad(sub_log_probs, (0, padding_len), value=0)
+        sub_log_probs = torch.tensor(sub_log_probs, requires_grad=True)
+        if len(sub_log_probs) < len(returns):
+            padding_len = len(returns) - len(sub_log_probs)
+            sub_log_probs = F.pad(sub_log_probs, (0, padding_len), value=0)
 
         main_loss = -torch.sum(main_log_probs.mul(returns))
-        # sub_loss = -torch.sum(sub_log_probs.mul(returns))
+        sub_loss = -torch.sum(sub_log_probs.mul(returns))
 
-        self.device_optimizer.zero_grad()
-        main_loss.backward()
-        self.device_optimizer.step()
+        # self.device_optimizer.zero_grad()
+        # main_loss.backward()
+        # self.device_optimizer.step()
 
-        # for optimizer in self.core.optimizers:
-        #     optimizer.zero_grad()
-        # sub_loss.backward()
-        # for optimizer in self.core.optimizers:
-        #     optimizer.step()
+        for optimizer in self.core.optimizers:
+            optimizer.zero_grad()
+        sub_loss.backward()
+        for optimizer in self.core.optimizers:
+            optimizer.step()
 
-        total_loss = main_loss + 0
+        total_loss = main_loss + sub_loss
         return total_loss
 
     def updata_params(self, job_id, log_probs, core_values, rewards):
@@ -221,7 +212,8 @@ class Agent:
             optimizer.step()
 
         core_values_loss.backward()
-        print(f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}")
+        print(
+            f"Job: {job_id} Finished, Policy Loss: {policy_loss.item()}, Value Loss: {core_values_loss.item()}")
 
     def compute_advantages(self, rewards, values, gamma=0.99, normalize=True):
         advantages = []
