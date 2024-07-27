@@ -2,7 +2,7 @@ import random
 from copy import copy
 
 from data.db import Database
-from data.configs import environment_config
+from data.configs import environment_config, monitor_config
 from environment.state import State
 from utilities.monitor import Monitor
 
@@ -76,18 +76,52 @@ class Preprocessing:
             cls._instance.queue = []
         return cls._instance
 
-    def get_log(self):
-        return {
-            'active_jobs_ID': list(self.active_jobs.keys()),
-            'job_pool': list(self.job_pool.keys()),
-            'ready_queue': self.queue,
-            'wait_queue': self.wait_queue,
-        }
+    def run(self):
+        jobs, _ = State().get()
+        self.update_active_jobs(jobs)
+        self.process()
+
+        if monitor_config['settings']['main']:
+            Monitor().add_log(f"active_jobs: {self.active_jobs.keys()}")
+            Monitor().add_log(f"job_pool: {self.job_pool.keys()}")
+            Monitor().add_log(f"wait_queue: {self.wait_queue}")
+            Monitor().add_log(f"queue: {self.queue}")
+
+    def update_active_jobs(self, state_jobs):
+        # add to active jobs
+        for job_ID in state_jobs.keys():
+            if job_ID not in self.active_jobs.keys():
+                self.active_jobs[job_ID] = state_jobs[job_ID]
+            else:
+                # update job values from state
+                self.active_jobs[job_ID] = state_jobs[job_ID]
+
+        # remove from active jobs
+        deleting_list = []
+        for job_ID in self.active_jobs.keys():
+            job = self.active_jobs[job_ID]
+            if len(job['finishedTasks']) + len(job["runningTasks"]) == job["task_count"]:
+                deleting_list.append(job_ID)
+        for item in deleting_list:
+            self.active_jobs.pop(item)
+
+        # add to job_pool
+        while len(self.active_jobs.keys()) > self.max_jobs:
+            job_ID, job = self.active_jobs.popitem()
+            self.job_pool[job_ID] = job
+
+        # remove from job_pool
+        while (len(self.active_jobs.keys()) < self.max_jobs) and len(self.job_pool.keys()) > 0:
+            job_ID, job = self.job_pool.popitem()
+            self.active_jobs[job_ID] = job
 
     def process(self):
         # add window tasks to wait queue
         for task in State().get_task_window():
-            self.wait_queue.append(task)
+            if self._is_ready_task(task):
+                self.queue.append(task)
+            else:
+                self.wait_queue.append(task)
 
         # add ready task from wait queue to main queue
         for task in self.wait_queue:
@@ -120,44 +154,6 @@ class Preprocessing:
         else:
             return False
 
-    def update_active_jobs(self, state_jobs):
-        # add to active jobs
-        for job_ID in state_jobs.keys():
-            if job_ID not in self.active_jobs.keys():
-                self.active_jobs[job_ID] = state_jobs[job_ID]
-            else:
-                # update job values from state
-                self.active_jobs[job_ID] = state_jobs[job_ID]
-
-        # remove from active jobs
-        deleting_list = []
-        for job_ID in self.active_jobs.keys():
-            job = self.active_jobs[job_ID]
-            if len(job['finishedTasks']) + len(job["runningTasks"]) == job["task_count"]:
-                deleting_list.append(job_ID)
-        for item in deleting_list:
-            self.active_jobs.pop(item)
-
-        # add to job_pool
-        while len(self.active_jobs.keys()) > self.max_jobs:
-            job_ID, job = self.active_jobs.popitem()
-            self.job_pool[job_ID] = job
-
-        # remove from job_pool
-        while (len(self.active_jobs.keys()) < self.max_jobs) and len(self.job_pool.keys()) > 0:
-            job_ID, job = self.job_pool.popitem()
-            self.active_jobs[job_ID] = job
-
-    def run(self):
-        jobs, _ = State().get()
-        self.update_active_jobs(jobs)
-        self.process()
-
-        Monitor().add_log(f"active_jobs: {self.active_jobs.keys()}")
-        Monitor().add_log(f"job_pool: {self.job_pool.keys()}")
-        Monitor().add_log(f"wait_queue: {self.wait_queue}")
-        Monitor().add_log(f"queue: {self.queue}")
-
     def get_agent_queue(self):
         agent_queue = {}
         for job_ID in self.active_jobs.keys():
@@ -173,3 +169,11 @@ class Preprocessing:
             self.queue.remove(task_ID)
         except ValueError:
             raise f"task{task_ID} is not in window-manager queue"
+
+    def get_log(self):
+        return {
+            'active_jobs_ID': list(self.active_jobs.keys()),
+            'job_pool': list(self.job_pool.keys()),
+            'ready_queue': self.queue,
+            'wait_queue': self.wait_queue,
+        }

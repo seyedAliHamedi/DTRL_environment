@@ -1,3 +1,4 @@
+from data.configs import monitor_config
 from environment.dtrl.og_tree import OGTree
 from environment.dtrl.value_network import ValueNetwork
 import torch.optim as optim
@@ -53,9 +54,9 @@ class Agent:
             print(f"Agent  queue: {queue}")
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
-            self.schedule(task_queue, job_ID)
+            self.schedule(task_queue, job_ID, display)
 
-    def schedule(self, task_queue, job_id):
+    def schedule(self, task_queue, job_id, display):
         if len(task_queue) == 0:
             return
 
@@ -143,7 +144,6 @@ class Agent:
         if job_state and len(job_state["remainingTasks"]) == 1:
             total_loss = self.update(self.main_log_probs[job_id], self.sub_log_probs[job_id],
                                      self.rewards[job_id], self.selected_devices[job_id])
-            print("DONE")
             Monitor().add_agent_log(
                 {
                     'loss': total_loss.item(),

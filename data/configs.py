@@ -41,7 +41,7 @@ devices_config = {
 
     },
     "cloud": {
-        "num_devices": 1,
+        "num_devices": 0,
         "num_cores": -1,
         "voltage_frequencies": ((2.8e9, 13.85), (3.9e9, 24.28)),
         "isl": -1,
@@ -69,11 +69,17 @@ jobs_config = {
     },
 }
 environment_config = {
-    "window": {"size": 10, "max_jobs": 10, "clock": 3},
-    "environment": {"cycle": 0.1}
+    "window": {"size": 10, "max_jobs": 1, "clock": 3},
+    "environment": {"cycle": 0.001, "anomaly_th": 0.5}
 
 }
 monitor_config = {
+    'settings': {
+        'time': True,
+        'main': False,
+        'summary': False,
+        'agent': True
+    },
     'paths': {
         'time': {
             'plot': './logs/simulation/time_plot.png',

@@ -59,12 +59,5 @@ class Database:
 
     @classmethod
     def get_task_successors(cls, task_ID):
-        owner_job = Database.get_job(Database.get_task(task_ID)['job_id'])
-        job_task_list = owner_job['tasks_ID']
-        successor_list = []
-        for task in job_task_list:
-            selected_task = Database.get_task(task)
-            if task_ID in selected_task["predecessors"]:
-                successor_list.append(task)
-        return successor_list
+        return Database.get_task(task_ID)['successors']
 

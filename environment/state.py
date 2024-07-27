@@ -1,5 +1,5 @@
 import math
-from data.configs import summary_log_string
+from data.configs import summary_log_string,monitor_config
 import pandas as pd
 import numpy as np
 from data.db import Database
@@ -35,44 +35,49 @@ class State:
         return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        pe = Database.get_device(pe_ID)
-        acceptable_tasks = pe["acceptableTasks"]
+        pe = self._PEs[pe_ID]
+        pe_database = Database.get_device(pe_ID)
+        acceptable_tasks = pe_database["acceptableTasks"]
         task = Database.get_task(task_ID)
 
         fail_flag = 0
-        if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe['handleSafeTask']):
+        if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe_database['handleSafeTask']):
             fail_flag = 2
             return self.reward_function(punish=True), fail_flag, 0, 0
-        elif Database.get_task(task_ID)["is_safe"] and not pe['handleSafeTask']:
+        elif Database.get_task(task_ID)["is_safe"] and not pe_database['handleSafeTask']:
             fail_flag = 1
             return self.reward_function(punish=True), fail_flag, 0, 0
         elif task["task_kind"] not in acceptable_tasks:
             fail_flag = 1
             return self.reward_function(punish=True), fail_flag, 0, 0
 
-        execution_time = t = math.ceil(task["computational_load"] / freq)
+        execution_time = t = math.ceil(Database.get_task(task_ID)[
+                                           "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
-        queue_index, core_index = find_place(self._PEs[pe_ID], core_i)
+        queue_index, core_index = find_place(pe, core_i)
 
         # if queue_index == -1:
         #     return self.reward_function(punish=-100)
 
         # apply on queue
-        self._PEs[pe_ID]["queue"][core_index][queue_index] = placing_slot
+        pe["queue"][core_index][queue_index] = placing_slot
         job_ID = task["job_id"]
-        self._jobs[job_ID]["assignedTask"] = task_ID
+        job = self._jobs[job_ID]
+        job["assignedTask"] = task_ID
+
+        # remove new assigned task from target job remaining tasks and add it to running tasks
+        job["remainingTasks"].remove(job["assignedTask"])
+        job["runningTasks"].append(task_ID)
 
         # apply energyConsumption
-        if self._PEs[pe_ID]['type'] == 'cloud':
-            self._PEs[pe_ID]["energyConsumption"][core_index] = volt
+        if pe['type'] == 'cloud':
+            pe["energyConsumption"][core_index] = volt
             e = volt * t
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
-            self._PEs[pe_ID]["energyConsumption"][core_index] = capacitance * \
-                                                                (volt * volt) * freq
+            pe["energyConsumption"][core_index] = capacitance * \
+                                                  (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
-
-        # ! reward: e+t
 
         return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
 
@@ -125,19 +130,30 @@ class State:
             print(pd.DataFrame(self._jobs), "\n")
             print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
-        Monitor().add_log('PEs::', start='\n\n', end='')
-        Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
-        Monitor().add_log("Jobs::", start='\n', end='')
-        Monitor().add_log(f'{pd.DataFrame(self._jobs).to_string()}')
-        Monitor().add_log(summary_log_string, start='\n')
+        if monitor_config['settings']['main']:
+            Monitor().add_log('PEs::', start='\n\n', end='')
+            Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
+            Monitor().add_log("Jobs::", start='\n', end='')
+            Monitor().add_log(f'{pd.DataFrame(self._jobs).to_string()}')
+            Monitor().add_log(summary_log_string, start='\n')
 
     ########  UPDATE JOBS #######
     def __update_jobs(self):
-        self.__update_deadlines()
+
         self.__add_new_active_jobs(self._task_window)
-        self.__update_remaining_tasks()
-        self.__update_running_tasks()
-        self.__remove_finished_active_jobs()
+
+        removing_items = []
+        for job_ID in self._jobs.keys():
+
+            # update deadlines
+            job = self._jobs[job_ID]
+            job["remainingDeadline"] -= 1
+
+            # check for finished jobs
+            if len(job["finishedTasks"]) == job["task_count"]:
+                removing_items.append(job_ID)
+
+        self.__remove_finished_active_jobs(removing_items)
 
     def __add_new_active_jobs(self, new_tasks):
         if self.display:
@@ -146,10 +162,9 @@ class State:
             job_id = Database.get_task(task)["job_id"]
             if not self.__is_active_job(job_id):
                 self._set_jobs([Database.get_job(job_id)])
-            self.__add_task_to_active_job(task)
+            self.__add_task_to_active_job(task, job_id)
 
-    def __add_task_to_active_job(self, task):
-        job_id = Database.get_task(task)["job_id"]
+    def __add_task_to_active_job(self, task, job_id):
         self._jobs[job_id]["remainingTasks"].append(task)
 
     def __is_active_job(self, job_ID):
@@ -158,32 +173,9 @@ class State:
                 return True
         return False
 
-    def __update_remaining_tasks(self):
-        for job in self._jobs.values():
-            if job["assignedTask"] or job["assignedTask"] == 0:
-                for task in job["remainingTasks"]:
-                    if task == job["assignedTask"]:
-                        job["remainingTasks"].remove(task)
-
-    def __update_running_tasks(self):
-        for job_ID in self._jobs.keys():
-            if self._jobs[job_ID]["assignedTask"] or self._jobs[job_ID]["assignedTask"] == 0:
-                self._jobs[job_ID]["runningTasks"].append(
-                    self._jobs[job_ID]["assignedTask"])
-
-    def __remove_finished_active_jobs(self):
-        removing_items = []
-        for job_ID in self._jobs.keys():
-            selected_job = self._jobs[job_ID]
-            if len(selected_job["finishedTasks"]) == selected_job["task_count"]:
-                removing_items.append(job_ID)
+    def __remove_finished_active_jobs(self, removing_items):
         for item in removing_items:
             del self._jobs[item]
-
-    def __update_deadlines(self):
-        # TODO : if < 0 return punishment ????
-        for job in self._jobs.values():
-            job["remainingDeadline"] -= 1
 
     def __remove_assigned_task(self):
         for job in self._jobs.values():
@@ -191,42 +183,40 @@ class State:
 
     ####### UPDATE PEs #######
     def __update_PEs(self):
-        self.__update_PEs_queue()
-        self.__update_occupied_cores()
-        self.__update_energy_consumption()
-        self.__update_batteries_capp()
-
-    def __update_batteries_capp(self):
-        for pe in self._PEs.values():
-            if pe["type"] == "mec" or pe["type"] == "cloud":
-                continue
-            pe["batteryLevel"] -= sum(pe["energyConsumption"])
-
-    def __update_energy_consumption(self):
         for pe_ID in self._PEs.keys():
-            for core_index, core_av in enumerate(self._PEs[pe_ID]["occupiedCores"]):
-                if core_av == 0:
-                    self._PEs[pe_ID]["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
-                        core_index]
+            pe = self._PEs[pe_ID]
+            self.__update_PEs_queue(pe)
+            self.__update_occupied_cores(pe, pe_ID)
+            self.__update_batteries_capp(pe)
 
-    def __update_PEs_queue(self):
-        for pe in self._PEs.values():
-            deleting_queues_on_pe = []
-            for core_index, core_queue in enumerate(pe["queue"]):
-                current_queue = pe["queue"][core_index]
-                # if time of this slot in queue is 0
-                if current_queue[0][0] == 0:
-                    if current_queue[0][1] != -1:
-                        finished_task_ID = current_queue[0][1]
-                        self.__task_finished(finished_task_ID)
-                    if pe["type"] == "cloud":
-                        deleting_queues_on_pe.append(core_index)
-                        continue
-                    queue_shift_left(current_queue)
-                else:
-                    current_queue[0] = (
-                        current_queue[0][0] - 1, current_queue[0][1])
-            self.__remove_unused_cores_cloud(pe, deleting_queues_on_pe)
+    def __update_batteries_capp(self, pe):
+        if pe["type"] == "mec" or pe["type"] == "cloud":
+            return
+        pe["batteryLevel"] -= sum(pe["energyConsumption"])
+
+    def __update_energy_consumption(self, pe, pe_ID):
+        for core_index, core_av in enumerate(pe["occupiedCores"]):
+            if core_av == 0:
+                pe["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
+                    core_index]
+
+    def __update_PEs_queue(self, pe):
+        deleting_queues_on_pe = []
+        for core_index, core_queue in enumerate(pe["queue"]):
+            current_queue = core_queue
+            # if time of this slot in queue is 0
+            if current_queue[0][0] == 0:
+                if current_queue[0][1] != -1:
+                    finished_task_ID = current_queue[0][1]
+                    self.__task_finished(finished_task_ID)
+                if pe["type"] == "cloud":
+                    deleting_queues_on_pe.append(core_index)
+                    continue
+                queue_shift_left(current_queue)
+            else:
+                current_queue[0] = (
+                    current_queue[0][0] - 1, current_queue[0][1])
+        self.__remove_unused_cores_cloud(pe, deleting_queues_on_pe)
 
     def __remove_unused_cores_cloud(self, pe, core_list):
         for i, item in enumerate(core_list):
@@ -243,14 +233,15 @@ class State:
             print(f"error {task_ID} | job {job_ID}")
             raise
 
-    def __update_occupied_cores(self):
-        # based on pe queue
-        for pe in self._PEs.values():
-            for core_index, core in enumerate(pe["occupiedCores"]):
-                if is_core_free(pe["queue"][core_index]):
-                    pe["occupiedCores"][core_index] = 0
-                else:
-                    pe["occupiedCores"][core_index] = 1
+    def __update_occupied_cores(self, pe, pe_ID):
+        for core_index, core in enumerate(pe["occupiedCores"]):
+            if is_core_free(pe["queue"][core_index]):
+                pe["occupiedCores"][core_index] = 0
+                # set default energy cons for idle cores
+                pe["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
+                    core_index]
+            else:
+                pe["occupiedCores"][core_index] = 1
 
 
 ####### UTILITY #######

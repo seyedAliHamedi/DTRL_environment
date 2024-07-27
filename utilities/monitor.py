@@ -71,7 +71,7 @@ class Monitor:
         self.agent_log['live-log']['fail'].append(log['fail'])
 
     def add_time(self, time, iteration):
-        if time > 0.5:
+        if time > environment_config["environment"]["anomaly_th"]:
             self.time_log['anomalies'][iteration] = time
         else:
             self.time_log['time_values'][iteration] = time
@@ -142,7 +142,10 @@ class Monitor:
         self.env_log['preprocessing']['wait_queue'].append(
             preprocessing_log['wait_queue'])
 
-    def save_logs(self, time=True, main=False, summery=False, agent=True):
+    def save_logs(self, time=monitor_config['settings']['time'],
+                  main=monitor_config['settings']['main'],
+                  summery=monitor_config['settings']['summary'],
+                  agent=monitor_config['settings']['agent']):
         if time:
             self._save_time_log()
         if main:
