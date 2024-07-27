@@ -1,5 +1,5 @@
 import math
-from data.configs import summary_log_string,monitor_config
+from data.configs import summary_log_string, monitor_config
 import pandas as pd
 import numpy as np
 from data.db import Database
@@ -52,7 +52,7 @@ class State:
             return self.reward_function(punish=True), fail_flag, 0, 0
 
         execution_time = t = math.ceil(Database.get_task(task_ID)[
-                                           "computational_load"] / freq)
+            "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(pe, core_i)
 
@@ -76,7 +76,7 @@ class State:
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             pe["energyConsumption"][core_index] = capacitance * \
-                                                  (volt * volt) * freq
+                (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
 
         return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
@@ -114,7 +114,7 @@ class State:
             }
 
     ####### ENVIRONMENT #######
-    def update(self, iteration):
+    def update(self):
 
         # process 1
         self.__update_jobs()
@@ -128,7 +128,8 @@ class State:
             print(pd.DataFrame(self._PEs), '\n')
             print("Jobs::")
             print(pd.DataFrame(self._jobs), "\n")
-            print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+            print(
+                "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
         if monitor_config['settings']['main']:
             Monitor().add_log('PEs::', start='\n\n', end='')

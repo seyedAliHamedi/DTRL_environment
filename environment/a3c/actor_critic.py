@@ -6,6 +6,9 @@ from torch.distributions import Categorical
 
 class ActorCritic(nn.Module):
     def __init__(self, input_dims, n_actions):
+        super(ActorCritic, self).__init__()
+        self.input_dims = input_dims
+        self.n_actions = n_actions
         self.actor = DDT(num_input=input_dims,
                          num_output=n_actions, depth=0, max_depth=3)
         self.critic = nn.Sequential(

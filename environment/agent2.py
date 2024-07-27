@@ -48,15 +48,13 @@ class Agent:
 
         return cls._instance
 
-    def run(self, display):
+    def run(self):
         queue = Preprocessing().get_agent_queue()
-        if display:
-            print(f"Agent  queue: {queue}")
         for job_ID in queue.keys():
             task_queue = queue[job_ID]
-            self.schedule(task_queue, job_ID, display)
+            self.schedule(task_queue, job_ID)
 
-    def schedule(self, task_queue, job_id, display):
+    def schedule(self, task_queue, job_id):
         if len(task_queue) == 0:
             return
 

@@ -106,7 +106,8 @@ class ActorCritic(nn.Module):
 
 
 class Agent(mp.Process):
-    def __init__(self, global_actor_critic, name, global_ep_idx, env_id):
+    def __init__(self, global_actor_critic, optimizer, input_dims, n_actions,
+                 gamma, lr, name, global_ep_idx, env_id):
         super(Agent, self).__init__()
         self.local_actor_critic = ActorCritic(input_dims, n_actions, gamma)
         self.global_actor_critic = global_actor_critic

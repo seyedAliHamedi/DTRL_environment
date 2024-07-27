@@ -1,8 +1,11 @@
+import multiprocessing
 import time
 import traceback
 
 from data.db import Database
-from environment.agent import Agent
+from environment.a3c.actor_critic import ActorCritic
+from environment.a3c.agent import Agent
+from environment.a3c.shared_adam import SharedAdam
 from environment.state import State
 from utilities.monitor import Monitor
 from environment.window_manager import Preprocessing, WindowManager
@@ -22,6 +25,19 @@ class Environment:
         self.__runner_flag = True
 
     def run(self):
+        WindowManager().run()
+        State().update()
+        Preprocessing().run()
+        max_jobs = Preprocessing().max_jobs
+        global_actor_critic = ActorCritic(
+            input_dims=5, n_actions=16)
+        global_actor_critic.share_memory()
+        optim = SharedAdam(global_actor_critic.parameters())
+        workers = [Agent(name=f"agent no.{
+                         i}", global_actor_critic=global_actor_critic, optimizer=optim) for i in range(max_jobs)]
+        [w.start() for w in workers]
+        [w.join() for w in workers]
+
         iteration = 0
         try:
             while iteration <= self.n_iterations:
@@ -31,9 +47,8 @@ class Environment:
                 starting_time = time.time()
 
                 WindowManager().run()
-                State().update(iteration)
+                State().update()
                 Preprocessing().run()
-                Agent().run(self.display)
 
                 time_len = time.time() - starting_time
 

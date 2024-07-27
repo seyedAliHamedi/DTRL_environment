@@ -179,27 +179,32 @@ class Monitor:
         fig, axs = plt.subplots(3, 2, figsize=(10, 20))
         # Plot each column in a separate plot
         # Plot for loss
-        axs[0, 0].plot(self.agent_log['live-log']["loss"], label='Loss', color="blue")
+        axs[0, 0].plot(self.agent_log['live-log']["loss"],
+                       label='Loss', color="blue")
         axs[0, 0].set_title('Loss')
         axs[0, 0].legend()
 
         # Plot for reward
-        axs[0, 1].plot(self.agent_log['live-log']["reward"], label='Reward',color="black")
+        axs[0, 1].plot(self.agent_log['live-log']["reward"],
+                       label='Reward', color="black")
         axs[0, 1].set_title('Reward')
         axs[0, 1].legend()
 
         # Plot for time
-        axs[1, 0].plot(self.agent_log['live-log']["time"], label='Time', color="red")
+        axs[1, 0].plot(self.agent_log['live-log']["time"],
+                       label='Time', color="red")
         axs[1, 0].set_title('Time')
         axs[1, 0].legend()
 
         # Plot for energy
-        axs[1, 1].plot(self.agent_log['live-log']["energy"], label='Energy', color="green")
+        axs[1, 1].plot(self.agent_log['live-log']["energy"],
+                       label='Energy', color="green")
         axs[1, 1].set_title('Energy')
         axs[1, 1].legend()
 
         # Plot for fail
-        axs[2, 0].plot(self.agent_log['live-log']["fail"], label='Fail',color="purple")
+        axs[2, 0].plot(self.agent_log['live-log']["fail"],
+                       label='Fail', color="purple")
         axs[2, 0].set_title('Fail')
         axs[2, 0].legend()
 

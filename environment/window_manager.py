@@ -17,7 +17,7 @@ class WindowManager:
             cls._instance.__head_index = 0
             cls._instance.__max_jobs = config["max_jobs"]
             cls._instance.__window_size = config["size"]
-            cls._instance.current_cycle = 1
+            cls._instance.current_cycle = config["clock"]
             cls._instance.__cycle = config["clock"]
             cls._instance.active_jobs_ID = []
         return cls._instance
@@ -71,6 +71,7 @@ class Preprocessing:
             cls._instance = super().__new__(cls)
             cls._instance.max_jobs = config["max_jobs"]
             cls._instance.active_jobs = {}
+            cls._instance.assigned_jobs = []
             cls._instance.job_pool = {}
             cls._instance.wait_queue = []
             cls._instance.queue = []
@@ -86,6 +87,12 @@ class Preprocessing:
             Monitor().add_log(f"job_pool: {self.job_pool.keys()}")
             Monitor().add_log(f"wait_queue: {self.wait_queue}")
             Monitor().add_log(f"queue: {self.queue}")
+
+    def assign_job(self):
+        for job in self.active_jobs.keys():
+            if job not in self.assign_jobs:
+                self.assign_jobs.append(job)
+                return job
 
     def update_active_jobs(self, state_jobs):
         # add to active jobs
@@ -104,6 +111,7 @@ class Preprocessing:
                 deleting_list.append(job_ID)
         for item in deleting_list:
             self.active_jobs.pop(item)
+            self.assign_jobs.remove(item)
 
         # add to job_pool
         while len(self.active_jobs.keys()) > self.max_jobs:
