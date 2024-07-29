@@ -34,12 +34,13 @@ class Environment:
 
         max_jobs = Preprocessing().max_jobs
         global_actor_critic = ActorCritic(
-            input_dims=5, n_actions=16)
+            input_dims=5, n_actions=15)
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
         workers = []
         for i in range(max_jobs):
-            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim)
+            worker = Agent(
+                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim)
             workers.append(worker)
 
         iteration = 0

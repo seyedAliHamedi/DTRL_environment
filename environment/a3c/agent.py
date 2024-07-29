@@ -30,7 +30,8 @@ class Agent(mp.Process):
     def run(self):
         if self.assigned_job is None:
             self.assigned_job = Preprocessing().assign_job()
-            self.task_queue = Preprocessing().get_agent_queue()[self.assigned_job]
+            self.task_queue = Preprocessing().get_agent_queue()[
+                self.assigned_job]
             self.local_actor_critic.clear_memory()
         self.schedule(self.task_queue, self.assigned_job)
         current_job = State().get_job(self.assigned_job)
@@ -40,10 +41,10 @@ class Agent(mp.Process):
             Monitor().add_agent_log(
                 {
                     'loss': total_loss.item(),
-                #     'reward': sum(self.rewards[self.assigned_job]) / len(self.rewards[self.assigned_job]),
-                #     'time': sum(self.time[self.assigned_job]) / len(self.time[self.assigned_job]),
-                #     'energy': sum(self.energy[self.assigned_job]) / len(self.energy[self.assigned_job]),
-                #     'fail': sum(self.fail[self.assigned_job]) / len(self.fail[self.assigned_job]),
+                    #     'reward': sum(self.rewards[self.assigned_job]) / len(self.rewards[self.assigned_job]),
+                    #     'time': sum(self.time[self.assigned_job]) / len(self.time[self.assigned_job]),
+                    #     'energy': sum(self.energy[self.assigned_job]) / len(self.energy[self.assigned_job]),
+                    #     'fail': sum(self.fail[self.assigned_job]) / len(self.fail[self.assigned_job]),
                 }
             )
 
@@ -57,11 +58,9 @@ class Agent(mp.Process):
         current_job = State().get_job(job_id)
         input_state = get_input(current_task, {})
 
-
         option = self.local_actor_critic.choose_action(input_state)
 
         selected_device_index = option
-        # print(self.devices[option])
         selected_device = self.devices[option]
 
         if selected_device['type'] != "cloud":

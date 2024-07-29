@@ -8,9 +8,15 @@ class SharedAdam(torch.optim.Adam):
         for group in self.param_groups:
             for p in group['params']:
                 state = self.state[p]
-                state['step'] = 0
-                state['exp_avg'] = torch.zeros_like(p.data)
-                state['exp_avg_sq'] = torch.zeros_like(p.data)
+                state['step'] = torch.tensor(0.0).share_memory_()
+                state['exp_avg'] = torch.zeros_like(p.data).share_memory_()
+                state['exp_avg_sq'] = torch.zeros_like(p.data).share_memory_()
 
-                state['exp_avg'].share_memory_()
-                state['exp_avg_sq'].share_memory_()
+    def step(self, closure=None):
+        for group in self.param_groups:
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+                state = self.state[p]
+                state['step'] += 1  # Increment the step tensor
+        super(SharedAdam, self).step(closure)
