@@ -33,14 +33,15 @@ class Environment:
                 if iteration % 500 == 0:
                     print(f"iteration : {iteration}")
 
-                starting_time = time.time()
 
                 WindowManager().run()
                 State().update(iteration)
+                starting_time = time.time()
                 Preprocessing().run()
+                time_len = time.time() - starting_time
                 Agent().run(self.display)
 
-                time_len = time.time() - starting_time
+
 
                 # Monitor logging
                 self.monitor_log(iteration)

@@ -55,7 +55,7 @@ class Generator:
                 cpu_cores = (
                     -1
                     if config["num_cores"]
-                    == -1 else int(np.random.choice(config["num_cores"]))
+                       == -1 else int(np.random.choice(config["num_cores"]))
                 )
                 device_info = {
                     "id": Generator._device_id_counter,
@@ -89,7 +89,7 @@ class Generator:
                         if config["battery_capacity"] == -1
                         else np.random.uniform(
                             config["battery_capacity"][0], config["battery_capacity"][1]
-                        )*1e3
+                        ) * 1e3
                     ),
                     "error_rate": np.random.uniform(
                         config["error_rate"][0], config["error_rate"][1]
@@ -127,6 +127,7 @@ class Generator:
             jobs["tails"] = jobs["tails"].apply(lambda x: ast.literal_eval(x))
             jobs["tree"] = jobs["tree"].apply(lambda x: ast.literal_eval(x))
             tasks = pd.read_csv(file_path_tasks)
+
             tasks["predecessors"] = tasks["predecessors"].apply(
                 lambda x: ast.literal_eval(x))
             return jobs, tasks
@@ -263,4 +264,5 @@ class Generator:
             "task_kind": task_kind,
             "is_head": is_head,
             "is_tail": is_tail,
+            "isReady": 0
         }
