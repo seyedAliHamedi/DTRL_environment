@@ -69,7 +69,7 @@ jobs_config = {
     },
 }
 environment_config = {
-    "window": {"size": 10, "max_jobs": 1, "clock": 3},
+    "window": {"size": 10, "max_jobs": 5, "clock": 3},
     "environment": {"cycle": 0.01, "anomaly_th": 0.5}
 
 }

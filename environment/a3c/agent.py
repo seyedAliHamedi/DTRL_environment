@@ -6,6 +6,7 @@ import torch.multiprocessing as mp
 from data.db import Database
 from environment.a3c.actor_critic import ActorCritic
 from environment.a3c.shared_adam import SharedAdam
+from environment.dtrl.core_scheduler import CoreScheduler
 from environment.state import State
 from environment.window_manager import Preprocessing
 from utilities.monitor import Monitor
@@ -21,29 +22,30 @@ class Agent(mp.Process):
         self.name = name
         self.num_input = 5
         self.num_output = 5
-        self.devices = None
+        self.devices = Database.get_all_devices()
         self.assigned_job = None
+        self.task_queue = []
+        self.core = CoreScheduler(self.devices)
 
     def run(self):
-        self.assigned_job = job_id = Preprocessing().assign_job()
-        task_queue = Preprocessing().get_agent_queue()[job_id]
-        while self.assigned_job is not None:
+        if self.assigned_job is None:
+            self.assigned_job = Preprocessing().assign_job()
+            self.task_queue = Preprocessing().get_agent_queue()[self.assigned_job]
             self.local_actor_critic.clear_memory()
-            self.schedule(task_queue, job_id)
-            current_job = State().get_job(job_id)
-            if len(current_job["remainingTasks"]) == 1:
-                total_loss = self.update()
-                print("DONE")
-                Monitor().add_agent_log(
-                    {
-                        'loss': total_loss.item(),
-                        'reward': sum(self.rewards[job_id]) / len(self.rewards[job_id]),
-                        'time': sum(self.time[job_id]) / len(self.time[job_id]),
-                        'energy': sum(self.energy[job_id]) / len(self.energy[job_id]),
-                        'fail': sum(self.fail[job_id]) / len(self.fail[job_id]),
-                    }
-                )
-                self.assigned_job = Preprocessing().get_job()
+        self.schedule(self.task_queue, self.assigned_job)
+        current_job = State().get_job(self.assigned_job)
+        if len(current_job["remainingTasks"]) == 1:
+            total_loss = self.update()
+            print("DONE")
+            Monitor().add_agent_log(
+                {
+                    'loss': total_loss.item(),
+                #     'reward': sum(self.rewards[self.assigned_job]) / len(self.rewards[self.assigned_job]),
+                #     'time': sum(self.time[self.assigned_job]) / len(self.time[self.assigned_job]),
+                #     'energy': sum(self.energy[self.assigned_job]) / len(self.energy[self.assigned_job]),
+                #     'fail': sum(self.fail[self.assigned_job]) / len(self.fail[self.assigned_job]),
+                }
+            )
 
     def schedule(self, task_queue, job_id):
         if len(task_queue) == 0:
@@ -54,11 +56,12 @@ class Agent(mp.Process):
         current_task = Database().get_task(current_task_id)
         current_job = State().get_job(job_id)
         input_state = get_input(current_task, {})
-        input_state = torch.tensor(input_state, dtype=torch.float32)
+
 
         option = self.local_actor_critic.choose_action(input_state)
 
         selected_device_index = option
+        # print(self.devices[option])
         selected_device = self.devices[option]
 
         if selected_device['type'] != "cloud":
@@ -72,7 +75,6 @@ class Agent(mp.Process):
             selected_core_index = action.item()
             selected_core = selected_device["voltages_frequencies"][selected_core_index]
             dvfs = selected_core[np.random.randint(0, 3)]
-            self.sub_log_probs[job_id].append(action_dist.log_prob(action))
 
         if selected_device['type'] == "cloud":
             selected_core_index = -1
@@ -88,7 +90,7 @@ class Agent(mp.Process):
         reward, fail_flag, energy, time = State().apply_action(selected_device_index,
                                                                selected_core_index, dvfs[0], dvfs[1], current_task_id)
 
-        self.local_actor_critic.remember(input_state, option, reward)
+        self.local_actor_critic.archive(input_state, option, reward)
 
         if fail_flag == 0:
             Preprocessing().remove_from_queue(current_task_id)
@@ -96,7 +98,8 @@ class Agent(mp.Process):
     def update(self):
         loss = self.local_actor_critic.calc_loss()
         loss.backward()
-        for local_param, global_param in zip(self.local_actor_critic.parameters(), self.global_actor_critic.parameters()):
+        for local_param, global_param in zip(self.local_actor_critic.parameters(),
+                                             self.global_actor_critic.parameters()):
             global_param._grad = local_param.grad
         self.optimizer.step()
         self.local_actor_critic.load_state_dict(

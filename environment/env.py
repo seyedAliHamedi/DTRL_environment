@@ -28,20 +28,19 @@ class Environment:
         State().initialize(display)
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
+        self.__worker_flags = []
 
     def run(self):
-        WindowManager().run()
-        State().update()
-        Preprocessing().run()
+
         max_jobs = Preprocessing().max_jobs
         global_actor_critic = ActorCritic(
             input_dims=5, n_actions=16)
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
-        workers = [Agent(name=f"agent no.{
-                         i}", global_actor_critic=global_actor_critic, optimizer=optim) for i in range(max_jobs)]
-        [w.start() for w in workers]
-        [w.join() for w in workers]
+        workers = []
+        for i in range(max_jobs):
+            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim)
+            workers.append(worker)
 
         iteration = 0
         try:
@@ -50,15 +49,17 @@ class Environment:
                 if iteration % 500 == 0:
                     print(f"iteration : {iteration}")
 
-                WindowManager().run()
-                State().update(iteration)
                 starting_time = time.time()
+                WindowManager().run()
+                State().update()
                 Preprocessing().run()
+                for worker in workers:
+                    worker.run()
                 time_len = time.time() - starting_time
-                Agent().run(self.display)
-
                 # Monitor logging
                 self.monitor_log(iteration)
+
+                # [w.join() for w in workers]
 
                 # Calculate sleeping time
                 self.sleep(time_len, iteration)

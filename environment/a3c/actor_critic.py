@@ -33,14 +33,15 @@ class ActorCritic(nn.Module):
         v = self.critic(x)
         return p, v
 
-    def choose_action(self, state):
-        state = torch.tensor([state], dtype=torch.float)
+    def choose_action(self, ob):
+        state = torch.tensor([ob], dtype=torch.float)
         pi, _ = self.forward(state)
-        probs = F.softmax(pi, dim=1)
-        dist = Categorical(probs)
-        action = dist.sample().numpy()[0]
 
-        return action
+        probs = F.softmax(pi, dim=0)
+        dist = Categorical(probs)
+        action = dist.sample()
+
+        return action.item()
 
     def calculate_returns(self):
         G = 0
@@ -63,7 +64,7 @@ class ActorCritic(nn.Module):
         values = values.squeeze()
         critic_loss = (returns-values)**2
 
-        probs = F.softmax(pi, dim=1)
+        probs = F.softmax(pi, dim=0)
         dist = Categorical(probs)
         log_probs = dist.log_prob(actions)
         actor_loss = -log_probs*(returns-values)

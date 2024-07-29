@@ -90,8 +90,8 @@ class Preprocessing:
 
     def assign_job(self):
         for job in self.active_jobs.keys():
-            if job not in self.assign_jobs:
-                self.assign_jobs.append(job)
+            if job not in self.assigned_jobs:
+                self.assigned_jobs.append(job)
                 return job
 
     def update_active_jobs(self, state_jobs):
@@ -111,7 +111,7 @@ class Preprocessing:
                 deleting_list.append(job_ID)
         for item in deleting_list:
             self.active_jobs.pop(item)
-            self.assign_jobs.remove(item)
+            self.assigned_jobs.remove(item)
 
         # add to job_pool
         while len(self.active_jobs.keys()) > self.max_jobs:

@@ -79,7 +79,10 @@ class Monitor:
     def _save_time_log(self):
         y_values = self.time_log['time_values'].values()
         # average time per iteration
-        self.time_log['avg_iteration_time'] = sum(y_values) / len(y_values)
+        if len(y_values) != 0:
+            self.time_log['avg_iteration_time'] = sum(y_values) / len(y_values)
+        else:
+            self.time_log['avg_iteration_time'] = -1
         self.time_log['total_time'] = sum(y_values)
         x_values = self.time_log['time_values'].keys()
         del self.time_log['time_values']
@@ -156,10 +159,14 @@ class Monitor:
             self._save_agent_log()
 
     def _save_agent_log(self):
-        self.agent_log['summary']['avg-time'] = np.sum(self.agent_log['live-log']['time']) / len(
-            self.agent_log['live-log']['time'])
-        self.agent_log['summary']['avg-energy'] = np.sum(self.agent_log['live-log']['energy']) / len(
-            self.agent_log['live-log']['energy'])
+        if len(self.agent_log['live-log']['time']) != 0:
+            self.agent_log['summary']['avg-time'] = np.sum(self.agent_log['live-log']['time']) / len(
+                self.agent_log['live-log']['time'])
+            self.agent_log['summary']['avg-energy'] = np.sum(self.agent_log['live-log']['energy']) / len(
+                self.agent_log['live-log']['energy'])
+        else:
+            self.agent_log['summary']['avg-time'] = -1
+            self.agent_log['summary']['avg-energy'] = -1
         self.agent_log['summary']['avg-fail'] = np.sum(
             self.agent_log['live-log']['fail'])
         summary_path = self._config['paths']['agent']['summary']
@@ -174,7 +181,6 @@ class Monitor:
 
     def __make_agents_plots(self, path):
         if len(self.agent_log['live-log']['time']) == 0:
-            print("Zero job done, no plot to be shown")
             return
         fig, axs = plt.subplots(3, 2, figsize=(10, 20))
         # Plot each column in a separate plot
