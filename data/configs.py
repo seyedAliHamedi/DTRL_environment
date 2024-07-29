@@ -69,8 +69,8 @@ jobs_config = {
     },
 }
 environment_config = {
-    "window": {"size": 10, "max_jobs": 10, "clock": 3},
-    "environment": {"cycle": 0.001, "anomaly_th": 0.5}
+    "window": {"size": 10, "max_jobs": 1, "clock": 3},
+    "environment": {"cycle": 0.01, "anomaly_th": 0.5}
 
 }
 monitor_config = {
@@ -95,7 +95,8 @@ monitor_config = {
         'agent': {
             'summary': './logs/agent/summary.txt',
             'plots': './logs/agent/plots.png'
-        }
+        },
+        'memory': './logs/simulation/memory.png',
     }
 }
 

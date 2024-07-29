@@ -126,10 +126,8 @@ class Preprocessing:
     def process(self):
         # add window tasks to wait queue
         for task in State().get_task_window():
-            if self._is_ready_task(task):
-                self.queue.append(task)
-            else:
-                self.wait_queue.append(task)
+            self.queue.append(task)
+
 
         # add ready task from wait queue to main queue
         for task in self.wait_queue:
@@ -149,15 +147,8 @@ class Preprocessing:
 
     def _is_ready_task(self, task):
         selected_task = Database.get_task(task)
-        task_job_id = selected_task['job_id']
-        if task_job_id not in self.active_jobs:
-            return False
-        state_job = self.active_jobs[task_job_id]
-        task_pred = copy(selected_task['predecessors'])
-        for task in state_job['finishedTasks']:
-            if task in task_pred:
-                task_pred.remove(task)
-        if len(task_pred) == 0:
+        pred = selected_task['predecessors']
+        if selected_task['isReady'] == len(pred):
             return True
         else:
             return False

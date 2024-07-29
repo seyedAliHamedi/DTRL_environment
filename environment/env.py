@@ -1,4 +1,5 @@
 import multiprocessing
+import threading
 import time
 import traceback
 
@@ -8,6 +9,7 @@ from environment.a3c.agent import Agent
 from environment.a3c.shared_adam import SharedAdam
 from environment.state import State
 from utilities.monitor import Monitor
+from utilities.memory_monitor import MemoryMonitor
 from environment.window_manager import Preprocessing, WindowManager
 from data.configs import environment_config, monitor_config
 
@@ -17,6 +19,9 @@ class Environment:
     def __init__(self, n_iterations, display):
         self.n_iterations = n_iterations
         self.display = display
+        self.memory_monitor = MemoryMonitor()
+        self.mem_monitor_thread = threading.Thread(
+            target=self.memory_monitor.run)
         # ! important load db first
         Database().load()
         Monitor().init(n_iterations)
@@ -40,22 +45,20 @@ class Environment:
 
         iteration = 0
         try:
+            self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
                 if iteration % 500 == 0:
                     print(f"iteration : {iteration}")
 
-                starting_time = time.time()
-
                 WindowManager().run()
-                State().update()
+                State().update(iteration)
+                starting_time = time.time()
                 Preprocessing().run()
-
                 time_len = time.time() - starting_time
+                Agent().run(self.display)
 
                 # Monitor logging
                 self.monitor_log(iteration)
-
-                # Calculating time passed in iteration and saving log
 
                 # Calculate sleeping time
                 self.sleep(time_len, iteration)
@@ -65,6 +68,7 @@ class Environment:
             print("Interrupted")
         finally:
             Monitor().save_logs()
+            self.memory_monitor.stop()
 
     def sleep(self, time_len, iteration):
         sleeping_time = self.cycle_wait - time_len

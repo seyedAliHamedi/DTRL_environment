@@ -227,6 +227,9 @@ class State:
 
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
+        task_pred = Database.get_task(task_ID)['predecessors']
+        for selected_task in task_pred:
+            Database.get_task(selected_task)['isReady'] += 1
         try:
             self._jobs[job_ID]["finishedTasks"].append(task_ID)
             self._jobs[job_ID]["runningTasks"].remove(task_ID)
