@@ -13,6 +13,8 @@ from utilities.memory_monitor import MemoryMonitor
 from environment.window_manager import Preprocessing, WindowManager
 from data.configs import environment_config, monitor_config, agent_config
 
+import torch.multiprocessing as mp
+
 
 class Environment:
 
@@ -29,7 +31,6 @@ class Environment:
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
         self.__worker_flags = []
-        self.barrier = threading.Barrier(agent_config['multi_agent'] + 1)
 
     def run(self):
         # TODO : decide worker.run / multithread/ !!!!! multiprocess pytorch --> .start() & .join()
@@ -38,9 +39,11 @@ class Environment:
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
         workers = []
+        barrier = mp.Barrier(agent_config['multi_agent'] + 1)
+
         for i in range(agent_config['multi_agent']):
             worker = Agent(
-                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=self.barrier)
+                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier)
             workers.append(worker)
             worker.start()
 
@@ -48,7 +51,7 @@ class Environment:
         try:
             self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
-                if iteration % 500 == 0:
+                if iteration % 10 == 0:
                     print(f"iteration : {iteration}")
 
                 starting_time = time.time()
@@ -63,7 +66,7 @@ class Environment:
                 # Monitor logging
 
                 # Calculate sleeping time
-                self.barrier.wait()
+                barrier.wait()
                 time_len = time.time() - starting_time
                 self.sleep(time_len, iteration)
 
@@ -72,13 +75,15 @@ class Environment:
         except KeyboardInterrupt:
             print("Interrupted")
         finally:
-            for i in range(agent_config['multi_agent']):
-                worker.thread.join()
-
             Monitor().save_logs()
-            self.memory_monitor.stop()
             print(State().jobs_done)
             print(len(Preprocessing().wait_queue))
+
+            for worker in workers:
+                worker.stop()
+            for worker in workers:
+                worker.join()
+            self.memory_monitor.stop()
 
     def sleep(self, time_len, iteration):
         sleeping_time = self.cycle_wait - time_len
