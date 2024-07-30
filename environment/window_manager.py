@@ -2,7 +2,7 @@ import random
 from copy import copy
 
 from data.db import Database
-from data.configs import environment_config, monitor_config
+from data.configs import environment_config, monitor_config,agent_config
 from environment.state import State
 from utilities.monitor import Monitor
 
@@ -15,7 +15,7 @@ class WindowManager:
             cls._instance = super().__new__(cls)
             cls._instance.__pool = []
             cls._instance.__head_index = 0
-            cls._instance.__max_jobs = config["max_jobs-win"]
+            cls._instance.__max_jobs = config["max_jobs"]
             cls._instance.__window_size = config["size"]
             cls._instance.current_cycle = config["clock"]
             cls._instance.__cycle = config["clock"]
@@ -69,7 +69,7 @@ class Preprocessing:
     def __new__(cls, config=environment_config['window']):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance.max_jobs = config["max_jobs-pre"]
+            cls._instance.max_jobs = agent_config['multi_agent']
             cls._instance.active_jobs = {}
             cls._instance.assigned_jobs = []
             cls._instance.job_pool = {}
@@ -155,9 +155,9 @@ class Preprocessing:
             return False
 
     def get_agent_queue(self):
-
         agent_queue = {}
-        for job_ID in self.active_jobs.keys():
+        copy_list = copy(list(self.active_jobs.keys()))
+        for job_ID in copy_list:
             agent_queue[job_ID] = []
             for task_ID in self.queue:
                 task = Database().get_task(task_ID)

@@ -11,7 +11,7 @@ from environment.state import State
 from utilities.monitor import Monitor
 from utilities.memory_monitor import MemoryMonitor
 from environment.window_manager import Preprocessing, WindowManager
-from data.configs import environment_config, monitor_config
+from data.configs import environment_config, monitor_config, agent_config
 
 
 class Environment:
@@ -29,19 +29,20 @@ class Environment:
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
         self.__worker_flags = []
+        self.barrier = threading.Barrier(agent_config['multi_agent'] + 1)
 
     def run(self):
-        #TODO : decide worker.run / multithread/ !!!!! multiprocess pytorch --> .start() & .join()
-        max_jobs = Preprocessing().max_jobs
+        # TODO : decide worker.run / multithread/ !!!!! multiprocess pytorch --> .start() & .join()
         global_actor_critic = ActorCritic(
             input_dims=5, n_actions=len(Database.get_all_devices()))
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
         workers = []
-        for i in range(max_jobs):
+        for i in range(agent_config['multi_agent']):
             worker = Agent(
-                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim)
+                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=self.barrier)
             workers.append(worker)
+            worker.start()
 
         iteration = 0
         try:
@@ -54,22 +55,26 @@ class Environment:
                 WindowManager().run()
                 State().update()
                 Preprocessing().run()
-                # print(Preprocessing().get_agent_queue())
-                for worker in workers:
-                    worker.run()
 
-                time_len = time.time() - starting_time
-                # Monitor logging
-                self.monitor_log(iteration)
+                # for worker in workers:
+                #     worker.run()
                 # [w.join() for w in workers]
 
+                # Monitor logging
+
                 # Calculate sleeping time
+                self.barrier.wait()
+                time_len = time.time() - starting_time
                 self.sleep(time_len, iteration)
 
+                self.monitor_log(iteration)
                 iteration += 1
         except KeyboardInterrupt:
             print("Interrupted")
         finally:
+            for i in range(agent_config['multi_agent']):
+                worker.thread.join()
+
             Monitor().save_logs()
             self.memory_monitor.stop()
             print(State().jobs_done)

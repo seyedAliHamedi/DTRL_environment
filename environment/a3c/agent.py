@@ -1,3 +1,6 @@
+import threading
+import time
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -14,7 +17,7 @@ from data.configs import monitor_config
 
 
 class Agent:
-    def __init__(self, name, global_actor_critic, optimizer):
+    def __init__(self, name, global_actor_critic, optimizer, barrier):
         super(Agent, self).__init__()
         self.global_actor_critic = global_actor_critic
         self.local_actor_critic = ActorCritic(
@@ -27,30 +30,45 @@ class Agent:
         self.assigned_job = None
         self.task_queue = []
         self.core = CoreScheduler(self.devices)
+        self.thread = threading.Thread(target=self.run, name=self.name)
+        self.runner_flag = False
+        self.barrier = barrier
+
+    def start(self):
+        self.runner_flag = True
+        self.thread.start()
 
     def run(self):
-        if self.assigned_job is None:
-            self.assigned_job = Preprocessing().assign_job()
+        time.sleep(1)
+        while self.runner_flag:
             if self.assigned_job is None:
-                return
-            self.local_actor_critic.clear_memory()
-        self.task_queue = Preprocessing().get_agent_queue()[self.assigned_job]
-        self.schedule()
-        current_job = State().get_job(self.assigned_job)
-        if len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
-            State().jobs_done += 1
-            total_loss = self.update()
-            self.assigned_job = None
-            if monitor_config['settings']['agent']:
-                Monitor().add_agent_log(
-                    {
-                        'loss': total_loss.item(),
-                        #     'reward': sum(self.rewards[self.assigned_job]) / len(self.rewards[self.assigned_job]),
-                        #     'time': sum(self.time[self.assigned_job]) / len(self.time[self.assigned_job]),
-                        #     'energy': sum(self.energy[self.assigned_job]) / len(self.energy[self.assigned_job]),
-                        #     'fail': sum(self.fail[self.assigned_job]) / len(self.fail[self.assigned_job]),
-                    }
-                )
+                self.assigned_job = Preprocessing().assign_job()
+                if self.assigned_job is None:
+                    self.barrier.wait()
+                    continue
+                self.local_actor_critic.clear_memory()
+            self.task_queue = Preprocessing().get_agent_queue()[self.assigned_job]
+            self.schedule()
+            current_job = State().get_job(self.assigned_job)
+
+            if len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
+                State().jobs_done += 1
+                total_loss = self.update()
+                self.assigned_job = None
+                if monitor_config['settings']['agent']:
+                    Monitor().add_agent_log(
+                        {
+                            'loss': total_loss.item(),
+                            #     'reward': sum(self.rewards[self.assigned_job]) / len(self.rewards[self.assigned_job]),
+                            #     'time': sum(self.time[self.assigned_job]) / len(self.time[self.assigned_job]),
+                            #     'energy': sum(self.energy[self.assigned_job]) / len(self.energy[self.assigned_job]),
+                            #     'fail': sum(self.fail[self.assigned_job]) / len(self.fail[self.assigned_job]),
+                        }
+                    )
+            self.barrier.wait()
+
+    def stop(self):
+        self.runner_flag = False
 
     def schedule(self):
         if len(self.task_queue) == 0:
