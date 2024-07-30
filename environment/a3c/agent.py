@@ -10,6 +10,7 @@ from environment.dtrl.core_scheduler import CoreScheduler
 from environment.state import State
 from environment.window_manager import Preprocessing
 from utilities.monitor import Monitor
+from data.configs import monitor_config
 
 
 class Agent(mp.Process):
@@ -30,25 +31,32 @@ class Agent(mp.Process):
     def run(self):
         if self.assigned_job is None:
             self.assigned_job = Preprocessing().assign_job()
-            self.task_queue = Preprocessing().get_agent_queue()[
-                self.assigned_job]
+            if self.assigned_job is None:
+                print(f"NAME={self.name}| No job assigned")
+                return
+            else:
+                print(f"NAME={self.name}| assigned job: {self.assigned_job}")
             self.local_actor_critic.clear_memory()
+
+        self.task_queue = Preprocessing().get_agent_queue()[self.assigned_job]
         self.schedule(self.task_queue, self.assigned_job)
         current_job = State().get_job(self.assigned_job)
-        if len(current_job["remainingTasks"]) == 1:
+        if len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
             total_loss = self.update()
-            print("DONE")
-            Monitor().add_agent_log(
-                {
-                    'loss': total_loss.item(),
-                    #     'reward': sum(self.rewards[self.assigned_job]) / len(self.rewards[self.assigned_job]),
-                    #     'time': sum(self.time[self.assigned_job]) / len(self.time[self.assigned_job]),
-                    #     'energy': sum(self.energy[self.assigned_job]) / len(self.energy[self.assigned_job]),
-                    #     'fail': sum(self.fail[self.assigned_job]) / len(self.fail[self.assigned_job]),
-                }
-            )
+            print(f"NAME={self.name}| DONE{self.assigned_job}")
+            if monitor_config['settings']['agent']:
+                Monitor().add_agent_log(
+                    {
+                        'loss': total_loss.item(),
+                        #     'reward': sum(self.rewards[self.assigned_job]) / len(self.rewards[self.assigned_job]),
+                        #     'time': sum(self.time[self.assigned_job]) / len(self.time[self.assigned_job]),
+                        #     'energy': sum(self.energy[self.assigned_job]) / len(self.energy[self.assigned_job]),
+                        #     'fail': sum(self.fail[self.assigned_job]) / len(self.fail[self.assigned_job]),
+                    }
+                )
 
     def schedule(self, task_queue, job_id):
+        print(f"NAME={self.name}| queue={task_queue}")
         if len(task_queue) == 0:
             return
 
@@ -80,11 +88,12 @@ class Agent(mp.Process):
             i = np.random.randint(0, 1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
 
-        Monitor().add_log(
-            f"Agent Action::Device: {selected_device_index} |"
-            f" Core: {selected_core_index} | freq: {dvfs[0]} |"
-            f" vol: {dvfs[1]} | task_id: {current_task_id} |"
-            f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n', end='')
+        if monitor_config['settings']['agent']:
+            Monitor().add_log(
+                f"Agent Action::Device: {selected_device_index} |"
+                f" Core: {selected_core_index} | freq: {dvfs[0]} |"
+                f" vol: {dvfs[1]} | task_id: {current_task_id} |"
+                f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n', end='')
 
         reward, fail_flag, energy, time = State().apply_action(selected_device_index,
                                                                selected_core_index, dvfs[0], dvfs[1], current_task_id)
@@ -93,6 +102,9 @@ class Agent(mp.Process):
 
         if fail_flag == 0:
             Preprocessing().remove_from_queue(current_task_id)
+            print(f"task{current_task_id} scheduled")
+        else:
+            print(f"task{current_task_id} failed to schedule")
 
     def update(self):
         loss = self.local_actor_critic.calc_loss()

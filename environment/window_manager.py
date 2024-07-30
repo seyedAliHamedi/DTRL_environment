@@ -165,7 +165,11 @@ class Preprocessing:
 
     def remove_from_queue(self, task_ID):
         try:
+            print(f"Queue before removing task{task_ID}")
+            print(self.queue)
             self.queue.remove(task_ID)
+            print(f"Queue After removing task{task_ID}")
+            print(self.queue)
         except ValueError:
             raise f"task{task_ID} is not in window-manager queue"
 

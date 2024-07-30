@@ -59,7 +59,7 @@ class Environment:
                 time_len = time.time() - starting_time
                 # Monitor logging
                 self.monitor_log(iteration)
-
+                print("PASSED ITER")
                 # [w.join() for w in workers]
 
                 # Calculate sleeping time

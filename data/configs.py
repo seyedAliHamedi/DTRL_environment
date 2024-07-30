@@ -78,7 +78,7 @@ monitor_config = {
         'time': True,
         'main': False,
         'summary': False,
-        'agent': True
+        'agent': False
     },
     'paths': {
         'time': {

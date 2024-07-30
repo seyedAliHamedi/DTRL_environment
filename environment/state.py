@@ -66,6 +66,8 @@ class State:
         job["assignedTask"] = task_ID
 
         # remove new assigned task from target job remaining tasks and add it to running tasks
+        print(f"trying to remove task{job['assignedTask']} from job{job_ID}| current runningTask{job['runningTasks']}")
+
         job["remainingTasks"].remove(job["assignedTask"])
         job["runningTasks"].append(task_ID)
 

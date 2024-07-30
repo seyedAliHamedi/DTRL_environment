@@ -97,7 +97,7 @@ class DDT(nn.Module):
             return self.prob_dist
         val = torch.sigmoid(
             self.alpha * (torch.matmul(x, self.weights) + self.bias))
-
+        print("aaaaaa{",val,x)
         if val >= 0.5:
             right_output = self.right(x)
             return val * right_output
