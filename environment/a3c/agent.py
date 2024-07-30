@@ -16,7 +16,7 @@ from utilities.monitor import Monitor
 from data.configs import monitor_config
 
 
-class Agent:
+class Agent(mp.Process):
     def __init__(self, name, global_actor_critic, optimizer, barrier):
         super(Agent, self).__init__()
         self.global_actor_critic = global_actor_critic
@@ -30,16 +30,12 @@ class Agent:
         self.assigned_job = None
         self.task_queue = []
         self.core = CoreScheduler(self.devices)
-        self.thread = threading.Thread(target=self.run, name=self.name)
-        self.runner_flag = False
+        # self.thread = threading.Thread(target=self.run, name=self.name)
+        # Shared boolean flag for stopping
+        self.runner_flag = mp.Value('b', True)
         self.barrier = barrier
 
-    def start(self):
-        self.runner_flag = True
-        self.thread.start()
-
     def run(self):
-        time.sleep(1)
         while self.runner_flag:
             if self.assigned_job is None:
                 self.assigned_job = Preprocessing().assign_job()
