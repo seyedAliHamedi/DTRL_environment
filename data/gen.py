@@ -128,8 +128,8 @@ class Generator:
             jobs["tree"] = jobs["tree"].apply(lambda x: ast.literal_eval(x))
             tasks = pd.read_csv(file_path_tasks)
 
-            tasks["predecessors"] = tasks["predecessors"].apply(
-                lambda x: ast.literal_eval(x))
+            tasks["predecessors"] = tasks["predecessors"].apply(lambda x: ast.literal_eval(x))
+            tasks["successors"] = tasks["successors"].apply(lambda x: ast.literal_eval(x))
             return jobs, tasks
         else:
             return Generator._generate_jobs()

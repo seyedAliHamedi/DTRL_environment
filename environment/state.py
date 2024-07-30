@@ -52,7 +52,7 @@ class State:
             return self.reward_function(punish=True), fail_flag, 0, 0
 
         execution_time = t = math.ceil(Database.get_task(task_ID)[
-            "computational_load"] / freq)
+                                           "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(pe, core_i)
 
@@ -65,9 +65,6 @@ class State:
         job = self._jobs[job_ID]
         job["assignedTask"] = task_ID
 
-        # remove new assigned task from target job remaining tasks and add it to running tasks
-        print(f"trying to remove task{job['assignedTask']} from job{job_ID}| current runningTask{job['runningTasks']}")
-
         job["remainingTasks"].remove(job["assignedTask"])
         job["runningTasks"].append(task_ID)
 
@@ -78,7 +75,7 @@ class State:
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             pe["energyConsumption"][core_index] = capacitance * \
-                (volt * volt) * freq
+                                                  (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
 
         return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
@@ -229,9 +226,10 @@ class State:
 
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
-        task_pred = Database.get_task(task_ID)['predecessors']
-        for selected_task in task_pred:
-            Database.get_task(selected_task)['isReady'] += 1
+        task_suc = Database.get_task(task_ID)['successors']
+
+        for selected_task in task_suc:
+            Database.update_task(selected_task, 'isReady', Database.get_task(selected_task)['isReady'] + 1)
         try:
             self._jobs[job_ID]["finishedTasks"].append(task_ID)
             self._jobs[job_ID]["runningTasks"].remove(task_ID)

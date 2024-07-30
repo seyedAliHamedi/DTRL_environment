@@ -32,18 +32,14 @@ class Agent(mp.Process):
         if self.assigned_job is None:
             self.assigned_job = Preprocessing().assign_job()
             if self.assigned_job is None:
-                print(f"NAME={self.name}| No job assigned")
                 return
-            else:
-                print(f"NAME={self.name}| assigned job: {self.assigned_job}")
             self.local_actor_critic.clear_memory()
-
         self.task_queue = Preprocessing().get_agent_queue()[self.assigned_job]
-        self.schedule(self.task_queue, self.assigned_job)
+        self.schedule()
         current_job = State().get_job(self.assigned_job)
         if len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
             total_loss = self.update()
-            print(f"NAME={self.name}| DONE{self.assigned_job}")
+            self.assigned_job = None
             if monitor_config['settings']['agent']:
                 Monitor().add_agent_log(
                     {
@@ -55,15 +51,13 @@ class Agent(mp.Process):
                     }
                 )
 
-    def schedule(self, task_queue, job_id):
-        print(f"NAME={self.name}| queue={task_queue}")
-        if len(task_queue) == 0:
+    def schedule(self):
+        if len(self.task_queue) == 0:
             return
-
         job_state, pe_state = State().get()
-        current_task_id = task_queue[0]
+        current_task_id = self.task_queue[0]
         current_task = Database().get_task(current_task_id)
-        current_job = State().get_job(job_id)
+        current_job = State().get_job(self.assigned_job)
         input_state = get_input(current_task, {})
 
         option = self.local_actor_critic.choose_action(input_state)
@@ -102,9 +96,7 @@ class Agent(mp.Process):
 
         if fail_flag == 0:
             Preprocessing().remove_from_queue(current_task_id)
-            print(f"task{current_task_id} scheduled")
-        else:
-            print(f"task{current_task_id} failed to schedule")
+            self.task_queue = Preprocessing().get_agent_queue()[self.assigned_job]
 
     def update(self):
         loss = self.local_actor_critic.calc_loss()

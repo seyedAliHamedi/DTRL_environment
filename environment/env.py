@@ -34,7 +34,7 @@ class Environment:
 
         max_jobs = Preprocessing().max_jobs
         global_actor_critic = ActorCritic(
-            input_dims=5, n_actions=16)
+            input_dims=5, n_actions=len(Database.get_all_devices()))
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
         workers = []
@@ -54,12 +54,12 @@ class Environment:
                 WindowManager().run()
                 State().update()
                 Preprocessing().run()
+                # print(Preprocessing().get_agent_queue())
                 for worker in workers:
                     worker.run()
                 time_len = time.time() - starting_time
                 # Monitor logging
                 self.monitor_log(iteration)
-                print("PASSED ITER")
                 # [w.join() for w in workers]
 
                 # Calculate sleeping time

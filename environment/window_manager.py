@@ -111,7 +111,6 @@ class Preprocessing:
                 deleting_list.append(job_ID)
         for item in deleting_list:
             self.active_jobs.pop(item)
-            self.assigned_jobs.remove(item)
 
         # add to job_pool
         while len(self.active_jobs.keys()) > self.max_jobs:
@@ -126,14 +125,14 @@ class Preprocessing:
     def process(self):
         # add window tasks to wait queue
         for task in State().get_task_window():
-            self.queue.append(task)
-
+            self.wait_queue.append(task)
 
         # add ready task from wait queue to main queue
         for task in self.wait_queue:
             if self._is_ready_task(task):
                 self.queue.append(task)
                 self.wait_queue.remove(task)
+
 
         # sort main queue by mobility
         self.__sort_by_mobility()
@@ -154,6 +153,7 @@ class Preprocessing:
             return False
 
     def get_agent_queue(self):
+
         agent_queue = {}
         for job_ID in self.active_jobs.keys():
             agent_queue[job_ID] = []
@@ -165,11 +165,7 @@ class Preprocessing:
 
     def remove_from_queue(self, task_ID):
         try:
-            print(f"Queue before removing task{task_ID}")
-            print(self.queue)
             self.queue.remove(task_ID)
-            print(f"Queue After removing task{task_ID}")
-            print(self.queue)
         except ValueError:
             raise f"task{task_ID} is not in window-manager queue"
 

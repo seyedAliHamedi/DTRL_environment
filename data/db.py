@@ -51,6 +51,9 @@ class Database:
     @classmethod
     def get_task(cls, id):
         return cls._tasks.iloc[id].to_dict()
+    @classmethod
+    def update_task(cls, id,column,new_val):
+        cls._tasks.at[id,column]=new_val
 
     # ---------- helper  ------------
     @classmethod
