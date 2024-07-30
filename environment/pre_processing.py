@@ -70,7 +70,7 @@ class Preprocessing:
         for task_id in state.get_task_window():
             task = Database.get_task(task_id)
 
-            if len(task['pred_count']) == 0:
+            if task['pred_count'] == 0:
                 self.queue.append(task_id)
             else:
                 self.wait_queue.append(task_id)

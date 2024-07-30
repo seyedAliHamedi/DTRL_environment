@@ -73,8 +73,12 @@ class Environment:
 
                 self.monitor_log(iteration)
                 iteration += 1
+
         except KeyboardInterrupt:
             print("Interrupted")
+        except Exception as e:
+            print("Caught an unexpected exception:")
+            traceback.print_exc()
         finally:
             Monitor().save_logs()
             print(State().jobs_done)
