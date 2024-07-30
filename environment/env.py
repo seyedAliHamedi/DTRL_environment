@@ -34,7 +34,7 @@ class Environment:
 
         max_jobs = Preprocessing().max_jobs
         global_actor_critic = ActorCritic(
-            input_dims=5, n_actions=15)
+            input_dims=5, n_actions=16)
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
         workers = []

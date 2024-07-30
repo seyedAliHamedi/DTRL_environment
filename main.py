@@ -8,5 +8,5 @@ if __name__ == '__main__':
     pd.set_option('display.width', None)
     pd.set_option('display.max_colwidth', None)
     pd.options.display.float_format = '{:,.5f}'.format
-    env = Environment(10000, True)
+    env = Environment(10000, False)
     env.run()

@@ -60,14 +60,20 @@ class ActorCritic(nn.Module):
         actions = torch.tensor(self.actions, dtype=torch.float)
         returns = self.calculate_returns()
 
-        pi, values = self.forward(states)
-        values = values.squeeze()
-        critic_loss = (returns-values)**2
+        pis = []
+        values = []
+        for state in states:
+            pi, value = self.forward(state)
+            pis.append(pi)
+            values.append(value)
+        pis = torch.stack(pis, dim=0)
+        values = torch.stack(values, dim=0).squeeze()
 
-        probs = F.softmax(pi, dim=0)
+        probs = F.softmax(pis, dim=0)
         dist = Categorical(probs)
         log_probs = dist.log_prob(actions)
         actor_loss = -log_probs*(returns-values)
+        critic_loss = (returns-values)**2
 
         total_loss = (critic_loss + actor_loss).mean()
         return total_loss
@@ -97,10 +103,7 @@ class DDT(nn.Module):
             return self.prob_dist
         val = torch.sigmoid(
             self.alpha * (torch.matmul(x, self.weights) + self.bias))
-        print("aaaaaa{",val,x)
         if val >= 0.5:
-            right_output = self.right(x)
-            return val * right_output
+            return val * self.right(x)
         else:
-            left_output = self.left(x)
-            return (1 - val) * left_output
+            return (1 - val) * self.left(x)
