@@ -13,7 +13,7 @@ from utilities.monitor import Monitor
 from data.configs import monitor_config
 
 
-class Agent(mp.Process):
+class Agent:
     def __init__(self, name, global_actor_critic, optimizer):
         super(Agent, self).__init__()
         self.global_actor_critic = global_actor_critic
@@ -38,6 +38,7 @@ class Agent(mp.Process):
         self.schedule()
         current_job = State().get_job(self.assigned_job)
         if len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
+            State().jobs_done += 1
             total_loss = self.update()
             self.assigned_job = None
             if monitor_config['settings']['agent']:

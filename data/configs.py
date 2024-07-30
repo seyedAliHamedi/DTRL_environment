@@ -69,7 +69,8 @@ jobs_config = {
     },
 }
 environment_config = {
-    "window": {"size": 15, "max_jobs": 1, "clock": 3},
+    #TODO : test this params
+    "window": {"size": 15, "max-jobs-win":10,"max_jobs-pre": 5, "clock": 3},
     "environment": {"cycle": 0.01, "anomaly_th": 0.5}
 
 }

@@ -31,7 +31,7 @@ class Environment:
         self.__worker_flags = []
 
     def run(self):
-
+        #TODO : decide worker.run / multithread/ !!!!! multiprocess pytorch --> .start() & .join()
         max_jobs = Preprocessing().max_jobs
         global_actor_critic = ActorCritic(
             input_dims=5, n_actions=len(Database.get_all_devices()))
@@ -57,6 +57,7 @@ class Environment:
                 # print(Preprocessing().get_agent_queue())
                 for worker in workers:
                     worker.run()
+
                 time_len = time.time() - starting_time
                 # Monitor logging
                 self.monitor_log(iteration)
@@ -71,6 +72,8 @@ class Environment:
         finally:
             Monitor().save_logs()
             self.memory_monitor.stop()
+            print(State().jobs_done)
+            print(len(Preprocessing().wait_queue))
 
     def sleep(self, time_len, iteration):
         sleeping_time = self.cycle_wait - time_len

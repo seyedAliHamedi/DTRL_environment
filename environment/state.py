@@ -8,6 +8,7 @@ from utilities.monitor import Monitor
 
 class State:
     _instance = None
+    jobs_done = 0
 
     def __new__(cls):
         if cls._instance is None:
