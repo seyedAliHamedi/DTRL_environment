@@ -3,6 +3,7 @@ from data.configs import summary_log_string, monitor_config
 import pandas as pd
 import numpy as np
 from data.db import Database
+from environment.pre_processing import Preprocessing
 from utilities.monitor import Monitor
 
 
@@ -53,7 +54,7 @@ class State:
             return self.reward_function(punish=True), fail_flag, 0, 0
 
         execution_time = t = math.ceil(Database.get_task(task_ID)[
-                                           "computational_load"] / freq)
+            "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(pe, core_i)
 
@@ -76,7 +77,7 @@ class State:
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             pe["energyConsumption"][core_index] = capacitance * \
-                                                  (volt * volt) * freq
+                (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
 
         return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
@@ -226,14 +227,21 @@ class State:
             del pe["energyConsumption"][item - i]
 
     def __task_finished(self, task_ID):
-        job_ID = Database.get_task(task_ID)["job_id"]
-        task_suc = Database.get_task(task_ID)['successors']
+        task = Database.get_task(task_ID)
+        job_ID = task["job_id"]
+        task_suc = task['successors']
 
-        for selected_task in task_suc:
-            Database.update_task(selected_task, 'isReady', Database.get_task(selected_task)['isReady'] + 1)
+        for t in task_suc:
+            Database.task_pred_dec(t)
+
+            if Database.get_task(t)['pred_count'] == 0:
+                Preprocessing().quque.append(t)
+                Preprocessing().wait_quque.remove(t)
+
         try:
             self._jobs[job_ID]["finishedTasks"].append(task_ID)
             self._jobs[job_ID]["runningTasks"].remove(task_ID)
+
         except:
             print(f"error {task_ID} | job {job_ID}")
             raise

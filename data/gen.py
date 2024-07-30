@@ -55,7 +55,7 @@ class Generator:
                 cpu_cores = (
                     -1
                     if config["num_cores"]
-                       == -1 else int(np.random.choice(config["num_cores"]))
+                    == -1 else int(np.random.choice(config["num_cores"]))
                 )
                 device_info = {
                     "id": Generator._device_id_counter,
@@ -128,8 +128,10 @@ class Generator:
             jobs["tree"] = jobs["tree"].apply(lambda x: ast.literal_eval(x))
             tasks = pd.read_csv(file_path_tasks)
 
-            tasks["predecessors"] = tasks["predecessors"].apply(lambda x: ast.literal_eval(x))
-            tasks["successors"] = tasks["successors"].apply(lambda x: ast.literal_eval(x))
+            tasks["predecessors"] = tasks["predecessors"].apply(
+                lambda x: ast.literal_eval(x))
+            tasks["successors"] = tasks["successors"].apply(
+                lambda x: ast.literal_eval(x))
             return jobs, tasks
         else:
             return Generator._generate_jobs()
@@ -260,6 +262,7 @@ class Generator:
             "input_size": input_size,
             "output_size": output_size,
             "predecessors": predecessors,
+            "pred_count": len(predecessors),
             "is_safe": safe,
             "task_kind": task_kind,
             "is_head": is_head,

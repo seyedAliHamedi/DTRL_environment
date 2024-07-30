@@ -10,7 +10,8 @@ from environment.a3c.shared_adam import SharedAdam
 from environment.state import State
 from utilities.monitor import Monitor
 from utilities.memory_monitor import MemoryMonitor
-from environment.window_manager import Preprocessing, WindowManager
+from environment.window_manager import WindowManager
+from environment.pre_processing import Preprocessing
 from data.configs import environment_config, monitor_config, agent_config
 
 
@@ -48,13 +49,13 @@ class Environment:
         try:
             self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
-                if iteration % 500 == 0:
+                if iteration % 10 == 0:
                     print(f"iteration : {iteration}")
 
                 starting_time = time.time()
                 WindowManager().run()
                 State().update()
-                Preprocessing().run()
+                Preprocessing().run(State())
 
                 # for worker in workers:
                 #     worker.run()

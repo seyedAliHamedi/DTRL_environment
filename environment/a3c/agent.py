@@ -11,7 +11,7 @@ from environment.a3c.actor_critic import ActorCritic
 from environment.a3c.shared_adam import SharedAdam
 from environment.dtrl.core_scheduler import CoreScheduler
 from environment.state import State
-from environment.window_manager import Preprocessing
+from environment.pre_processing import Preprocessing
 from utilities.monitor import Monitor
 from data.configs import monitor_config
 
@@ -47,7 +47,8 @@ class Agent:
                     self.barrier.wait()
                     continue
                 self.local_actor_critic.clear_memory()
-            self.task_queue = Preprocessing().get_agent_queue()[self.assigned_job]
+            self.task_queue = Preprocessing().get_agent_queue()[
+                self.assigned_job]
             self.schedule()
             current_job = State().get_job(self.assigned_job)
 
@@ -115,7 +116,8 @@ class Agent:
 
         if fail_flag == 0:
             Preprocessing().remove_from_queue(current_task_id)
-            self.task_queue = Preprocessing().get_agent_queue()[self.assigned_job]
+            self.task_queue = Preprocessing().get_agent_queue()[
+                self.assigned_job]
 
     def update(self):
         loss = self.local_actor_critic.calc_loss()
