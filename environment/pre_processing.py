@@ -5,18 +5,14 @@ from data.db import Database
 
 
 class Preprocessing:
-    _instance = None
-
-    def __new__(cls, config=environment_config['window']):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.max_jobs = agent_config['multi_agent']
-            cls._instance.active_jobs = {}
-            cls._instance.assigned_jobs = []
-            cls._instance.job_pool = {}
-            cls._instance.wait_queue = []
-            cls._instance.queue = []
-        return cls._instance
+    def __init__(self, active_jobs, assigned_jobs, job_pool, wait_queue, queue, max_jobs=agent_config['multi_agent']):
+        # Initialize with shared state
+        self.active_jobs = active_jobs
+        self.assigned_jobs = assigned_jobs
+        self.job_pool = job_pool
+        self.wait_queue = wait_queue
+        self.queue = queue
+        self.max_jobs = max_jobs
 
     def run(self, state):
         jobs, _ = state.get()
@@ -24,16 +20,17 @@ class Preprocessing:
         self.process(state)
 
         if monitor_config['settings']['main']:
-            Monitor().add_log(f"active_jobs: {self.active_jobs.keys()}")
-            Monitor().add_log(f"job_pool: {self.job_pool.keys()}")
-            Monitor().add_log(f"wait_queue: {self.wait_queue}")
-            Monitor().add_log(f"queue: {self.queue}")
+            Monitor().add_log(f"active_jobs: {list(self.active_jobs.keys())}")
+            Monitor().add_log(f"job_pool: {list(self.job_pool.keys())}")
+            Monitor().add_log(f"wait_queue: {list(self.wait_queue)}")
+            Monitor().add_log(f"queue: {list(self.queue)}")
 
     def assign_job(self):
         for job in self.active_jobs.keys():
             if job not in self.assigned_jobs:
                 self.assigned_jobs.append(job)
                 return job
+        return None
 
     def update_active_jobs(self, state_jobs):
         # add to active jobs
@@ -59,13 +56,11 @@ class Preprocessing:
             self.job_pool[job_ID] = job
 
         # remove from job_pool
-        while (len(self.active_jobs.keys()) < self.max_jobs) and len(self.job_pool.keys()) > 0:
+        while len(self.active_jobs.keys()) < self.max_jobs and len(self.job_pool.keys()) > 0:
             job_ID, job = self.job_pool.popitem()
             self.active_jobs[job_ID] = job
 
     def process(self, state):
-        # TODO : make it faster / maybe : hashmap
-
         # add window tasks to wait queue
         for task_id in state.get_task_window():
             task = Database.get_task(task_id)
@@ -82,16 +77,13 @@ class Preprocessing:
         mobility_dict = {}
         for task in self.queue:
             mobility_dict[task] = len(Database.get_task_successors(task))
-        self.queue = list({k: v for k, v in sorted(
-            mobility_dict.items(), key=lambda item: item[1])}.keys())
+        sorted_queue = sorted(mobility_dict.items(), key=lambda item: item[1])
+        self.queue = [k for k, v in sorted_queue]
 
     def _is_ready_task(self, task):
         selected_task = Database.get_task(task)
         pred = selected_task['predecessors']
-        if selected_task['isReady'] == len(pred):
-            return True
-        else:
-            return False
+        return selected_task['isReady'] == len(pred)
 
     def get_agent_queue(self):
         agent_queue = {}
@@ -99,7 +91,7 @@ class Preprocessing:
         for job_ID in copy_list:
             agent_queue[job_ID] = []
             for task_ID in self.queue:
-                task = Database().get_task(task_ID)
+                task = Database.get_task(task_ID)
                 if task['job_id'] == job_ID:
                     agent_queue[job_ID].append(task_ID)
         return agent_queue
@@ -108,12 +100,12 @@ class Preprocessing:
         try:
             self.queue.remove(task_ID)
         except ValueError:
-            raise f"task{task_ID} is not in window-manager queue"
+            raise ValueError(f"task {task_ID} is not in window-manager queue")
 
     def get_log(self):
         return {
             'active_jobs_ID': list(self.active_jobs.keys()),
             'job_pool': list(self.job_pool.keys()),
-            'ready_queue': self.queue,
-            'wait_queue': self.wait_queue,
+            'ready_queue': list(self.queue),
+            'wait_queue': list(self.wait_queue),
         }

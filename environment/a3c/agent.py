@@ -12,12 +12,13 @@ from environment.a3c.shared_adam import SharedAdam
 from environment.dtrl.core_scheduler import CoreScheduler
 from environment.state import State
 from environment.pre_processing import Preprocessing
+from environment.window_manager import WindowManager
 from utilities.monitor import Monitor
-from data.configs import monitor_config
+from data.configs import monitor_config, agent_config
 
 
 class Agent(mp.Process):
-    def __init__(self, name, global_actor_critic, optimizer, barrier):
+    def __init__(self, name, global_actor_critic, optimizer, barrier, shared_dicts):
         super(Agent, self).__init__()
         self.global_actor_critic = global_actor_critic
         self.local_actor_critic = ActorCritic(
@@ -34,16 +35,31 @@ class Agent(mp.Process):
         # Shared boolean flag for stopping
         self.runner_flag = mp.Value('b', True)
         self.barrier = barrier
+        self.active_jobs = shared_dicts['active_jobs']
+        self.assigned_jobs = shared_dicts['assigned_jobs']
+        self.job_pool = shared_dicts['job_pool']
+        self.wait_queue = shared_dicts['wait_queue']
+        self.queue = shared_dicts['queue']
+        self.max_jobs = agent_config['multi_agent']
+        self.preprocessing = Preprocessing(
+            self.active_jobs, self.assigned_jobs, self.job_pool, self.wait_queue, self.queue, self.max_jobs)
 
     def run(self):
+        Database.load()
+        State().initialize(False)
+        WindowManager().run()
+        State().update()
+        self.preprocessing.run(State())
         while self.runner_flag:
+            self.barrier.wait()
             if self.assigned_job is None:
-                self.assigned_job = Preprocessing().assign_job()
+                self.assigned_job = self.preprocessing.assign_job()
+                print(self.name, self.preprocessing,
+                      self.preprocessing.get_agent_queue())
                 if self.assigned_job is None:
-                    self.barrier.wait()
                     continue
                 self.local_actor_critic.clear_memory()
-            self.task_queue = Preprocessing().get_agent_queue()[
+            self.task_queue = self.preprocessing.get_agent_queue()[
                 self.assigned_job]
             self.schedule()
             current_job = State().get_job(self.assigned_job)
@@ -62,7 +78,6 @@ class Agent(mp.Process):
                             #     'fail': sum(self.fail[self.assigned_job]) / len(self.fail[self.assigned_job]),
                         }
                     )
-            self.barrier.wait()
 
     def stop(self):
         self.runner_flag = False
@@ -111,8 +126,8 @@ class Agent(mp.Process):
         self.local_actor_critic.archive(input_state, option, reward)
 
         if fail_flag == 0:
-            Preprocessing().remove_from_queue(current_task_id)
-            self.task_queue = Preprocessing().get_agent_queue()[
+            self.preprocessing.remove_from_queue(current_task_id)
+            self.task_queue = self.preprocessing.get_agent_queue()[
                 self.assigned_job]
 
     def update(self):

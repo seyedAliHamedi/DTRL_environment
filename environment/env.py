@@ -27,11 +27,23 @@ class Environment:
             target=self.memory_monitor.run)
         # ! important load db first
         Database().load()
+
         Monitor().init(n_iterations)
         State().initialize(display)
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
         self.__worker_flags = []
+        manager = multiprocessing.Manager()
+        self.shared_dicts = {
+            'active_jobs': manager.dict(),
+            'assigned_jobs': manager.list(),
+            'job_pool': manager.dict(),
+            'wait_queue': manager.list(),
+            'queue': manager.list()
+        }
+
+        # Initialize Preprocessing with the manager
+        self.preprocessor = Preprocessing(**self.shared_dicts)
 
     def run(self):
         # TODO : decide worker.run / multithread/ !!!!! multiprocess pytorch --> .start() & .join()
@@ -44,7 +56,7 @@ class Environment:
 
         for i in range(agent_config['multi_agent']):
             worker = Agent(
-                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier)
+                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier, shared_dicts=self.shared_dicts)
             workers.append(worker)
             worker.start()
 
@@ -58,7 +70,7 @@ class Environment:
                 starting_time = time.time()
                 WindowManager().run()
                 State().update()
-                Preprocessing().run(State())
+                self.preprocessor.run(State())
 
                 # for worker in workers:
                 #     worker.run()
@@ -82,7 +94,7 @@ class Environment:
         finally:
             Monitor().save_logs()
             print(State().jobs_done)
-            print(len(Preprocessing().wait_queue))
+            print(len(self.preprocessor.wait_queue))
 
             for worker in workers:
                 worker.stop()
@@ -104,4 +116,4 @@ class Environment:
     def monitor_log(self, iteration):
         if monitor_config['settings']['main']:
             Monitor().set_env_log(State().get(), WindowManager().get_log(),
-                                  Preprocessing().get_log(), iteration)
+                                  self.preprocessor.get_log(), iteration)

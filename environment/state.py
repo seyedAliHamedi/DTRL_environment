@@ -235,8 +235,9 @@ class State:
             Database.task_pred_dec(t)
 
             if Database.get_task(t)['pred_count'] == 0:
-                Preprocessing().quque.append(t)
-                Preprocessing().wait_quque.remove(t)
+                pass
+                # Preprocessing().quque.append(t)
+                # Preprocessing().wait_quque.remove(t)
 
         try:
             self._jobs[job_ID]["finishedTasks"].append(task_ID)
