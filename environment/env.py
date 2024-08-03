@@ -7,7 +7,7 @@ from environment.a3c.actor_critic import ActorCritic
 from environment.a3c.agent import Agent
 from environment.a3c.shared_adam import SharedAdam
 from environment.state import State
-from utilities.monitor import Monitor
+from utilities.mini_monitor import MiniMonitor
 from utilities.memory_monitor import MemoryMonitor
 from data.configs import environment_config, monitor_config, agent_config
 
@@ -21,12 +21,12 @@ class Environment:
         self.memory_monitor = MemoryMonitor()
         self.mem_monitor_thread = threading.Thread(
             target=self.memory_monitor.run)
-        Monitor().init(n_iterations)
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
         self.__worker_flags = []
 
         manager = mp.Manager()
+        self.monitor = MiniMonitor(n_iterations, manager)
         lock = mp.Lock()
         self.manager = manager
         self.state = State(display, manager=manager, lock=lock)
@@ -79,14 +79,18 @@ class Environment:
             print("Caught an unexpected exception:")
             traceback.print_exc()
         finally:
-            Monitor().save_logs()
+            self.monitor.save_logs()
             print(self.state.jobs_done)
             print(len(self.preprocessor.wait_queue))
 
             for worker in workers:
                 worker.stop()
+
             for worker in workers:
-                worker.join()
+                if worker.is_alive():
+                    worker.terminate()
+                    worker.join()
+
             self.memory_monitor.stop()
 
     def sleep(self, time_len, iteration):
@@ -94,13 +98,13 @@ class Environment:
         if sleeping_time < 0:
             sleeping_time = 0
             if monitor_config['settings']['time']:
-                Monitor().add_time(time_len, iteration)
+                self.monitor.add_time(time_len, iteration)
         else:
             if monitor_config['settings']['time']:
-                Monitor().add_time(self.cycle_wait, iteration)
+                self.monitor.add_time(self.cycle_wait, iteration)
         time.sleep(sleeping_time)
 
     def monitor_log(self, iteration):
         if monitor_config['settings']['main']:
-            Monitor().set_env_log(self.state.get(), self.window_manager.get_log(),
-                                  self.preprocessor.get_log(), iteration)
+            self.monitor.set_env_log(self.state.get(), self.window_manager.get_log(),
+                                     self.preprocessor.get_log(), iteration)

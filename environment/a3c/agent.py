@@ -124,6 +124,7 @@ class Agent(mp.Process):
 
 ####### UTILITY #######
 
+
     def get_pe_data(self, pe_dict):
 
         pe = self.state.database.get_device(pe_dict["id"])
