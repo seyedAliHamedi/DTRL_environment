@@ -5,23 +5,21 @@ from data.db import Database
 
 
 class Preprocessing:
-    _instance = None
 
-    def __new__(cls, config=environment_config['window']):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.max_jobs = agent_config['multi_agent']
-            cls._instance.active_jobs = {}
-            cls._instance.assigned_jobs = []
-            cls._instance.job_pool = {}
-            cls._instance.wait_queue = []
-            cls._instance.queue = []
-        return cls._instance
+    def __init__(self, env, config=environment_config['window']):
+        self.max_jobs = agent_config['multi_agent']
+        self.active_jobs = {}
+        self.assigned_jobs = []
+        self.job_pool = {}
+        self.wait_queue = []
+        self.queue = []
+        self.agent_queue = {}
+        self.env = env
 
-    def run(self, state):
-        jobs, _ = state.get()
+    def run(self):
+        jobs, _ = self.env.state.get()
         self.update_active_jobs(jobs)
-        self.process(state)
+        self.process()
 
         if monitor_config['settings']['main']:
             Monitor().add_log(f"active_jobs: {self.active_jobs.keys()}")
@@ -63,13 +61,12 @@ class Preprocessing:
             job_ID, job = self.job_pool.popitem()
             self.active_jobs[job_ID] = job
 
-    def process(self, state):
+    def process(self):
         # TODO : make it faster / maybe : hashmap
 
         # add window tasks to wait queue
-        for task_id in state.get_task_window():
+        for task_id in self.env.state.get_task_window():
             task = Database.get_task(task_id)
-
             if task['pred_count'] == 0:
                 self.queue.append(task_id)
             else:
@@ -95,8 +92,7 @@ class Preprocessing:
 
     def get_agent_queue(self):
         agent_queue = {}
-        copy_list = copy(list(self.active_jobs.keys()))
-        for job_ID in copy_list:
+        for job_ID in self.active_jobs.keys():
             agent_queue[job_ID] = []
             for task_ID in self.queue:
                 task = Database().get_task(task_ID)

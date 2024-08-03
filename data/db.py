@@ -53,7 +53,7 @@ class Database:
         return cls._tasks.iloc[id].to_dict()
 
     @classmethod
-    def task_pred_dec(cls, id, column, new_val):
+    def task_pred_dec(cls, id):
         cls._tasks.at[id, "pred_count"] -= 1
 
     # ---------- helper  ------------

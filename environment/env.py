@@ -1,8 +1,8 @@
 import multiprocessing
+import sys
 import threading
 import time
 import traceback
-
 from data.db import Database
 from environment.a3c.actor_critic import ActorCritic
 from environment.a3c.agent import Agent
@@ -13,7 +13,6 @@ from utilities.memory_monitor import MemoryMonitor
 from environment.window_manager import WindowManager
 from environment.pre_processing import Preprocessing
 from data.configs import environment_config, monitor_config, agent_config
-
 import torch.multiprocessing as mp
 
 
@@ -28,10 +27,13 @@ class Environment:
         # ! important load db first
         Database().load()
         Monitor().init(n_iterations)
-        State().initialize(display)
+
+        self.state = State(self, display)
+        self.window_manager = WindowManager(self)
+        self.pre_processing = Preprocessing(self)
+        self.agent = Agent()
+        self.agent.init(self, display)
         self.cycle_wait = environment_config["environment"]["cycle"]
-        self.__runner_flag = True
-        self.__worker_flags = []
 
     def run(self):
         # TODO : decide worker.run / multithread/ !!!!! multiprocess pytorch --> .start() & .join()
@@ -39,55 +41,38 @@ class Environment:
             input_dims=5, n_actions=len(Database.get_all_devices()))
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
-        workers = []
-        barrier = mp.Barrier(agent_config['multi_agent'] + 1)
-
-        for i in range(agent_config['multi_agent']):
-            worker = Agent(
-                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier)
-            workers.append(worker)
-            worker.start()
 
         iteration = 0
         try:
             self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
-                if iteration % 10 == 0:
+                if iteration % 200 == 0:
                     print(f"iteration : {iteration}")
 
+                self.window_manager.run()
+
+                self.state.update()
+
+                self.pre_processing.run()
                 starting_time = time.time()
-                WindowManager().run()
-                State().update()
-                Preprocessing().run(State())
-
-                # for worker in workers:
-                #     worker.run()
-                # [w.join() for w in workers]
-
-                # Monitor logging
-
-                # Calculate sleeping time
-                barrier.wait()
+                self.agent.run()
                 time_len = time.time() - starting_time
+                # Calculate sleeping time
+
                 self.sleep(time_len, iteration)
 
                 self.monitor_log(iteration)
                 iteration += 1
 
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as e:
             print("Interrupted")
         except Exception as e:
             print("Caught an unexpected exception:")
             traceback.print_exc()
         finally:
             Monitor().save_logs()
-            print(State().jobs_done)
-            print(len(Preprocessing().wait_queue))
-
-            for worker in workers:
-                worker.stop()
-            for worker in workers:
-                worker.join()
+            print("Jobs Done:", self.state.jobs_done)
+            print("WaitQueue Length",len(self.pre_processing.wait_queue))
             self.memory_monitor.stop()
 
     def sleep(self, time_len, iteration):
@@ -104,4 +89,4 @@ class Environment:
     def monitor_log(self, iteration):
         if monitor_config['settings']['main']:
             Monitor().set_env_log(State().get(), WindowManager().get_log(),
-                                  Preprocessing().get_log(), iteration)
+                                  self.pre_processing.get_log(), iteration)

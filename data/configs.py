@@ -70,8 +70,8 @@ jobs_config = {
 }
 environment_config = {
     # TODO : test this params
-    "window": {"size": 15, "max_jobs": 5, "clock": 3},
-    "environment": {"cycle": 0.01, "anomaly_th": 0.5}
+    "window": {"size": 20, "max_jobs": 10, "clock": 5},
+    "environment": {"cycle": 0.05, "anomaly_th": 0.5}
 
 }
 monitor_config = {

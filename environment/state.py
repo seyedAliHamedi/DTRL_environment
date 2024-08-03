@@ -8,19 +8,14 @@ from utilities.monitor import Monitor
 
 
 class State:
-    _instance = None
-    jobs_done = 0
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance._PEs = {}
-            cls._instance._jobs = {}
-            cls._instance._task_window = {}
-            cls._instance.display = False
-        return cls._instance
-
-    def initialize(self, display):
+    def __init__(self, env, display):
+        self._PEs = {}
+        self._jobs = {}
+        self._task_window = {}
+        self._display = False
+        self.jobs_done = 0
+        self.env = env
         self.display = display
         self._init_PEs(Database.get_all_devices())
 
@@ -54,7 +49,7 @@ class State:
             return self.reward_function(punish=True), fail_flag, 0, 0
 
         execution_time = t = math.ceil(Database.get_task(task_ID)[
-            "computational_load"] / freq)
+                                           "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         queue_index, core_index = find_place(pe, core_i)
 
@@ -67,8 +62,16 @@ class State:
         job = self._jobs[job_ID]
         job["assignedTask"] = task_ID
 
-        job["remainingTasks"].remove(job["assignedTask"])
+        # update job
+        try:
+            job["remainingTasks"].remove(task_ID)
+        except ValueError:
+            print(f"tried to remove {task_ID} from job{job_ID} and Queue")
+            raise "Error occurred"
         job["runningTasks"].append(task_ID)
+
+        # update on agent queue
+        self.env.pre_processing.remove_from_queue(task_ID)
 
         # apply energyConsumption
         if pe['type'] == 'cloud':
@@ -77,7 +80,7 @@ class State:
         else:
             capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
             pe["energyConsumption"][core_index] = capacitance * \
-                (volt * volt) * freq
+                                                  (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
 
         return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
@@ -167,7 +170,8 @@ class State:
             self.__add_task_to_active_job(task, job_id)
 
     def __add_task_to_active_job(self, task, job_id):
-        self._jobs[job_id]["remainingTasks"].append(task)
+        job = self._jobs[job_id]
+        job['remainingTasks'].append(task)
 
     def __is_active_job(self, job_ID):
         for job_ID_key in self._jobs.keys():
@@ -235,8 +239,14 @@ class State:
             Database.task_pred_dec(t)
 
             if Database.get_task(t)['pred_count'] == 0:
-                Preprocessing().quque.append(t)
-                Preprocessing().wait_quque.remove(t)
+                job = self._jobs[job_ID]
+                if t in job['remainingTasks']:
+                    self.env.pre_processing.queue.append(t)
+                try:
+                    self.env.pre_processing.wait_queue.remove(t)
+                except ValueError:
+                    #print(f"Task{t} not found in wait queue to be removed when __task_finished")
+                    pass
 
         try:
             self._jobs[job_ID]["finishedTasks"].append(task_ID)
