@@ -3,15 +3,12 @@ import threading
 import time
 import traceback
 
-from data.db import Database
 from environment.a3c.actor_critic import ActorCritic
 from environment.a3c.agent import Agent
 from environment.a3c.shared_adam import SharedAdam
 from environment.state import State
 from utilities.monitor import Monitor
 from utilities.memory_monitor import MemoryMonitor
-from environment.window_manager import WindowManager
-from environment.pre_processing import Preprocessing
 from data.configs import environment_config, monitor_config, agent_config
 
 import torch.multiprocessing as mp
@@ -21,34 +18,25 @@ class Environment:
 
     def __init__(self, n_iterations, display):
         self.n_iterations = n_iterations
-        self.display = display
         self.memory_monitor = MemoryMonitor()
         self.mem_monitor_thread = threading.Thread(
             target=self.memory_monitor.run)
-        # ! important load db first
-        Database().load()
-
         Monitor().init(n_iterations)
-        State().initialize(display)
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
         self.__worker_flags = []
-        manager = multiprocessing.Manager()
-        self.shared_dicts = {
-            'active_jobs': manager.dict(),
-            'assigned_jobs': manager.list(),
-            'job_pool': manager.dict(),
-            'wait_queue': manager.list(),
-            'queue': manager.list()
-        }
 
-        # Initialize Preprocessing with the manager
-        self.preprocessor = Preprocessing(**self.shared_dicts)
+        manager = mp.Manager()
+        lock = mp.Lock()
+        self.state = State(manager=manager, lock=lock)
+        self.state.initialize(display=display)
+        self.db = self.state.database
+        self.preprocessor = self.state.preprocessor
+        self.window_manager = self.state.window_manager
 
     def run(self):
-        # TODO : decide worker.run / multithread/ !!!!! multiprocess pytorch --> .start() & .join()
         global_actor_critic = ActorCritic(
-            input_dims=5, n_actions=len(Database.get_all_devices()))
+            input_dims=5, n_actions=len(self.db.get_all_devices()))
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
         workers = []
@@ -56,7 +44,7 @@ class Environment:
 
         for i in range(agent_config['multi_agent']):
             worker = Agent(
-                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier, shared_dicts=self.shared_dicts)
+                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier, shared_state=self.state)
             workers.append(worker)
             worker.start()
 
@@ -68,10 +56,11 @@ class Environment:
                     print(f"iteration : {iteration}")
 
                 starting_time = time.time()
-                WindowManager().run()
-                State().update()
-                self.preprocessor.run(State())
-
+                self.window_manager.run()
+                self.state.update()
+                self.preprocessor.run()
+                print("-------- ", self.state.get_agent_queue2())
+                time.sleep(1)
                 # for worker in workers:
                 #     worker.run()
                 # [w.join() for w in workers]
@@ -93,7 +82,7 @@ class Environment:
             traceback.print_exc()
         finally:
             Monitor().save_logs()
-            print(State().jobs_done)
+            print(self.state.jobs_done)
             print(len(self.preprocessor.wait_queue))
 
             for worker in workers:
@@ -115,5 +104,5 @@ class Environment:
 
     def monitor_log(self, iteration):
         if monitor_config['settings']['main']:
-            Monitor().set_env_log(State().get(), WindowManager().get_log(),
+            Monitor().set_env_log(self.state.get(), self.window_manager.get_log(),
                                   self.preprocessor.get_log(), iteration)

@@ -6,19 +6,16 @@ import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
 
-from data.db import Database
 from environment.a3c.actor_critic import ActorCritic
 from environment.a3c.shared_adam import SharedAdam
-from environment.dtrl.core_scheduler import CoreScheduler
+from environment.a3c.core_scheduler import CoreScheduler
 from environment.state import State
-from environment.pre_processing import Preprocessing
-from environment.window_manager import WindowManager
 from utilities.monitor import Monitor
 from data.configs import monitor_config, agent_config
 
 
 class Agent(mp.Process):
-    def __init__(self, name, global_actor_critic, optimizer, barrier, shared_dicts):
+    def __init__(self, name, global_actor_critic, optimizer, barrier, shared_state):
         super(Agent, self).__init__()
         self.global_actor_critic = global_actor_critic
         self.local_actor_critic = ActorCritic(
@@ -27,45 +24,32 @@ class Agent(mp.Process):
         self.name = name
         self.num_input = 5
         self.num_output = 5
-        self.devices = Database.get_all_devices()
+        self.devices = shared_state.database.get_all_devices()
         self.assigned_job = None
         self.task_queue = []
         self.core = CoreScheduler(self.devices)
-        # self.thread = threading.Thread(target=self.run, name=self.name)
-        # Shared boolean flag for stopping
         self.runner_flag = mp.Value('b', True)
         self.barrier = barrier
-        self.active_jobs = shared_dicts['active_jobs']
-        self.assigned_jobs = shared_dicts['assigned_jobs']
-        self.job_pool = shared_dicts['job_pool']
-        self.wait_queue = shared_dicts['wait_queue']
-        self.queue = shared_dicts['queue']
-        self.max_jobs = agent_config['multi_agent']
-        self.preprocessing = Preprocessing(
-            self.active_jobs, self.assigned_jobs, self.job_pool, self.wait_queue, self.queue, self.max_jobs)
+        self.state = shared_state
 
     def run(self):
-        Database.load()
-        State().initialize(False)
-        WindowManager().run()
-        State().update()
-        self.preprocessing.run(State())
         while self.runner_flag:
             self.barrier.wait()
             if self.assigned_job is None:
-                self.assigned_job = self.preprocessing.assign_job()
-                print(self.name, self.preprocessing,
-                      self.preprocessing.get_agent_queue())
+
+                self.assigned_job = self.state.preprocessor.assign_job()
+                print(self.name,
+                      self.state.get_agent_queue2())
                 if self.assigned_job is None:
                     continue
                 self.local_actor_critic.clear_memory()
-            self.task_queue = self.preprocessing.get_agent_queue()[
+            self.task_queue = self.state.preprocessor.get_agent_queue()[
                 self.assigned_job]
             self.schedule()
-            current_job = State().get_job(self.assigned_job)
+            current_job = self.state.get_job(self.assigned_job)
 
             if len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
-                State().jobs_done += 1
+                self.state.jobs_done += 1
                 total_loss = self.update()
                 self.assigned_job = None
                 if monitor_config['settings']['agent']:
@@ -85,10 +69,10 @@ class Agent(mp.Process):
     def schedule(self):
         if len(self.task_queue) == 0:
             return
-        job_state, pe_state = State().get()
+        job_state, pe_state = self.state.get()
         current_task_id = self.task_queue[0]
-        current_task = Database().get_task(current_task_id)
-        current_job = State().get_job(self.assigned_job)
+        current_task = self.state.database.get_task(current_task_id)
+        current_job = self.state.get_job(self.assigned_job)
         input_state = get_input(current_task, {})
 
         option = self.local_actor_critic.choose_action(input_state)
@@ -118,16 +102,16 @@ class Agent(mp.Process):
                 f"Agent Action::Device: {selected_device_index} |"
                 f" Core: {selected_core_index} | freq: {dvfs[0]} |"
                 f" vol: {dvfs[1]} | task_id: {current_task_id} |"
-                f" cl: {Database.get_task(current_task_id)['computational_load']}", start='\n', end='')
+                f" cl: {self.state.database.get_task(current_task_id)['computational_load']}", start='\n', end='')
 
-        reward, fail_flag, energy, time = State().apply_action(selected_device_index,
-                                                               selected_core_index, dvfs[0], dvfs[1], current_task_id)
+        reward, fail_flag, energy, time = self.state.apply_action(selected_device_index,
+                                                                  selected_core_index, dvfs[0], dvfs[1], current_task_id)
 
         self.local_actor_critic.archive(input_state, option, reward)
 
         if fail_flag == 0:
-            self.preprocessing.remove_from_queue(current_task_id)
-            self.task_queue = self.preprocessing.get_agent_queue()[
+            self.state.preprocessor.remove_from_queue(current_task_id)
+            self.task_queue = self.state.preprocessor.get_agent_queue()[
                 self.assigned_job]
 
     def update(self):
@@ -164,7 +148,7 @@ def get_task_data(task):
 
 
 def get_pe_data(pe_dict):
-    pe = Database.get_device(pe_dict["id"])
+    pe = self.state.database.get_device(pe_dict["id"])
     battery_capacity = pe["battery_capacity"]
     battery_level = pe_dict["batteryLevel"]
     battery_isl = pe["ISL"]

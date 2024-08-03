@@ -1,32 +1,27 @@
 import random
 
-from data.db import Database
 from data.configs import environment_config, monitor_config, agent_config
-from environment.state import State
 
 
 class WindowManager:
-    _instance = None
 
-    def __new__(cls, config=environment_config['window']):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-            cls._instance.__pool = []
-            cls._instance.__head_index = 0
-            cls._instance.__max_jobs = config["max_jobs"]
-            cls._instance.__window_size = config["size"]
-            cls._instance.current_cycle = config["clock"]
-            cls._instance.__cycle = config["clock"]
-            cls._instance.active_jobs_ID = []
-        return cls._instance
+    def __init__(self, state, config=environment_config['window']):
+        self.state = state
+        self.__pool = []
+        self.__head_index = 0
+        self.__max_jobs = config["max_jobs"]
+        self.__window_size = config["size"]
+        self.current_cycle = config["clock"]
+        self.__cycle = config["clock"]
+        self.active_jobs_ID = []
 
     def run(self):
         if self.current_cycle != self.__cycle:
             self.current_cycle += 1
-            State().set_task_window([])
+            self.state.set_task_window([])
         else:
             self.current_cycle = 0
-            State().set_task_window(self.get_window())
+            self.state.set_task_window(self.get_window())
 
     def get_window(self):
         window = []
@@ -43,7 +38,7 @@ class WindowManager:
         return window
 
     def __slice(self):
-        sliced_jobs = Database.get_jobs_window(
+        sliced_jobs = self.state.database.get_jobs_window(
             self.__head_index, self.__max_jobs)
         self.__head_index = self.__head_index + self.__max_jobs
         selected_tasks = []
