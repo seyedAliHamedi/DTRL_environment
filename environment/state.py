@@ -12,33 +12,29 @@ from utilities.monitor import Monitor
 class State:
     jobs_done = 0
 
-    def __init__(self, manager, lock):
+    def __init__(self, display, manager, lock):
+        self.database = Database()
         self._PEs = manager.dict()
         self._jobs = manager.dict()
         self._task_window = manager.dict()
-        self.database = Database()
-        self.preprocessor = Preprocessing(state=self)
-        self.window_manager = WindowManager(state=self)
-        self.display = False
+        self.initialize()
+        self.preprocessor = Preprocessing(state=self, manager=manager)
+        self.window_manager = WindowManager(state=self, manager=manager)
         self.lock = lock
-
-    def initialize(self, display):
-        self.database.load()
         self.display = display
+
+    def initialize(self):
         self._init_PEs(self.database.get_all_devices())
         print("State Initialization complete.")
 
     def get(self):
-        with self.lock:
-            return dict(self._jobs), dict(self._PEs)
+        return dict(self._jobs), dict(self._PEs)
 
     def set_task_window(self, task_window):
-        with self.lock:
-            self._task_window = task_window
+        self._task_window = task_window
 
     def get_task_window(self):
-        with self.lock:
-            return list(self._task_window)
+        return list(self._task_window)
 
     def get_job(self, job_id):
         with self.lock:
@@ -118,9 +114,11 @@ class State:
     ####### ENVIRONMENT #######
     def update(self):
         with self.lock:
+            self.window_manager.run()
             self.__update_jobs()
             self.__update_PEs()
             self.__remove_assigned_task()
+            self.preprocessor.run()
 
             if self.display:
                 print("PEs::")

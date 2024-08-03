@@ -114,7 +114,7 @@ class Generator:
         devices['name'] = devices.apply(
             lambda row: row['type'] + str(row.name), axis=1)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        devices.to_csv(file_path)
+        devices.to_csv(file_path, index=False)
         return devices
 
     @classmethod

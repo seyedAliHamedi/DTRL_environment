@@ -2,66 +2,51 @@ from data.gen import Generator
 
 
 class Database:
-    _devices = None
-    _jobs = None
-    _tasks = None
 
-    @classmethod
-    def load(cls):
-        if not Database._devices:
-            Database._devices = Generator.get_devices()
-        if not Database._jobs or not Database._tasks:
-            Database._jobs, Database._tasks = Generator.get_jobs()
+    def __init__(self):
+        self._devices = Generator.get_devices()
+        self._jobs, self._tasks = Generator.get_jobs()
 
     # ------------ all ----------
-    @classmethod
-    def get_all_devices(cls):
-        return cls._devices.to_dict(orient='records')
 
-    @classmethod
-    def get_all_jobs(cls):
-        return cls._jobs.to_dict(orient='records')
+    def get_all_devices(self):
+        return self._devices.to_dict(orient='records')
 
-    @classmethod
-    def get_all_tasks(cls):
-        return cls._tasks.to_dict(orient='records')
+    def get_all_jobs(self):
+        return self._jobs.to_dict(orient='records')
+
+    def get_all_tasks(self):
+        return self._tasks.to_dict(orient='records')
 
     # ---------- multiple ------------
-    @classmethod
-    def get_devices(cls, count):
-        return cls._devices.head(count).to_dict(orient='records')
 
-    @classmethod
-    def get_jobs(cls, count):
-        return cls._jobs.head(count).to_dict(orient='records')
+    def get_devices(self, count):
+        return self._devices.head(count).to_dict(orient='records')
 
-    @classmethod
-    def get_tasks(cls, count):
-        return cls._tasks.head(count).to_dict(orient='records')
+    def get_jobs(self, count):
+        return self._jobs.head(count).to_dict(orient='records')
+
+    def get_tasks(self, count):
+        return self._tasks.head(count).to_dict(orient='records')
 
     # ---------- single ------------
-    @classmethod
-    def get_device(cls, id):
-        return cls._devices.iloc[id].to_dict()
 
-    @classmethod
-    def get_job(cls, id):
-        return cls._jobs.iloc[id].to_dict()
+    def get_device(self, id):
+        return self._devices.iloc[id].to_dict()
 
-    @classmethod
-    def get_task(cls, id):
-        return cls._tasks.iloc[id].to_dict()
+    def get_job(self, id):
+        return self._jobs.iloc[id].to_dict()
 
-    @classmethod
-    def task_pred_dec(cls, id, column, new_val):
-        cls._tasks.at[id, "pred_count"] -= 1
+    def get_task(self, id):
+        return self._tasks.iloc[id].to_dict()
+
+    def task_pred_dec(self, id, column, new_val):
+        self._tasks.at[id, "pred_count"] -= 1
 
     # ---------- helper  ------------
 
-    @classmethod
-    def get_jobs_window(cls, head, count):
-        return cls._jobs.iloc[head:head + count].to_dict(orient='records')
+    def get_jobs_window(self, head, count):
+        return self._jobs.iloc[head:head + count].to_dict(orient='records')
 
-    @classmethod
-    def get_task_successors(cls, task_ID):
-        return Database.get_task(task_ID)['successors']
+    def get_task_successors(self, task_ID):
+        return self.get_task(task_ID)['successors']

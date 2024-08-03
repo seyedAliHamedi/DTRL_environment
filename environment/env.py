@@ -28,8 +28,7 @@ class Environment:
 
         manager = mp.Manager()
         lock = mp.Lock()
-        self.state = State(manager=manager, lock=lock)
-        self.state.initialize(display=display)
+        self.state = State(display, manager=manager, lock=lock)
         self.db = self.state.database
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
@@ -56,10 +55,9 @@ class Environment:
                     print(f"iteration : {iteration}")
 
                 starting_time = time.time()
-                self.window_manager.run()
+
                 self.state.update()
-                self.preprocessor.run()
-                print("-------- ", self.state.get_agent_queue2())
+                print("-------- ", self.state.preprocessor.get_agent_queue())
                 time.sleep(1)
                 # for worker in workers:
                 #     worker.run()

@@ -5,15 +5,15 @@ from data.configs import environment_config, monitor_config, agent_config
 
 class WindowManager:
 
-    def __init__(self, state, config=environment_config['window']):
+    def __init__(self, state, manager, config=environment_config['window']):
         self.state = state
-        self.__pool = []
+        self.__pool = manager.list()
         self.__head_index = 0
         self.__max_jobs = config["max_jobs"]
         self.__window_size = config["size"]
         self.current_cycle = config["clock"]
         self.__cycle = config["clock"]
-        self.active_jobs_ID = []
+        self.active_jobs_ID = manager.list()
 
     def run(self):
         if self.current_cycle != self.__cycle:

@@ -38,8 +38,7 @@ class Agent(mp.Process):
             if self.assigned_job is None:
 
                 self.assigned_job = self.state.preprocessor.assign_job()
-                print(self.name,
-                      self.state.get_agent_queue2())
+                print(self.name, self.state.preprocessor.get_agent_queue())
                 if self.assigned_job is None:
                     continue
                 self.local_actor_critic.clear_memory()
@@ -73,7 +72,7 @@ class Agent(mp.Process):
         current_task_id = self.task_queue[0]
         current_task = self.state.database.get_task(current_task_id)
         current_job = self.state.get_job(self.assigned_job)
-        input_state = get_input(current_task, {})
+        input_state = self.get_input(current_task, {})
 
         option = self.local_actor_critic.choose_action(input_state)
 
@@ -81,7 +80,7 @@ class Agent(mp.Process):
         selected_device = self.devices[option]
 
         if selected_device['type'] != "cloud":
-            sub_state = get_input(
+            sub_state = self.get_input(
                 current_task, {0: pe_state[selected_device['id']]})
             sub_state = torch.tensor(sub_state, dtype=torch.float32)
             action_logits = self.core.forest[selected_device_index](sub_state)
@@ -129,47 +128,47 @@ class Agent(mp.Process):
 
 
 ####### UTILITY #######
-def get_input(task, pe_dict):
-    task_features = get_task_data(task)
-    pe_features = []
-    for pe in pe_dict.values():
-        pe_features.extend(get_pe_data(pe))
-    return task_features + pe_features
 
+    def get_pe_data(self, pe_dict):
 
-def get_task_data(task):
-    return [
-        task["computational_load"],
-        task["input_size"],
-        task["output_size"],
-        task["task_kind"],
-        task["is_safe"],
-    ]
+        pe = self.state.database.get_device(pe_dict["id"])
+        battery_capacity = pe["battery_capacity"]
+        battery_level = pe_dict["batteryLevel"]
+        battery_isl = pe["ISL"]
+        battery = (battery_level / battery_capacity -
+                   battery_isl) * battery_capacity
 
+        num_cores = pe["num_cores"]
+        cores_availability = pe_dict["occupiedCores"]
+        cores = 1 - (sum(cores_availability) / num_cores)
 
-def get_pe_data(pe_dict):
-    pe = self.state.database.get_device(pe_dict["id"])
-    battery_capacity = pe["battery_capacity"]
-    battery_level = pe_dict["batteryLevel"]
-    battery_isl = pe["ISL"]
-    battery = (battery_level / battery_capacity -
-               battery_isl) * battery_capacity
+        devicePower = 0
+        for index, core in enumerate(pe["voltages_frequencies"]):
+            if cores_availability[index] == 1:
+                continue
+            corePower = 0
+            for mod in core:
+                freq, vol = mod
+                corePower += freq / vol
+            devicePower += corePower
+        devicePower = devicePower / num_cores
 
-    num_cores = pe["num_cores"]
-    cores_availability = pe_dict["occupiedCores"]
-    cores = 1 - (sum(cores_availability) / num_cores)
+        error_rate = pe["error_rate"]
 
-    devicePower = 0
-    for index, core in enumerate(pe["voltages_frequencies"]):
-        if cores_availability[index] == 1:
-            continue
-        corePower = 0
-        for mod in core:
-            freq, vol = mod
-            corePower += freq / vol
-        devicePower += corePower
-    devicePower = devicePower / num_cores
+        return [cores, devicePower, battery, error_rate]
 
-    error_rate = pe["error_rate"]
+    def get_input(self, task, pe_dict):
+        task_features = self.get_task_data(task)
+        pe_features = []
+        for pe in pe_dict.values():
+            pe_features.extend(self.get_pe_data(pe))
+        return task_features + pe_features
 
-    return [cores, devicePower, battery, error_rate]
+    def get_task_data(self, task):
+        return [
+            task["computational_load"],
+            task["input_size"],
+            task["output_size"],
+            task["task_kind"],
+            task["is_safe"],
+        ]

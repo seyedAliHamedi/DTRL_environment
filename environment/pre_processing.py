@@ -3,14 +3,14 @@ from data.configs import monitor_config, agent_config
 
 
 class Preprocessing:
-    def __init__(self, state):
+    def __init__(self, state, manager):
         self.state = state
         self.max_jobs = agent_config['multi_agent']
-        self.active_jobs = {}
-        self.assigned_jobs = []
-        self.job_pool = {}
-        self.wait_queue = []
-        self.queue = []
+        self.active_jobs = manager.dict()
+        self.assigned_jobs = manager.list()
+        self.job_pool = manager.dict()
+        self.wait_queue = manager.list()
+        self.queue = manager.list()
 
     def run(self):
         jobs, _ = self.state.get()
@@ -77,8 +77,9 @@ class Preprocessing:
         for task in self.queue:
             mobility_dict[task] = len(
                 self.state.database.get_task_successors(task))
-        self.queue = list({k: v for k, v in sorted(
+        sorted_tasks = list({k: v for k, v in sorted(
             mobility_dict.items(), key=lambda item: item[1])}.keys())
+        self.queue[:] = sorted_tasks
 
     def _is_ready_task(self, task):
         selected_task = self.state.database.get_task(task)
