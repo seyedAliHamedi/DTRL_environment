@@ -64,7 +64,6 @@ class Environment:
                 # [w.join() for w in workers]
 
                 # Monitor logging
-                time.sleep(1)
 
                 # Calculate sleeping time
                 barrier.wait()

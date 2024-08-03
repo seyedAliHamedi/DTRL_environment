@@ -38,7 +38,6 @@ class Agent(mp.Process):
             if self.assigned_job is None:
                 with self.state.lock:
                     self.assigned_job = self.state.preprocessor.assign_job()
-                print(self.name, self.assigned_job)
                 if self.assigned_job is None:
                     continue
                 self.local_actor_critic.clear_memory()
@@ -67,6 +66,7 @@ class Agent(mp.Process):
         self.runner_flag = False
 
     def schedule(self):
+
         if len(self.task_queue) == 0:
             return
         job_state, pe_state = self.state.get()
@@ -106,7 +106,6 @@ class Agent(mp.Process):
 
         reward, fail_flag, energy, time = self.state.apply_action(selected_device_index,
                                                                   selected_core_index, dvfs[0], dvfs[1], current_task_id)
-        print(" AGGGGGGENT : ", current_task_id)
         self.local_actor_critic.archive(input_state, option, reward)
 
     def update(self):
@@ -124,7 +123,6 @@ class Agent(mp.Process):
 
 
 ####### UTILITY #######
-
 
     def get_pe_data(self, pe_dict):
 

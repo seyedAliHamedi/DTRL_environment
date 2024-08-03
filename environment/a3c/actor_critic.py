@@ -39,7 +39,10 @@ class ActorCritic(nn.Module):
         state = torch.tensor([ob], dtype=torch.float)
         pi, _ = self.forward(state)
 
-        probs = F.softmax(pi, dim=0)
+        # Ensure numerical stability for softmax
+        pi = pi - pi.max()
+        probs = F.softmax(pi, dim=-1)
+
         dist = Categorical(probs)
         action = dist.sample()
 
@@ -50,7 +53,7 @@ class ActorCritic(nn.Module):
         gamma = 0.99
         returns = []
         for reward in self.rewards[::-1]:
-            G = G + gamma * reward
+            G = G * gamma + reward
             returns.append(G)
 
         returns.reverse()
@@ -59,7 +62,8 @@ class ActorCritic(nn.Module):
 
     def calc_loss(self):
         states = torch.tensor(self.states, dtype=torch.float)
-        actions = torch.tensor(self.actions, dtype=torch.float)
+        # Ensure actions are long type for indexing
+        actions = torch.tensor(self.actions, dtype=torch.long)
         returns = self.calculate_returns()
 
         pis = []
@@ -71,11 +75,14 @@ class ActorCritic(nn.Module):
         pis = torch.stack(pis, dim=0)
         values = torch.stack(values, dim=0).squeeze()
 
-        probs = F.softmax(pis, dim=0)
+        # Ensure numerical stability for softmax
+        pis = pis - pis.max(dim=-1, keepdim=True)[0]
+        probs = F.softmax(pis, dim=-1)
+
         dist = Categorical(probs)
         log_probs = dist.log_prob(actions)
-        actor_loss = -log_probs*(returns-values)
-        critic_loss = (returns-values)**2
+        actor_loss = -log_probs * (returns - values)
+        critic_loss = F.mse_loss(values, returns, reduction='none')
 
-        total_loss = (critic_loss + actor_loss).mean()
+        total_loss = (actor_loss + critic_loss).mean()
         return total_loss

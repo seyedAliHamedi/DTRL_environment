@@ -28,13 +28,13 @@ class State:
         print("State Initialization complete.")
 
     def get(self):
-        return dict(self._jobs), dict(self._PEs)
+        return self._jobs, self._PEs
 
     def set_task_window(self, task_window):
         self._task_window = task_window
 
     def get_task_window(self):
-        return list(self._task_window)
+        return self._task_window
 
     def get_job(self, job_id):
         with self.lock:
@@ -63,15 +63,15 @@ class State:
             placing_slot = (execution_time, task_ID)
             queue_index, core_index = find_place(pe, core_i)
 
-            if queue_index != -1 and core_index != -1:
-                # Convert manager.list to regular list for modification
-                queue = list(pe["queue"][core_index])
-                queue[queue_index] = placing_slot
-                pe["queue"][core_index] = queue
+            # if queue_index != -1 and core_index != -1:
 
-                job_ID = task["job_id"]
-                job = self._jobs[job_ID]
-                job["assignedTask"] = task_ID
+            # Convert manager.list to regular list for modification
+            queue = list(pe["queue"][core_index])
+            queue[queue_index] = placing_slot
+            pe["queue"][core_index] = queue
+            job_ID = task["job_id"]
+            job = self._jobs[job_ID]
+            job["assignedTask"] = task_ID
 
             try:
                 if task_ID in job["remainingTasks"]:
@@ -262,7 +262,7 @@ class State:
                     continue
                 queue_shift_left(current_queue)
             else:
-                current_queue[0] = (0, current_queue[0][1])
+                current_queue[0] = (current_queue[0][0]-1, current_queue[0][1])
 
         for i, core_queue in enumerate(queue_copy):
             pe["queue"][i] = core_queue
@@ -283,15 +283,14 @@ class State:
         for t in task_suc:
             self.database.task_pred_dec(t)
 
-            # Uncommented code
-            # if self.database.get_task(t)['pred_count'] == 0:
-            #     job = self._jobs[job_ID]
-            #     if t in job['remainingTasks']:
-            #         self.preprocessor.queue.append(t)
-            #     try:
-            #         self.preprocessor.wait_queue.remove(t)
-            #     except ValueError:
-            #         pass
+            if self.database.get_task(t)['pred_count'] == 0:
+                job = self._jobs[job_ID]
+                if t in job['remainingTasks']:
+                    self.preprocessor.queue.append(t)
+                try:
+                    self.preprocessor.wait_queue.remove(t)
+                except ValueError:
+                    pass
 
         try:
             # Convert manager lists to regular lists for modification

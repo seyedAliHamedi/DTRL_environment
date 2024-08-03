@@ -10,6 +10,6 @@ if __name__ == '__main__':
     pd.set_option('display.max_colwidth', None)
     pd.options.display.float_format = '{:,.5f}'.format
     print("Creating environment...")
-    env = Environment(500, True)
+    env = Environment(100, False)
     print("Running environment...")
     env.run()
