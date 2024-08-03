@@ -58,8 +58,6 @@ class Preprocessing:
             self.active_jobs[job_ID] = job
 
     def process(self):
-        # TODO : make it faster / maybe : hashmap
-
         # add window tasks to wait queue
         for task_id in self.state.get_task_window():
             task = self.state.database.get_task(task_id)
@@ -94,7 +92,7 @@ class Preprocessing:
         copy_list = list(self.active_jobs.keys())
         for job_ID in copy_list:
             agent_queue[job_ID] = []
-            for task_ID in self.queue:
+            for task_ID in list(self.queue):
                 task = self.state.database.get_task(task_ID)
                 if task['job_id'] == job_ID:
                     agent_queue[job_ID].append(task_ID)

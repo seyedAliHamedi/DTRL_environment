@@ -40,7 +40,7 @@ class Database:
     def get_task(self, id):
         return self._tasks.iloc[id].to_dict()
 
-    def task_pred_dec(self, id, column, new_val):
+    def task_pred_dec(self, id):
         self._tasks.at[id, "pred_count"] -= 1
 
     # ---------- helper  ------------

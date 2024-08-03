@@ -28,6 +28,7 @@ class Environment:
 
         manager = mp.Manager()
         lock = mp.Lock()
+        self.manager = manager
         self.state = State(display, manager=manager, lock=lock)
         self.db = self.state.database
         self.preprocessor = self.state.preprocessor
@@ -41,6 +42,7 @@ class Environment:
         workers = []
         barrier = mp.Barrier(agent_config['multi_agent'] + 1)
 
+        self.state.update(self.manager)
         for i in range(agent_config['multi_agent']):
             worker = Agent(
                 name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier, shared_state=self.state)
@@ -56,14 +58,13 @@ class Environment:
 
                 starting_time = time.time()
 
-                self.state.update()
-                print("-------- ", self.state.preprocessor.get_agent_queue())
-                time.sleep(1)
+                self.state.update(self.manager)
                 # for worker in workers:
                 #     worker.run()
                 # [w.join() for w in workers]
 
                 # Monitor logging
+                time.sleep(1)
 
                 # Calculate sleeping time
                 barrier.wait()

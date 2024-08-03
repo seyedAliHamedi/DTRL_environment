@@ -36,9 +36,9 @@ class Agent(mp.Process):
         while self.runner_flag:
             self.barrier.wait()
             if self.assigned_job is None:
-
-                self.assigned_job = self.state.preprocessor.assign_job()
-                print(self.name, self.state.preprocessor.get_agent_queue())
+                with self.state.lock:
+                    self.assigned_job = self.state.preprocessor.assign_job()
+                print(self.name, self.assigned_job)
                 if self.assigned_job is None:
                     continue
                 self.local_actor_critic.clear_memory()
@@ -49,6 +49,7 @@ class Agent(mp.Process):
 
             if len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
                 self.state.jobs_done += 1
+                print("DONE")
                 total_loss = self.update()
                 self.assigned_job = None
                 if monitor_config['settings']['agent']:
@@ -105,13 +106,8 @@ class Agent(mp.Process):
 
         reward, fail_flag, energy, time = self.state.apply_action(selected_device_index,
                                                                   selected_core_index, dvfs[0], dvfs[1], current_task_id)
-
+        print(" AGGGGGGENT : ", current_task_id)
         self.local_actor_critic.archive(input_state, option, reward)
-
-        if fail_flag == 0:
-            self.state.preprocessor.remove_from_queue(current_task_id)
-            self.task_queue = self.state.preprocessor.get_agent_queue()[
-                self.assigned_job]
 
     def update(self):
         loss = self.local_actor_critic.calc_loss()
@@ -128,6 +124,7 @@ class Agent(mp.Process):
 
 
 ####### UTILITY #######
+
 
     def get_pe_data(self, pe_dict):
 
