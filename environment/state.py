@@ -11,9 +11,9 @@ from utilities.monitor import Monitor
 
 
 class State:
-    jobs_done = 0
 
     def __init__(self, display, manager, lock):
+        self.jobs_done = 0
         self.database = Database()
         self._PEs = manager.dict()
         self._jobs = manager.dict()
@@ -302,12 +302,10 @@ class State:
             if is_core_free(pe["queue"][core_index]):
                 pe["occupiedCores"][core_index] = 0
                 # set default energy cons for idle cores
-                pe["energyConsumption"][core_index] = self.database.get_device(pe_ID)["powerIdle"][
-                    core_index]
+                pe["energyConsumption"][core_index] = self.database.get_device(pe_ID)[
+                    "powerIdle"][core_index]
             else:
                 pe["occupiedCores"][core_index] = 1
-
-####### UTILITY #######
 
 
 ####### UTILITY #######

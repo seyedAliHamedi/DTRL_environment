@@ -102,7 +102,7 @@ monitor_config = {
 }
 
 agent_config = {
-    'multi_agent': 25,
+    'multi_agent': 20,
     'learning_mod': 1,
     'alpha': 1,
     'beta': 1,

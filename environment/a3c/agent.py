@@ -1,3 +1,4 @@
+import traceback
 import threading
 import time
 
@@ -26,7 +27,6 @@ class Agent(mp.Process):
         self.num_output = 5
         self.devices = shared_state.database.get_all_devices()
         self.assigned_job = None
-        self.task_queue = []
         self.core = CoreScheduler(self.devices)
         self.runner_flag = mp.Value('b', True)
         self.barrier = barrier
@@ -41,10 +41,15 @@ class Agent(mp.Process):
                 if self.assigned_job is None:
                     continue
                 self.local_actor_critic.clear_memory()
-            self.task_queue = self.state.preprocessor.get_agent_queue()[
+            task_queue = self.state.preprocessor.get_agent_queue()[
                 self.assigned_job]
-            self.schedule()
-            current_job = self.state.get_job(self.assigned_job)
+            for task in task_queue:
+                self.schedule(task)
+            try:
+                current_job = self.state.get_job(self.assigned_job)
+            except:
+                print("HHHHH")
+                traceback.print_exc()
 
             if len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
                 self.state.jobs_done += 1
@@ -52,25 +57,14 @@ class Agent(mp.Process):
                 total_loss = self.update()
                 self.assigned_job = None
                 if monitor_config['settings']['agent']:
-                    Monitor().add_agent_log(
-                        {
-                            'loss': total_loss.item(),
-                            #     'reward': sum(self.rewards[self.assigned_job]) / len(self.rewards[self.assigned_job]),
-                            #     'time': sum(self.time[self.assigned_job]) / len(self.time[self.assigned_job]),
-                            #     'energy': sum(self.energy[self.assigned_job]) / len(self.energy[self.assigned_job]),
-                            #     'fail': sum(self.fail[self.assigned_job]) / len(self.fail[self.assigned_job]),
-                        }
-                    )
+                    pass
 
     def stop(self):
         self.runner_flag = False
 
-    def schedule(self):
+    def schedule(self, current_task_id):
 
-        if len(self.task_queue) == 0:
-            return
         job_state, pe_state = self.state.get()
-        current_task_id = self.task_queue[0]
         current_task = self.state.database.get_task(current_task_id)
         current_job = self.state.get_job(self.assigned_job)
         input_state = self.get_input(current_task, {})
@@ -104,9 +98,13 @@ class Agent(mp.Process):
                 f" vol: {dvfs[1]} | task_id: {current_task_id} |"
                 f" cl: {self.state.database.get_task(current_task_id)['computational_load']}", start='\n', end='')
 
-        reward, fail_flag, energy, time = self.state.apply_action(selected_device_index,
-                                                                  selected_core_index, dvfs[0], dvfs[1], current_task_id)
-        self.local_actor_critic.archive(input_state, option, reward)
+        try:
+            reward, fail_flag, energy, time = self.state.apply_action(
+                selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
+            self.local_actor_critic.archive(input_state, option, reward)
+        except:
+            pass
+            # print(selected_device_index, selected_device)
 
     def update(self):
         loss = self.local_actor_critic.calc_loss()
@@ -123,7 +121,6 @@ class Agent(mp.Process):
 
 
 ####### UTILITY #######
-
 
     def get_pe_data(self, pe_dict):
 
