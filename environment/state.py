@@ -1,4 +1,5 @@
 import math
+import time
 import numpy as np
 import pandas as pd
 from multiprocessing import Manager, Lock
@@ -37,67 +38,56 @@ class State:
         return self._task_window
 
     def get_job(self, job_id):
-        with self.lock:
-            return self._jobs[job_id]
+        return self._jobs[job_id]
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        with self.lock:
-            pe = self._PEs[pe_ID]
-            pe_database = self.database.get_device(pe_ID)
-            acceptable_tasks = pe_database["acceptableTasks"]
-            task = self.database.get_task(task_ID)
-
-            fail_flag = 0
-            if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe_database['handleSafeTask']):
-                fail_flag = 2
-                return self.reward_function(punish=True), fail_flag, 0, 0
-            elif task["task_kind"] not in acceptable_tasks:
-                fail_flag = 1
-                return self.reward_function(punish=True), fail_flag, 0, 0
-            elif task["task_kind"] not in acceptable_tasks:
-                fail_flag = 1
-                return self.reward_function(punish=True), fail_flag, 0, 0
-
-            execution_time = t = math.ceil(self.database.get_task(task_ID)[
-                                           "computational_load"] / freq)
-            placing_slot = (execution_time, task_ID)
-            queue_index, core_index = find_place(pe, core_i)
-
-            # if queue_index != -1 and core_index != -1:
-
-            # Convert manager.list to regular list for modification
-            queue = list(pe["queue"][core_index])
-            queue[queue_index] = placing_slot
-            pe["queue"][core_index] = queue
-            job_ID = task["job_id"]
-            job = self._jobs[job_ID]
-            job["assignedTask"] = task_ID
-
-            try:
-                if task_ID in job["remainingTasks"]:
-                    job["remainingTasks"].remove(task_ID)
-                else:
-                    print(
-                        f"Task ID {task_ID} not found in remaining tasks of job {job_ID}")
-            except Exception as e:
-                print(f"Exception occurred: {e}")
-                raise
-
-            job["runningTasks"].append(task_ID)
-
-            self.preprocessor.remove_from_queue(task_ID)
-
-            if pe['type'] == 'cloud':
-                list(pe["energyConsumption"])[core_index] = volt
-                e = volt * t
+        pe = self._PEs[pe_ID]
+        pe_database = self.database.get_device(pe_ID)
+        acceptable_tasks = pe_database["acceptableTasks"]
+        task = self.database.get_task(task_ID)
+        fail_flag = 0
+        if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe_database['handleSafeTask']):
+            fail_flag = 2
+            return self.reward_function(punish=True), fail_flag, 0, 0
+        elif task["task_kind"] not in acceptable_tasks:
+            fail_flag = 1
+            return self.reward_function(punish=True), fail_flag, 0, 0
+        elif task["task_kind"] not in acceptable_tasks:
+            fail_flag = 1
+            return self.reward_function(punish=True), fail_flag, 0, 0
+        execution_time = t = math.ceil(self.database.get_task(task_ID)[
+                                       "computational_load"] / freq)
+        placing_slot = (execution_time, task_ID)
+        queue_index, core_index = find_place(pe, core_i)
+        # if queue_index != -1 and core_index != -1:
+        # Convert manager.list to regular list for modification
+        queue = list(pe["queue"][core_index])
+        queue[queue_index] = placing_slot
+        pe["queue"][core_index] = queue
+        job_ID = task["job_id"]
+        job = self._jobs[job_ID]
+        job["assignedTask"] = task_ID
+        try:
+            if task_ID in job["remainingTasks"]:
+                job["remainingTasks"].remove(task_ID)
             else:
-                capacitance = self.database.get_device(
-                    pe_ID)["capacitance"][core_index]
-                list(pe["energyConsumption"])[core_index] = capacitance * \
-                    (volt * volt) * freq
-                e = capacitance * (volt * volt) * freq * t
-
-            return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
+                print(
+                    f"Task ID {task_ID} not found in remaining tasks of job {job_ID}")
+        except Exception as e:
+            print(f"Exception occurred: {e}")
+            raise
+        job["runningTasks"].append(task_ID)
+        self.preprocessor.remove_from_queue(task_ID)
+        if pe['type'] == 'cloud':
+            list(pe["energyConsumption"])[core_index] = volt
+            e = volt * t
+        else:
+            capacitance = self.database.get_device(
+                pe_ID)["capacitance"][core_index]
+            list(pe["energyConsumption"])[core_index] = capacitance * \
+                (volt * volt) * freq
+            e = capacitance * (volt * volt) * freq * t
+        return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
 
     def reward_function(self, e=0, alpha=0, t=0, beta=0, punish=0):
         if punish == 0:
@@ -133,58 +123,58 @@ class State:
     ####### ENVIRONMENT #######
 
     def update(self, manager):
-        with self.lock:
-            self.window_manager.run()
-            self.__update_jobs(manager)
-            self.__update_PEs()
-            self.__remove_assigned_task()
-            self.preprocessor.run()
+        self.window_manager.run()
+        self.__update_jobs(manager)
+        a = time.time()
+        self.__update_PEs()
+        self.__remove_assigned_task()
+        self.preprocessor.run()
 
-            if self.display:
-                print("PEs::")
-                # Convert manager.dict() to a regular dict for easier printing
-                pe_data = {}
-                for pe_id, pe in self._PEs.items():
-                    pe_data[pe_id] = {
-                        "id": pe["id"],
-                        "type": pe["type"],
-                        "batteryLevel": pe["batteryLevel"],
-                        # Convert ListProxy to list
-                        "occupiedCores": list(pe["occupiedCores"]),
-                        # Convert ListProxy to list
-                        "energyConsumption": list(pe["energyConsumption"]),
-                        # Convert each ListProxy in queue to list
-                        "queue": [list(core_queue) for core_queue in pe["queue"]]
-                    }
-                # Transpose for better readability
-                print(pd.DataFrame(pe_data).T, '\n')
+        if self.display:
+            # print("PEs::")
+            # Convert manager.dict() to a regular dict for easier printing
+            pe_data = {}
+            for pe_id, pe in self._PEs.items():
+                pe_data[pe_id] = {
+                    "id": pe["id"],
+                    "type": pe["type"],
+                    "batteryLevel": pe["batteryLevel"],
+                    # Convert ListProxy to list
+                    "occupiedCores": list(pe["occupiedCores"]),
+                    # Convert ListProxy to list
+                    "energyConsumption": list(pe["energyConsumption"]),
+                    # Convert each ListProxy in queue to list
+                    "queue": [list(core_queue) for core_queue in pe["queue"]]
+                }
+            # Transpose for better readability
+            # print(pd.DataFrame(pe_data).T, '\n')
 
-                print("Jobs::")
-                # Convert manager.dict() to a regular dict for easier printing
-                job_data = {}
-                for job_id, job in self._jobs.items():
-                    job_data[job_id] = {
-                        "task_count": job["task_count"],
-                        # Convert ListProxy to list
-                        "finishedTasks": list(job["finishedTasks"]),
-                        "assignedTask": job["assignedTask"],
-                        # Convert ListProxy to list
-                        "runningTasks": list(job["runningTasks"]),
-                        # Convert ListProxy to list
-                        "remainingTasks": list(job["remainingTasks"]),
-                        "remainingDeadline": job["remainingDeadline"]
-                    }
-                print(pd.DataFrame(job_data), "\n")
+            print("Jobs::")
+            # Convert manager.dict() to a regular dict for easier printing
+            job_data = {}
+            for job_id, job in self._jobs.items():
+                job_data[job_id] = {
+                    "task_count": job["task_count"],
+                    # Convert ListProxy to list
+                    "finishedTasks": list(job["finishedTasks"]),
+                    "assignedTask": job["assignedTask"],
+                    # Convert ListProxy to list
+                    "runningTasks": list(job["runningTasks"]),
+                    # Convert ListProxy to list
+                    "remainingTasks": list(job["remainingTasks"]),
+                    "remainingDeadline": job["remainingDeadline"]
+                }
+            print(pd.DataFrame(job_data), "\n")
 
-                print(
-                    "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
+            print(
+                "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
-            if monitor_config['settings']['main']:
-                Monitor().add_log('PEs::', start='\n\n', end='')
-                Monitor().add_log(f'{pd.DataFrame(pe_data).to_string()}')
-                Monitor().add_log("Jobs::", start='\n', end='')
-                Monitor().add_log(f'{pd.DataFrame(job_data).to_string()}')
-                Monitor().add_log(summary_log_string, start='\n')
+        if monitor_config['settings']['main']:
+            Monitor().add_log('PEs::', start='\n\n', end='')
+            Monitor().add_log(f'{pd.DataFrame(pe_data).to_string()}')
+            Monitor().add_log("Jobs::", start='\n', end='')
+            Monitor().add_log(f'{pd.DataFrame(job_data).to_string()}')
+            Monitor().add_log(summary_log_string, start='\n')
 
     ########  UPDATE JOBS #######
 
@@ -271,9 +261,9 @@ class State:
 
     def __remove_unused_cores_cloud(self, pe, core_list):
         for i, item in enumerate(core_list):
-            del list(pe["queue"])[item - i]
-            del list(pe["occupiedCores"])[item - i]
-            del list(pe["energyConsumption"])[item - i]
+            del pe["queue"][item - i]
+            del pe["occupiedCores"][item - i]
+            del pe["energyConsumption"][item - i]
 
     def __task_finished(self, task_ID):
         task = self.database.get_task(task_ID)
@@ -308,14 +298,14 @@ class State:
             raise
 
     def __update_occupied_cores(self, pe, pe_ID):
-        for core_index, core in enumerate(list(pe["occupiedCores"])):
+        for core_index, core in enumerate(pe["occupiedCores"]):
             if is_core_free(pe["queue"][core_index]):
-                list(pe["occupiedCores"])[core_index] = 0
+                pe["occupiedCores"][core_index] = 0
                 # set default energy cons for idle cores
-                list(pe["energyConsumption"])[core_index] = self.database.get_device(pe_ID)["powerIdle"][
+                pe["energyConsumption"][core_index] = self.database.get_device(pe_ID)["powerIdle"][
                     core_index]
             else:
-                list(pe["occupiedCores"])[core_index] = 1
+                pe["occupiedCores"][core_index] = 1
 
 ####### UTILITY #######
 
@@ -323,10 +313,10 @@ class State:
 ####### UTILITY #######
 def find_place(pe, core_i):
     if pe["type"] == "cloud":
-        list(pe["queue"]).append([])
-        list(pe["queue"])[-1].append((0, -1))
-        list(pe["energyConsumption"]).append(0)
-        list(pe["occupiedCores"]).append(1)
+        pe["queue"].append([])
+        pe["queue"][-1].append((0, -1))
+        pe["energyConsumption"].append(0)
+        pe["occupiedCores"].append(1)
         return 0, len(pe["queue"]) - 1
     else:
         for i, slot in enumerate(list(pe["queue"])[core_i]):

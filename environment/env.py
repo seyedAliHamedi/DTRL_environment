@@ -1,4 +1,6 @@
-import multiprocessing
+import matplotlib.pyplot as plt
+import os
+import json
 import threading
 import time
 import traceback
@@ -33,6 +35,7 @@ class Environment:
         self.db = self.state.database
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
+        self.time_log = []
 
     def run(self):
         global_actor_critic = ActorCritic(
@@ -80,6 +83,7 @@ class Environment:
             traceback.print_exc()
         finally:
             self.monitor.save_logs()
+            self.save_time_log()
             print(self.state.jobs_done)
             print(len(self.preprocessor.wait_queue))
 
@@ -99,12 +103,31 @@ class Environment:
             sleeping_time = 0
             if monitor_config['settings']['time']:
                 self.monitor.add_time(time_len, iteration)
+                self.time_log.append(time_len)
         else:
             if monitor_config['settings']['time']:
                 self.monitor.add_time(self.cycle_wait, iteration)
+                self.time_log.append(self.cycle_wait)
         time.sleep(sleeping_time)
 
     def monitor_log(self, iteration):
         if monitor_config['settings']['main']:
             self.monitor.set_env_log(self.state.get(), self.window_manager.get_log(),
                                      self.preprocessor.get_log(), iteration)
+
+    def save_time_log(self):
+        y_values = self.time_log
+        plt.figure(figsize=(10, 5))
+        plt.plot(y_values, marker='o', linestyle='-')
+        plt.axhline(y=environment_config['environment']['cycle'],
+                    color='red', linestyle='--', label='-set-cycle-time')
+        plt.title("Sleeping time on each iteration")
+        plt.xlabel("iteration")
+        plt.ylabel("sleeping time")
+        plt.grid(True)
+        plt.legend()
+        path = monitor_config['paths']['time']['plot']
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        plt.savefig(path)
+        with open(monitor_config['paths']['time']['summery'], 'w') as f:
+            json.dump(self.time_log, f, indent=4)
