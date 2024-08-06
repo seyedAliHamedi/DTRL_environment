@@ -9,7 +9,8 @@ import itertools
 def run_env(run_index, iteration, config, path=monitor_config['paths']['time']['plot'],
             log_file="environment/config_testing/env_run_log.txt"):
     log_dir = os.path.dirname(log_file)
-    os.makedirs(log_dir, exist_ok=True)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
     start_msg = (f"Started test={run_index} | CONFIG:: multi_agent={config['multi_agent']}, "
                  f"size: {config['window']['size']}, max_jobs: {config['window']['max_jobs']}, "
                  f"clock: {config['window']['clock']}\n")
