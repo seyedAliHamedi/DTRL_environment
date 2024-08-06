@@ -55,7 +55,7 @@ class Preprocessing:
             task = self.state.database.get_task(task_id)
 
             if task['pred_count'] == 0:
-                self.queue.append(task_id)
+                self.get_queue().append(task_id)
             else:
                 self.wait_queue.append(task_id)
 
@@ -64,31 +64,29 @@ class Preprocessing:
 
     def __sort_by_mobility(self):
         mobility_dict = {}
-        for task in self.queue:
+        for task in self.get_queue():
             mobility_dict[task] = len(
                 self.state.database.get_task_successors(task))
         sorted_tasks = list({k: v for k, v in sorted(
             mobility_dict.items(), key=lambda item: item[1])}.keys())
-        self.queue[:] = sorted_tasks
+        self.get_queue()[:] = sorted_tasks
+
+    def get_queue(self):
+        try:
+            return self.queue
+        except:
+            return []
 
     def get_agent_queue(self):
-        with self.state.lock:
-            agent_queue = {}
-            task_list = list(self.queue)
-
-            for job_ID in self.active_jobs.keys():
-                agent_queue[job_ID] = []
-
-                for task_ID in task_list:
-                    task = self.state.database.get_task(task_ID)
-
-                    if task['job_id'] == job_ID:
-                        agent_queue[job_ID].append(task_ID)
-
-            return agent_queue
+        agent_queue = {}
+        task_list = list(self.get_queue())
+        for job_ID in self.active_jobs.keys():
+            agent_queue[job_ID] = []
+            for task_ID in task_list:
+                task = self.state.database.get_task(task_ID)
+                if task['job_id'] == job_ID:
+                    agent_queue[job_ID].append(task_ID)
+        return agent_queue
 
     def remove_from_queue(self, task_ID):
-        try:
-            self.queue.remove(task_ID)
-        except:
-            pass
+        self.get_queue().remove(task_ID)

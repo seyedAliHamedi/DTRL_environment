@@ -60,6 +60,8 @@ class Environment:
                     print(f"iteration : {iteration}")
                 if iteration % 500 == 0:
                     self.make_agents_plots()
+                if iteration == 50000:
+                    self.make_agents_plots(path='./plots2.png')
 
                 starting_time = time.time()
 
@@ -80,14 +82,16 @@ class Environment:
 
         except KeyboardInterrupt:
             print("Interrupted")
+            self.monitor.save_logs()
+            self.save_time_log()
+            self.make_agents_plots()
+            print(len(self.preprocessor.wait_queue))
         except Exception as e:
             print("Caught an unexpected exception:")
-            traceback.print_exc()
         finally:
             self.monitor.save_logs()
             self.save_time_log()
             self.make_agents_plots()
-            print(self.state.jobs_done)
             print(len(self.preprocessor.wait_queue))
 
             for worker in workers:
