@@ -70,7 +70,7 @@ jobs_config = {
 }
 environment_config = {
     # TODO : test this params
-    "window": {"size": 50, "max_jobs": 10, "clock": 18},
+    "window": {"size": 50, "max_jobs": 15, "clock": 30},
     "environment": {"cycle": 0.01, "anomaly_th": 0.5}
 
 }
@@ -102,7 +102,7 @@ monitor_config = {
 }
 
 agent_config = {
-    'multi_agent': 20,
+    'multi_agent': 25,
     'learning_mod': 1,
     'alpha': 1,
     'beta': 1,

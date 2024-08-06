@@ -13,7 +13,6 @@ from utilities.monitor import Monitor
 class State:
 
     def __init__(self, display, manager, lock):
-        self.jobs_done = 0
         self.database = Database()
         self._PEs = manager.dict()
         self._jobs = manager.dict()
@@ -23,10 +22,10 @@ class State:
         self.window_manager = WindowManager(state=self, manager=manager)
         self.lock = lock
         self.display = display
+        self.agent_log = manager.dict({})
 
     def initialize(self, manager):
         self._init_PEs(self.database.get_all_devices(), manager)
-        print("State Initialization complete.")
 
     def get(self):
         return self._jobs, self._PEs
@@ -38,56 +37,64 @@ class State:
         return self._task_window
 
     def get_job(self, job_id):
-        return self._jobs[job_id]
+        with self.lock:
+            try:
+                return self._jobs.get(job_id)
+            except:
+                pass
 
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        pe = self._PEs[pe_ID]
-        pe_database = self.database.get_device(pe_ID)
-        acceptable_tasks = pe_database["acceptableTasks"]
-        task = self.database.get_task(task_ID)
-        fail_flag = 0
-        if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe_database['handleSafeTask']):
-            fail_flag = 2
-            return self.reward_function(punish=True), fail_flag, 0, 0
-        elif task["task_kind"] not in acceptable_tasks:
-            fail_flag = 1
-            return self.reward_function(punish=True), fail_flag, 0, 0
-        elif task["task_kind"] not in acceptable_tasks:
-            fail_flag = 1
-            return self.reward_function(punish=True), fail_flag, 0, 0
-        execution_time = t = math.ceil(self.database.get_task(task_ID)[
-                                       "computational_load"] / freq)
-        placing_slot = (execution_time, task_ID)
-        queue_index, core_index = find_place(pe, core_i)
-        # if queue_index != -1 and core_index != -1:
-        # Convert manager.list to regular list for modification
-        queue = list(pe["queue"][core_index])
-        queue[queue_index] = placing_slot
-        pe["queue"][core_index] = queue
-        job_ID = task["job_id"]
-        job = self._jobs[job_ID]
-        job["assignedTask"] = task_ID
-        try:
-            if task_ID in job["remainingTasks"]:
+        with self.lock:
+            x = self.get()
+            y = x[1]
+            try:
+                pe = y[pe_ID]
+            except:
+                pass
+            pe = y[pe_ID]
+            pe_database = self.database.get_device(pe_ID)
+            acceptable_tasks = pe_database["acceptableTasks"]
+            task = self.database.get_task(task_ID)
+            execution_time = t = math.ceil(self.database.get_task(task_ID)[
+                "computational_load"] / freq)
+            placing_slot = (execution_time, task_ID)
+            placing_slot = (1, task_ID)
+            queue_index, core_index = find_place(pe, core_i)
+            fail_flag = 0
+            if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe_database['handleSafeTask']):
+                fail_flag = 2
+                return self.reward_function(punish=True), fail_flag, 0, 0
+            elif (task["is_safe"] and not pe_database['handleSafeTask']):
+                fail_flag = 1
+                return self.reward_function(punish=True), fail_flag, 0, 0
+            elif task["task_kind"] not in acceptable_tasks:
+                fail_flag = 1
+                return self.reward_function(punish=True), fail_flag, 0, 0
+            elif queue_index == -1 and core_index == -1:
+                return 0, 0, 0, 0
+            # Convert manager.list to regular list for modification
+            queue = list(pe["queue"][core_index])
+            queue[queue_index] = placing_slot
+            pe["queue"][core_index] = queue
+            job_ID = task["job_id"]
+            job = self._jobs.get(job_ID)
+            job["assignedTask"] = task_ID
+            try:
                 job["remainingTasks"].remove(task_ID)
+                job["runningTasks"].append(task_ID)
+            except:
+                pass
+            self.preprocessor.remove_from_queue(task_ID)
+            if pe['type'] == 'cloud':
+                list(pe["energyConsumption"])[core_index] = volt
+                e = volt * t
             else:
-                print(
-                    f"Task ID {task_ID} not found in remaining tasks of job {job_ID}")
-        except Exception as e:
-            print(f"Exception occurred: {e}")
-            raise
-        job["runningTasks"].append(task_ID)
-        self.preprocessor.remove_from_queue(task_ID)
-        if pe['type'] == 'cloud':
-            list(pe["energyConsumption"])[core_index] = volt
-            e = volt * t
-        else:
-            capacitance = self.database.get_device(
-                pe_ID)["capacitance"][core_index]
-            list(pe["energyConsumption"])[core_index] = capacitance * \
-                (volt * volt) * freq
-            e = capacitance * (volt * volt) * freq * t
-        return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
+                capacitance = self.database.get_device(
+                    pe_ID)["capacitance"][core_index]
+                list(pe["energyConsumption"])[core_index] = capacitance * \
+                    (volt * volt) * freq
+                e = capacitance * (volt * volt) * freq * t
+            return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
 
     def reward_function(self, e=0, alpha=0, t=0, beta=0, punish=0):
         if punish == 0:
@@ -125,7 +132,6 @@ class State:
     def update(self, manager):
         self.window_manager.run()
         self.__update_jobs(manager)
-        a = time.time()
         self.__update_PEs()
         self.__remove_assigned_task()
         self.preprocessor.run()
@@ -277,25 +283,10 @@ class State:
                 job = self._jobs[job_ID]
                 if t in job['remainingTasks']:
                     self.preprocessor.queue.append(t)
-                try:
-                    self.preprocessor.wait_queue.remove(t)
-                except ValueError:
-                    pass
 
-        try:
-            # Convert manager lists to regular lists for modification
-
-            self._jobs[job_ID]["finishedTasks"].append(task_ID)
-            if task_ID in self._jobs[job_ID]["runningTasks"]:
-                self._jobs[job_ID]["runningTasks"].remove(task_ID)
-
-            # Convert lists back to manager lists if needed
-            # self._jobs[job_ID]["finishedTasks"] = finished_tasks
-            # self._jobs[job_ID]["runningTasks"] = running_tasks
-
-        except Exception as e:
-            print(f"Error processing task {task_ID} for job {job_ID}: {e}")
-            raise
+        self._jobs[job_ID]["finishedTasks"].append(task_ID)
+        if task_ID in self._jobs[job_ID]["runningTasks"]:
+            self._jobs[job_ID]["runningTasks"].remove(task_ID)
 
     def __update_occupied_cores(self, pe, pe_ID):
         for core_index, core in enumerate(pe["occupiedCores"]):

@@ -50,7 +50,7 @@ class ActorCritic(nn.Module):
 
     def calculate_returns(self):
         G = 0
-        gamma = 0.99
+        gamma = 0
         returns = []
         for reward in self.rewards[::-1]:
             G = G * gamma + reward
@@ -81,8 +81,10 @@ class ActorCritic(nn.Module):
 
         dist = Categorical(probs)
         log_probs = dist.log_prob(actions)
-        actor_loss = -log_probs * (returns - values)
+        # actor_loss = -log_probs * (returns - values)
+        actor_loss = -torch.sum(log_probs * returns)
         critic_loss = F.mse_loss(values, returns, reduction='none')
 
-        total_loss = (actor_loss + critic_loss).mean()
+        # total_loss = (actor_loss + critic_loss).mean()
+        total_loss = actor_loss
         return total_loss

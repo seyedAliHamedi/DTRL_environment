@@ -32,32 +32,35 @@ class Agent(mp.Process):
         self.barrier = barrier
         self.state = shared_state
 
+    def init_logs(self):
+        self.state.agent_log[self.assigned_job] = {}
+        self.reward_log = []
+        self.time_log = []
+        self.energy_log = []
+        self.fails_log = []
+
     def run(self):
         while self.runner_flag:
             self.barrier.wait()
             if self.assigned_job is None:
-                with self.state.lock:
-                    self.assigned_job = self.state.preprocessor.assign_job()
+                self.assigned_job = self.state.preprocessor.assign_job()
                 if self.assigned_job is None:
                     continue
                 self.local_actor_critic.clear_memory()
-            task_queue = self.state.preprocessor.get_agent_queue()[
-                self.assigned_job]
+                self.init_logs()
+            try:
+                task_queue = self.state.preprocessor.get_agent_queue()[
+                    self.assigned_job]
+            except:
+                task_queue = []
             for task in task_queue:
                 self.schedule(task)
-            try:
-                current_job = self.state.get_job(self.assigned_job)
-            except:
-                print("HHHHH")
-                traceback.print_exc()
 
-            if len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
-                self.state.jobs_done += 1
+            current_job = self.state.get_job(self.assigned_job)
+            if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
                 print("DONE")
-                total_loss = self.update()
+                self.update()
                 self.assigned_job = None
-                if monitor_config['settings']['agent']:
-                    pass
 
     def stop(self):
         self.runner_flag = False
@@ -91,23 +94,24 @@ class Agent(mp.Process):
             i = np.random.randint(0, 1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
 
-        if monitor_config['settings']['agent']:
-            Monitor().add_log(
-                f"Agent Action::Device: {selected_device_index} |"
-                f" Core: {selected_core_index} | freq: {dvfs[0]} |"
-                f" vol: {dvfs[1]} | task_id: {current_task_id} |"
-                f" cl: {self.state.database.get_task(current_task_id)['computational_load']}", start='\n', end='')
-
-        try:
-            reward, fail_flag, energy, time = self.state.apply_action(
-                selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
-            self.local_actor_critic.archive(input_state, option, reward)
-        except:
-            pass
-            # print(selected_device_index, selected_device)
+        reward, fail_flag, energy, time = self.state.apply_action(
+            selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
+        self.local_actor_critic.archive(input_state, option, reward)
+        self.reward_log.append(reward)
+        self.time_log.append(time)
+        self.energy_log.append(energy)
+        self.fails_log.append(fail_flag)
 
     def update(self):
         loss = self.local_actor_critic.calc_loss()
+        with self.state.lock:
+            self.state.agent_log[self.assigned_job] = {
+                "loss": loss.item(),
+                "reward": sum(self.reward_log)/len(self.reward_log),
+                "time": sum(self.time_log)/len(self.time_log),
+                "energy": sum(self.energy_log)/len(self.energy_log),
+                "fails": sum(self.fails_log)/len(self.fails_log),
+            }
         loss.backward()
         for local_param, global_param in zip(self.local_actor_critic.parameters(),
                                              self.global_actor_critic.parameters()):

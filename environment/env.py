@@ -58,6 +58,8 @@ class Environment:
             while iteration <= self.n_iterations:
                 if iteration % 10 == 0:
                     print(f"iteration : {iteration}")
+                if iteration % 500 == 0:
+                    self.make_agents_plots()
 
                 starting_time = time.time()
 
@@ -84,6 +86,7 @@ class Environment:
         finally:
             self.monitor.save_logs()
             self.save_time_log()
+            self.make_agents_plots()
             print(self.state.jobs_done)
             print(len(self.preprocessor.wait_queue))
 
@@ -131,3 +134,48 @@ class Environment:
         plt.savefig(path)
         with open(monitor_config['paths']['time']['summery'], 'w') as f:
             json.dump(self.time_log, f, indent=4)
+
+    def make_agents_plots(self, path=monitor_config['paths']['agent']['plots']):
+        print("~~~~~~ MAKING AGENT PLOTS ~~~~~~~")
+        filtered_data = {k: v for k, v in self.state.agent_log.items() if v}
+        time_list = [v["time"] for v in filtered_data.values()]
+        energy_list = [v["energy"] for v in filtered_data.values()]
+        fails_list = [v["fails"] for v in filtered_data.values()]
+        reward_list = [v["reward"] for v in filtered_data.values()]
+        loss_list = [v["loss"] for v in filtered_data.values()]
+
+        fig, axs = plt.subplots(3, 2, figsize=(20, 15))
+        axs[0, 0].plot(loss_list,
+                       label='Loss', color="blue", marker='o')
+        axs[0, 0].set_title('Loss')
+        axs[0, 0].legend()
+
+        # Plot for reward
+        axs[0, 1].plot(reward_list,
+                       label='Reward', color="cyan", marker='o')
+        axs[0, 1].set_title('Reward')
+        axs[0, 1].legend()
+
+        # Plot for time
+        axs[1, 0].plot(time_list,
+                       label='Time', color="red", marker='o')
+        axs[1, 0].set_title('Time')
+        axs[1, 0].legend()
+
+        # Plot for energy
+        axs[1, 1].plot(energy_list,
+                       label='Energy', color="green", marker='o')
+        axs[1, 1].set_title('Energy')
+        axs[1, 1].legend()
+
+        # Plot for fail
+        axs[2, 0].plot(fails_list,
+                       label='Fail', color="purple", marker='o')
+        axs[2, 0].set_title('Fail')
+        axs[2, 0].legend()
+
+        # Adjust layout to prevent overlap
+        plt.tight_layout()
+
+        # Save the plots to an image file
+        plt.savefig(path)
