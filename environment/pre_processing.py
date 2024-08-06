@@ -3,14 +3,15 @@ from data.configs import monitor_config, agent_config
 
 
 class Preprocessing:
-    def __init__(self, state, manager):
+    def __init__(self, state, manager, config):
         self.state = state
         self.active_jobs = manager.dict()
         self.assigned_jobs = manager.list()
         self.job_pool = manager.dict()
         self.wait_queue = manager.list()
         self.queue = manager.list()
-        self.max_jobs = agent_config['multi_agent']
+        self.config = config
+        self.max_jobs = config['multi_agent']
 
     def run(self):
         jobs, _ = self.state.get()

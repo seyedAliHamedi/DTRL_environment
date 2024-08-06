@@ -3,22 +3,22 @@ import pandas as pd
 from data.db import Database
 from environment.pre_processing import Preprocessing
 from environment.window_manager import WindowManager
-from data.configs import summary_log_string, monitor_config
 
 
 class State:
 
-    def __init__(self, display, manager, lock):
+    def __init__(self, display, manager, lock, config):
         self.database = Database()
         self._PEs = manager.dict()
         self._jobs = manager.dict()
         self._task_window = manager.list()
         self.initialize(manager)
-        self.preprocessor = Preprocessing(state=self, manager=manager)
-        self.window_manager = WindowManager(state=self, manager=manager)
+        self.preprocessor = Preprocessing(state=self, manager=manager, config=config)
+        self.window_manager = WindowManager(state=self, manager=manager, config=config)
         self.agent_log = manager.dict({})
         self.lock = lock
         self.display = display
+        self.config = config
 
     def initialize(self, manager):
         self._init_PEs(self.database.get_all_devices(), manager)
@@ -53,7 +53,7 @@ class State:
         acceptable_tasks = pe_database["acceptableTasks"]
         task = self.database.get_task(task_ID)
         execution_time = t = np.ceil(self.database.get_task(task_ID)[
-            "computational_load"] / freq)
+                                         "computational_load"] / freq)
         placing_slot = (execution_time, task_ID)
         placing_slot = (1, task_ID)
         queue_index, core_index = find_place(pe, core_i)
@@ -89,7 +89,7 @@ class State:
             capacitance = self.database.get_device(
                 pe_ID)["capacitance"][core_index]
             list(pe["energyConsumption"])[core_index] = capacitance * \
-                (volt * volt) * freq
+                                                        (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
         return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
 
@@ -248,7 +248,7 @@ class State:
                     continue
                 queue_shift_left(current_queue)
             else:
-                current_queue[0] = (current_queue[0][0]-1, current_queue[0][1])
+                current_queue[0] = (current_queue[0][0] - 1, current_queue[0][1])
 
         for i, core_queue in enumerate(queue_copy):
             pe["queue"][i] = core_queue

@@ -1,18 +1,16 @@
 import random
 
-from data.configs import environment_config, monitor_config, agent_config
-
 
 class WindowManager:
 
-    def __init__(self, state, manager, config=environment_config['window']):
+    def __init__(self, state, manager, config):
         self.state = state
         self.__pool = manager.list()
         self.__head_index = 0
-        self.__max_jobs = config["max_jobs"]
-        self.__window_size = config["size"]
-        self.current_cycle = config["clock"]
-        self.__cycle = config["clock"]
+        self.__max_jobs = config['window']["max_jobs"]
+        self.__window_size = config['window']["size"]
+        self.current_cycle = config['window']["clock"]
+        self.__cycle = config['window']["clock"]
         self.active_jobs_ID = manager.list()
 
     def run(self):

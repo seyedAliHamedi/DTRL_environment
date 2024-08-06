@@ -18,7 +18,8 @@ import torch.multiprocessing as mp
 
 class Environment:
 
-    def __init__(self, n_iterations, display):
+    def __init__(self, n_iterations, display, config, path):
+        self.time_save_path = path
         self.n_iterations = n_iterations
         self.memory_monitor = MemoryMonitor()
         self.mem_monitor_thread = threading.Thread(
@@ -26,16 +27,17 @@ class Environment:
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
         self.__worker_flags = []
-
+        self.config = config
         manager = mp.Manager()
         self.monitor = MiniMonitor(n_iterations, manager)
         lock = mp.Lock()
         self.manager = manager
-        self.state = State(display, manager=manager, lock=lock)
+        self.state = State(display=display, config=config, manager=manager, lock=lock)
         self.db = self.state.database
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
         self.time_log = []
+        self.display = display
 
     def run(self):
         global_actor_critic = ActorCritic(
@@ -43,12 +45,13 @@ class Environment:
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
         workers = []
-        barrier = mp.Barrier(agent_config['multi_agent'] + 1)
+        barrier = mp.Barrier(self.config['multi_agent'] + 1)
 
         self.state.update(self.manager)
-        for i in range(agent_config['multi_agent']):
+        for i in range(self.config['multi_agent']):
             worker = Agent(
-                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier, shared_state=self.state)
+                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier,
+                shared_state=self.state)
             workers.append(worker)
             worker.start()
 
@@ -56,21 +59,14 @@ class Environment:
         try:
             self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
-                if iteration % 10 == 0:
+                if iteration % 10 == 0 and self.display:
                     print(f"iteration : {iteration}")
                 if iteration % 500 == 0:
                     self.make_agents_plots()
-                if iteration == 50000:
-                    self.make_agents_plots(path='./plots2.png')
 
                 starting_time = time.time()
 
                 self.state.update(self.manager)
-                # for worker in workers:
-                #     worker.run()
-                # [w.join() for w in workers]
-
-                # Monitor logging
 
                 # Calculate sleeping time
                 barrier.wait()
@@ -82,17 +78,12 @@ class Environment:
 
         except KeyboardInterrupt:
             print("Interrupted")
-            self.monitor.save_logs()
-            self.save_time_log()
-            self.make_agents_plots()
-            print(len(self.preprocessor.wait_queue))
         except Exception as e:
             print("Caught an unexpected exception:")
         finally:
             self.monitor.save_logs()
-            self.save_time_log()
+            self.save_time_log(self.time_save_path)
             self.make_agents_plots()
-            print(len(self.preprocessor.wait_queue))
 
             for worker in workers:
                 worker.stop()
@@ -103,6 +94,7 @@ class Environment:
                     worker.join()
 
             self.memory_monitor.stop()
+            return sum(self.time_log), len(self.state.agent_log), len(self.preprocessor.wait_queue)
 
     def sleep(self, time_len, iteration):
         sleeping_time = self.cycle_wait - time_len
@@ -122,7 +114,7 @@ class Environment:
             self.monitor.set_env_log(self.state.get(), self.window_manager.get_log(),
                                      self.preprocessor.get_log(), iteration)
 
-    def save_time_log(self):
+    def save_time_log(self, path):
         y_values = self.time_log
         plt.figure(figsize=(10, 5))
         plt.plot(y_values, marker='o', linestyle='-')
@@ -133,14 +125,13 @@ class Environment:
         plt.ylabel("sleeping time")
         plt.grid(True)
         plt.legend()
-        path = monitor_config['paths']['time']['plot']
         os.makedirs(os.path.dirname(path), exist_ok=True)
         plt.savefig(path)
         with open(monitor_config['paths']['time']['summery'], 'w') as f:
             json.dump(self.time_log, f, indent=4)
 
     def make_agents_plots(self, path=monitor_config['paths']['agent']['plots']):
-        print("~~~~~~ MAKING AGENT PLOTS ~~~~~~~")
+
         filtered_data = {k: v for k, v in self.state.agent_log.items() if v}
         time_list = [v["time"] for v in filtered_data.values()]
         energy_list = [v["energy"] for v in filtered_data.values()]

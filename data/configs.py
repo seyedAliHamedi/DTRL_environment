@@ -68,12 +68,14 @@ jobs_config = {
         "task_kinds": [1, 2, 3, 4],
     },
 }
+
 environment_config = {
     # TODO : test this params
-    "window": {"size": 50, "max_jobs": 15, "clock": 30},
-    "environment": {"cycle": 0.01, "anomaly_th": 0.5}
-
+    "window": {"size": 55, "max_jobs": 25, "clock": 22},
+    "environment": {"cycle": 0.01, "anomaly_th": 0.5},
+    'multi_agent': 25,
 }
+
 monitor_config = {
     'settings': {
         'time': True,
@@ -102,7 +104,6 @@ monitor_config = {
 }
 
 agent_config = {
-    'multi_agent': 25,
     'learning_mod': 1,
     'alpha': 1,
     'beta': 1,

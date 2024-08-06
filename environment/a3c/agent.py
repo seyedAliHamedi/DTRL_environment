@@ -58,7 +58,6 @@ class Agent(mp.Process):
 
             current_job = self.state.get_job(self.assigned_job)
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
-                print("DONE")
                 self.update()
                 self.assigned_job = None
 
