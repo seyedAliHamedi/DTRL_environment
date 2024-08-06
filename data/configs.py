@@ -1,6 +1,6 @@
 devices_config = {
     "iot": {
-        "num_devices": 10,
+        "num_devices": 50,
         "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
@@ -21,7 +21,7 @@ devices_config = {
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 6,
+        "num_devices": 30,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -70,8 +70,8 @@ jobs_config = {
 }
 environment_config = {
     # TODO : test this params
-    "window": {"size": 20, "max_jobs": 10, "clock": 5},
-    "environment": {"cycle": 0.05, "anomaly_th": 0.5}
+    "window": {"size": 10, "max_jobs": 1, "clock": 6},
+    "environment": {"cycle": 0.01, "anomaly_th": 0.8}
 
 }
 monitor_config = {
@@ -79,7 +79,7 @@ monitor_config = {
         'time': True,
         'main': False,
         'summary': False,
-        'agent': False
+        'agent': True
     },
     'paths': {
         'time': {
@@ -102,7 +102,7 @@ monitor_config = {
 }
 
 agent_config = {
-    'multi_agent': 5,
+    'multi_agent': 25,
     'learning_mod': 1,
     'alpha': 1,
     'beta': 1,

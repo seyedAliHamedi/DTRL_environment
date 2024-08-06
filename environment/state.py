@@ -36,7 +36,10 @@ class State:
         pe_database = Database.get_device(pe_ID)
         acceptable_tasks = pe_database["acceptableTasks"]
         task = Database.get_task(task_ID)
-
+        execution_time = t = math.ceil(Database.get_task(task_ID)[
+                                           "computational_load"] / freq)
+        placing_slot = (1, task_ID)
+        queue_index, core_index = find_place(pe, core_i)
         fail_flag = 0
         if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe_database['handleSafeTask']):
             fail_flag = 2
@@ -47,11 +50,12 @@ class State:
         elif task["task_kind"] not in acceptable_tasks:
             fail_flag = 1
             return self.reward_function(punish=True), fail_flag, 0, 0
+        elif queue_index == -1 and core_index == -1:
+            fail_flag = 1
+            return 0, 0, 0, 0
 
-        execution_time = t = math.ceil(Database.get_task(task_ID)[
-                                           "computational_load"] / freq)
-        placing_slot = (execution_time, task_ID)
-        queue_index, core_index = find_place(pe, core_i)
+
+
 
         # if queue_index == -1:
         #     return self.reward_function(punish=-100)
@@ -67,6 +71,7 @@ class State:
             job["remainingTasks"].remove(task_ID)
         except ValueError:
             print(f"tried to remove {task_ID} from job{job_ID} and Queue")
+            print(f"remaining tasks: {job['remainingTasks']}")
             raise "Error occurred"
         job["runningTasks"].append(task_ID)
 

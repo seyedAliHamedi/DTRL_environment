@@ -182,7 +182,7 @@ class Monitor:
     def __make_agents_plots(self, path):
         if len(self.agent_log['live-log']['time']) == 0:
             return
-        fig, axs = plt.subplots(3, 2, figsize=(10, 20))
+        fig, axs = plt.subplots(3, 2, figsize=(25, 10))
         # Plot each column in a separate plot
         # Plot for loss
         axs[0, 0].plot(self.agent_log['live-log']["loss"],

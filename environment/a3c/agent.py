@@ -45,6 +45,7 @@ class Agent:
             cls._instance.fail = {}
             cls._instance.selected_devices = {}
             cls.env = None
+            cls.assigned_job = -1
 
         return cls._instance
 
@@ -53,13 +54,11 @@ class Agent:
         self.display = display
 
     def run(self):
-        jobs = self.env.pre_processing.active_jobs
-        agent_queue = self.env.pre_processing.get_agent_queue()
-        if self.display:
-            print(f"AgenQueue = {agent_queue}")
-        for job_ID in jobs:
-            for task in agent_queue[job_ID]:
-                self.schedule(task, job_ID)
+        agent_queue, job_ID = self.env.pre_processing.get_agent_ready_queue()
+        if job_ID == -1:
+            return
+        for task in agent_queue:
+            self.schedule(task, job_ID)
 
     def schedule(self, assigned_task, job_id):
 
@@ -169,7 +168,7 @@ class Agent:
         return current_task_id
 
     def update(self, main_log_probs, sub_log_probs, rewards, indices):
-        gamma = 0.99
+        gamma = 0
 
         returns = []
         G = 0
@@ -189,17 +188,17 @@ class Agent:
         main_loss = -torch.sum(main_log_probs.mul(returns))
         sub_loss = -torch.sum(sub_log_probs.mul(returns))
 
-        # self.device_optimizer.zero_grad()
-        # main_loss.backward()
-        # self.device_optimizer.step()0
+        self.device_optimizer.zero_grad()
+        main_loss.backward()
+        self.device_optimizer.step()
 
-        for optimizer in self.core.optimizers:
-            optimizer.zero_grad()
-        sub_loss.backward()
-        for optimizer in self.core.optimizers:
-            optimizer.step()
+        # for optimizer in self.core.optimizers:
+        #     optimizer.zero_grad()
+        # sub_loss.backward()
+        # for optimizer in self.core.optimizers:
+        #     optimizer.step()
 
-        total_loss = main_loss + sub_loss
+        total_loss = main_loss
         return total_loss
 
     def updata_params(self, job_id, log_probs, core_values, rewards):

@@ -100,6 +100,18 @@ class Preprocessing:
                     agent_queue[job_ID].append(task_ID)
         return agent_queue
 
+    def get_agent_ready_queue(self):
+        active_jobs = self.active_jobs
+        if len(active_jobs) == 0:
+            return [] , -1
+        job = list(self.active_jobs.keys())[0]
+        agent_ready_queue = []
+        for task_ID in self.queue:
+            task = Database().get_task(task_ID)
+            if task['job_id'] == job:
+                agent_ready_queue.append(task_ID)
+        return agent_ready_queue, job
+
     def remove_from_queue(self, task_ID):
         try:
             self.queue.remove(task_ID)

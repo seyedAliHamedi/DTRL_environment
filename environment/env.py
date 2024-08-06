@@ -46,17 +46,16 @@ class Environment:
         try:
             self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
-                if iteration % 200 == 0:
+                if iteration % 100 == 0:
                     print(f"iteration : {iteration}")
 
-                self.window_manager.run()
-
-                self.state.update()
-
-                self.pre_processing.run()
                 starting_time = time.time()
+                self.window_manager.run()
+                self.state.update()
+                self.pre_processing.run()
                 self.agent.run()
                 time_len = time.time() - starting_time
+
                 # Calculate sleeping time
 
                 self.sleep(time_len, iteration)
@@ -72,7 +71,7 @@ class Environment:
         finally:
             Monitor().save_logs()
             print("Jobs Done:", self.state.jobs_done)
-            print("WaitQueue Length",len(self.pre_processing.wait_queue))
+            print("WaitQueue Length", len(self.pre_processing.wait_queue))
             self.memory_monitor.stop()
 
     def sleep(self, time_len, iteration):
