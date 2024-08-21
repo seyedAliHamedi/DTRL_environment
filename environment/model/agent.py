@@ -7,9 +7,9 @@ import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
 
-from environment.a3c.actor_critic import ActorCritic
-from environment.a3c.shared_adam import SharedAdam
-from environment.a3c.core_scheduler import CoreScheduler
+from environment.model.actor_critic import ActorCritic
+from environment.model.shared_adam import SharedAdam
+from environment.model.core_scheduler import CoreScheduler
 from environment.state import State
 from utilities.monitor import Monitor
 from data.configs import monitor_config, agent_config
@@ -48,17 +48,16 @@ class Agent(mp.Process):
                     continue
                 self.local_actor_critic.clear_memory()
                 self.init_logs()
-            try:
-                task_queue = self.state.preprocessor.get_agent_queue()[
-                    self.assigned_job]
-            except:
-                task_queue = []
+            agent_queue = self.state.preprocessor.get_agent_queue()
+            print("^^^^^^ ", agent_queue)
+            task_queue = agent_queue.get(self.assigned_job)
+            print("----- ", self.name, self.assigned_job, task_queue)
             for task in task_queue:
                 self.schedule(task)
 
             current_job = self.state.get_job(self.assigned_job)
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
-                print("Done")
+                print("DONE")
                 self.update()
                 self.assigned_job = None
 
@@ -66,7 +65,6 @@ class Agent(mp.Process):
         self.runner_flag = False
 
     def schedule(self, current_task_id):
-
         job_state, pe_state = self.state.get()
         current_task = self.state.database.get_task(current_task_id)
         current_job = self.state.get_job(self.assigned_job)
@@ -96,6 +94,7 @@ class Agent(mp.Process):
 
         reward, fail_flag, energy, time = self.state.apply_action(
             selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
+        
         self.local_actor_critic.archive(input_state, option, reward)
         self.reward_log.append(reward)
         self.time_log.append(time)

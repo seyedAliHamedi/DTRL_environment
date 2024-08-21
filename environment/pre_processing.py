@@ -18,10 +18,11 @@ class Preprocessing:
         self.process()
 
     def assign_job(self):
-        for job in self.active_jobs.keys():
-            if job not in self.assigned_jobs:
-                self.assigned_jobs.append(job)
-                return job
+        with self.state.lock:
+            for job in self.active_jobs.keys():
+                if job not in self.assigned_jobs:
+                    self.assigned_jobs.append(job)
+                    return job
 
     def update_active_jobs(self, state_jobs):
         # Add or update jobs in active_jobs
@@ -70,16 +71,17 @@ class Preprocessing:
         self.queue = sorted_tasks
 
     def get_agent_queue(self):
-        # creating the agent queue dict
-        agent_queue = {}
-        task_list = self.queue
-        for job_ID in self.active_jobs.keys():
-            agent_queue[job_ID] = []
-            for task_ID in task_list:
-                task = self.state.database.get_task(task_ID)
-                if task['job_id'] == job_ID:
-                    agent_queue[job_ID].append(task_ID)
-        return agent_queue
+        with self.state.lock:
+            # creating the agent queue dict
+            agent_queue = {}
+            task_list = self.queue
+            for job_ID in self.active_jobs.keys():
+                agent_queue[job_ID] = []
+                for task_ID in task_list:
+                    task = self.state.database.get_task(task_ID)
+                    if task['job_id'] == job_ID:
+                        agent_queue[job_ID].append(task_ID)
+            return agent_queue
 
     def remove_from_queue(self, task_ID):
         self.queue.remove(task_ID)

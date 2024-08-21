@@ -3,7 +3,7 @@ import numpy as np
 import torch.nn as nn
 import torch.optim as optim
 
-from environment.a3c.DDT import DDT
+from environment.model.DDT import DDT
 
 
 class CoreScheduler(nn.Module):

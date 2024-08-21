@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 
-from environment.a3c.DDT import DDT
+from environment.model.DDT import DDT
 
 
 class ActorCritic(nn.Module):

@@ -5,9 +5,9 @@ import threading
 import time
 import traceback
 
-from environment.a3c.actor_critic import ActorCritic
-from environment.a3c.agent import Agent
-from environment.a3c.shared_adam import SharedAdam
+from environment.model.actor_critic import ActorCritic
+from environment.model.agent import Agent
+from environment.model.shared_adam import SharedAdam
 from environment.state import State
 from utilities.memory_monitor import MemoryMonitor
 from data.configs import environment_config, monitor_config
@@ -26,9 +26,8 @@ class Environment:
         self.__runner_flag = True
         self.__worker_flags = []
         self.config = config
-        manager = mp.Manager()
-        self.manager = manager
-        self.state = State(display=display, manager=manager)
+        self.manager = mp.Manager()
+        self.state = State(display=display, manager=self.manager)
         self.db = self.state.database
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager

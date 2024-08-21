@@ -22,6 +22,7 @@ class State:
         self.window_manager = WindowManager(state=self, manager=manager)
         self.agent_log = manager.dict({})
         self.display = display
+        self.lock = mp.Lock()
 
     ###### getters & setters ######
     def get(self):
@@ -34,69 +35,72 @@ class State:
         return self.get()[1]
 
     def set_task_window(self, task_window):
-        self._task_window = task_window
+        with self.lock:
+            self._task_window = task_window
 
     def get_task_window(self):
-        return self._task_window
+        with self.lock:
+            return self._task_window
 
     def get_job(self, job_id):
         return self.get_jobs().get(job_id)
 
     ##### Functionality
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        # retriving the data from the database and the live values from state
-        pe_dict = self.get_PEs()[pe_ID]
-        pe = self.database.get_device(pe_ID)
-        task = self.database.get_task(task_ID)
-        job_ID = task["job_id"]
-        job_dict = self.get_jobs().get(job_ID)
-        
-        # calculating the execution time
-        execution_time = t = np.ceil(task["computational_load"] / freq)
-        # placing_slot = (execution_time, task_ID)
-        placing_slot = (1, task_ID)
-        
-        #finding the empty slot in queue for the selected device & core
-        queue_index, core_index = find_place(pe_dict, core_i)
+        with self.lock:
+            # retriving the data from the database and the live values from state
+            pe_dict = self.get_PEs()[pe_ID]
+            pe = self.database.get_device(pe_ID)
+            task = self.database.get_task(task_ID)
+            job_ID = task["job_id"]
+            job_dict = self.get_jobs().get(job_ID)
 
-        fail_flag = 0
-        if (task["is_safe"] and not pe['handleSafeTask']):
-            # fail : assigned safe task to unsafe device
-            fail_flag += 1
-        elif task["task_kind"] not in pe["acceptableTasks"]:
-            # fail : assigned a kind of task to the inappropriate device
-            fail_flag += 1
-        elif queue_index == -1 and core_index == -1:
-            # fail : assigned a task to a full queue core
-            fail_flag += 1
-            
-        # manage failed assingments
-        if fail_flag:
-            return reward_function(punish=True), fail_flag, 0, 0
-        
-        # updating the queue slots
-        pe_dict["queue"][core_index] = [placing_slot]+  pe_dict["queue"][core_index][1:]
-        
-        # updating the live status of the state after the schedule
-        job_dict["remainingTasks"].remove(task_ID)
-        job_dict["runningTasks"].append(task_ID)
-        
-        # updating the pre processor queue
-        self.preprocessor.remove_from_queue(task_ID)
-        
-        # calc and power consumption for different devices
-        if pe_dict['type'] == 'cloud':
-            pe_dict["energyConsumption"][core_index] = volt
-            e = volt * t
-        else:
-            capacitance = self.database.get_device(
-                pe_ID)["capacitance"][core_index]
-            pe_dict["energyConsumption"][
-                core_index] = capacitance * (volt * volt) * freq
-            e = capacitance * (volt * volt) * freq * t
+            # calculating the execution time
+            execution_time = t = np.ceil(task["computational_load"] / freq)
+            # placing_slot = (execution_time, task_ID)
+            placing_slot = (1, task_ID)
 
-        # returning the results
-        return reward_function(e=e, t=t), fail_flag, e, t
+            #finding the empty slot in queue for the selected device & core
+            queue_index, core_index = find_place(pe_dict, core_i)
+
+            fail_flag = 0
+            if (task["is_safe"] and not pe['handleSafeTask']):
+                # fail : assigned safe task to unsafe device
+                fail_flag += 1
+            elif task["task_kind"] not in pe["acceptableTasks"]:
+                # fail : assigned a kind of task to the inappropriate device
+                fail_flag += 1
+            elif queue_index == -1 and core_index == -1:
+                # fail : assigned a task to a full queue core
+                fail_flag += 1
+
+            # manage failed assingments
+            if fail_flag:
+                return reward_function(punish=True), fail_flag, 0, 0
+
+            # updating the queue slots
+            pe_dict["queue"][core_index] = [placing_slot]+  pe_dict["queue"][core_index][1:]
+
+            # updating the live status of the state after the schedule
+            job_dict["remainingTasks"].remove(task_ID)
+            job_dict["runningTasks"].append(task_ID)
+
+            # updating the pre processor queue
+            self.preprocessor.remove_from_queue(task_ID)
+
+            # calc and power consumption for different devices
+            if pe_dict['type'] == 'cloud':
+                pe_dict["energyConsumption"][core_index] = volt
+                e = volt * t
+            else:
+                capacitance = self.database.get_device(
+                    pe_ID)["capacitance"][core_index]
+                pe_dict["energyConsumption"][
+                    core_index] = capacitance * (volt * volt) * freq
+                e = capacitance * (volt * volt) * freq * t
+            # returning the results
+            print("task ",task_ID , "----- scheduleed")
+            return reward_function(e=e, t=t), fail_flag, e, t
 
     def _init_PEs(self, PEs, manager):
         # initlizeing the PEs live variable from db
@@ -141,10 +145,10 @@ class State:
             for pe_id, pe in self.get_PEs().items():
                 pe_data[pe_id] = {
                     "id": pe["id"],
-                    "type": pe["type"],
-                    "batteryLevel": pe["batteryLevel"],
-                    "occupiedCores": list(pe["occupiedCores"]),
-                    "energyConsumption": list(pe["energyConsumption"]),
+                    # "type": pe["type"],
+                    # "batteryLevel": pe["batteryLevel"],
+                    # "occupiedCores": list(pe["occupiedCores"]),
+                    # "energyConsumption": list(pe["energyConsumption"]),
                     "queue": [list(core_queue) for core_queue in pe["queue"]]
                 }
             print(pd.DataFrame(pe_data).T, '\n')
@@ -182,8 +186,9 @@ class State:
             if len(job["finishedTasks"]) == job["task_count"]:
                 removing_items.append(job_ID)
 
+        jobs = self.get_jobs()  
         for item in removing_items:
-            del self.get_jobs().get(item)
+            del jobs[item]
 
     def __add_new_active_jobs(self, new_tasks, manager):
         if self.display:
@@ -248,11 +253,11 @@ class State:
                 # removing the finished task from queue
                 if pe["queue"][core_index][0][1] != -1:
                     self.__task_finished(pe["queue"][core_index][0][1])
+                    pe["queue"][core_index] =  pe["queue"][core_index][1:] + [(0,0)]
                 # TODO cloud shit
                 if pe["type"] == "cloud":
                     deleting_queues_on_pe.append(core_index)
                     continue
-                queue_shift_left(pe["queue"][core_index])
             else:
                 # updating the queue for mec and iot (reducing the remaining time by 1 clock)
                 slot = (pe["queue"][core_index][0][0] -1, pe["queue"][core_index][0][1])
