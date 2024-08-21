@@ -7,6 +7,7 @@ class Preprocessing:
         self.active_jobs = manager.dict()
         self.assigned_jobs = manager.list()
         self.job_pool = manager.dict()
+        # the ready & wait queue
         self.wait_queue = manager.list()
         self.queue = manager.list()
         self.max_jobs = config['multi_agent']
@@ -27,7 +28,7 @@ class Preprocessing:
         for job_ID in state_jobs.keys():
             self.active_jobs[job_ID] = state_jobs[job_ID]
 
-        # Remove completed jobs from active_jobs
+        # Remove completed jobs from active_jobs if they are all scheduled
         deleting_list = []
         for job_ID in self.active_jobs.keys():
             job = self.active_jobs[job_ID]
@@ -48,10 +49,10 @@ class Preprocessing:
             self.active_jobs[job_ID] = job
 
     def process(self):
-        # add window tasks to wait queue
+        # add window tasks to the queues
         for task_id in self.state.get_task_window():
             task = self.state.database.get_task(task_id)
-
+            # check if the task is ready upon adding it to the queue
             if task['pred_count'] == 0:
                 self.queue.append(task_id)
             else:
@@ -69,6 +70,7 @@ class Preprocessing:
         self.queue = sorted_tasks
 
     def get_agent_queue(self):
+        # creating the agent queue dict
         agent_queue = {}
         task_list = self.queue
         for job_ID in self.active_jobs.keys():
