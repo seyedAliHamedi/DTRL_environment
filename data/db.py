@@ -48,5 +48,3 @@ class Database:
     def get_jobs_window(self, head, count):
         return self._jobs.iloc[head:head + count].to_dict(orient='records')
 
-    def get_task_successors(self, task_ID):
-        return self.get_task(task_ID)['successors']

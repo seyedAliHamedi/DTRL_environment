@@ -12,10 +12,12 @@ def run_env(run_index, iteration, config, path=monitor_config['paths']['time']['
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
     start_msg = (f"Started test={run_index} | CONFIG:: multi_agent={config['multi_agent']}, "
-                 f"size: {config['window']['size']}, max_jobs: {config['window']['max_jobs']}, "
+                 f"size: {config['window']['size']}, max_jobs: {
+                     config['window']['max_jobs']}, "
                  f"clock: {config['window']['clock']}\n")
     print(start_msg)
-    env = Environment(n_iterations=iteration, display=False, config=config, path=path)
+    env = Environment(n_iterations=iteration, display=False,
+                      config=config, path=path)
     total_t, jobs_done, wait_queue = env.run()
     result_msg = (f"Run{run_index}: total_t={total_t}, iter={iteration}, jobs_done={jobs_done - 1}, "
                   f"wait-queue={wait_queue}\n")
@@ -24,7 +26,8 @@ def run_env(run_index, iteration, config, path=monitor_config['paths']['time']['
     with open(log_file, "a") as f:
         f.write(start_msg)
         f.write(result_msg)
-        f.write("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
+        f.write(
+            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n")
 
 
 def test_configs(configs, iteration, log_file="env_run_log.txt"):
@@ -50,6 +53,11 @@ if __name__ == '__main__':
     pd.set_option('display.max_colwidth', None)
     pd.options.display.float_format = '{:,.5f}'.format
 
-    from data.testing_configs import testing_conf
-
-    test_configs(testing_conf, 1000)
+    print("Creating environment...")
+    env = Environment(1000, False, {
+        "multi_agent": 25,
+        "window": {"size": 30, "max_jobs": 15, "clock": 15},
+        "environment": environment_config['environment']
+    }, path=f'environment/config_testing/time_plot.png')
+    print("Running environment...")
+    env.run()

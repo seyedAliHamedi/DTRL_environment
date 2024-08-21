@@ -58,6 +58,7 @@ class Agent(mp.Process):
 
             current_job = self.state.get_job(self.assigned_job)
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
+                print("Done")
                 self.update()
                 self.assigned_job = None
 
@@ -102,6 +103,7 @@ class Agent(mp.Process):
         self.fails_log.append(fail_flag)
 
     def update(self):
+
         loss = self.local_actor_critic.calc_loss()
         with self.state.lock:
             self.state.agent_log[self.assigned_job] = {

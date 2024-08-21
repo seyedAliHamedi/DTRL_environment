@@ -9,9 +9,8 @@ from environment.a3c.actor_critic import ActorCritic
 from environment.a3c.agent import Agent
 from environment.a3c.shared_adam import SharedAdam
 from environment.state import State
-from utilities.mini_monitor import MiniMonitor
 from utilities.memory_monitor import MemoryMonitor
-from data.configs import environment_config, monitor_config, agent_config
+from data.configs import environment_config, monitor_config
 
 import torch.multiprocessing as mp
 
@@ -22,17 +21,14 @@ class Environment:
         self.time_save_path = path
         self.n_iterations = n_iterations
         self.memory_monitor = MemoryMonitor()
-        self.mem_monitor_thread = threading.Thread(
-            target=self.memory_monitor.run)
+        self.mem_monitor_thread = threading.Thread(target=self.memory_monitor.run)
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
         self.__worker_flags = []
         self.config = config
         manager = mp.Manager()
-        self.monitor = MiniMonitor(n_iterations, manager)
-        lock = mp.Lock()
         self.manager = manager
-        self.state = State(display=display, config=config, manager=manager, lock=lock)
+        self.state = State(display=display, manager=manager)
         self.db = self.state.database
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
@@ -40,8 +36,7 @@ class Environment:
         self.display = display
 
     def run(self):
-        global_actor_critic = ActorCritic(
-            input_dims=5, n_actions=len(self.db.get_all_devices()))
+        global_actor_critic = ActorCritic(input_dims=5, n_actions=len(self.db.get_all_devices()))
         global_actor_critic.share_memory()
         optim = SharedAdam(global_actor_critic.parameters())
         workers = []
@@ -49,9 +44,7 @@ class Environment:
 
         self.state.update(self.manager)
         for i in range(self.config['multi_agent']):
-            worker = Agent(
-                name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier,
-                shared_state=self.state)
+            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier,shared_state=self.state)
             workers.append(worker)
             worker.start()
 
@@ -59,29 +52,26 @@ class Environment:
         try:
             self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
-                if iteration % 10 == 0 and self.display:
+                if iteration % 10 == 0:
                     print(f"iteration : {iteration}")
                 if iteration % 500 == 0:
                     self.make_agents_plots()
 
                 starting_time = time.time()
-
                 self.state.update(self.manager)
 
-                # Calculate sleeping time
                 barrier.wait()
                 time_len = time.time() - starting_time
                 self.sleep(time_len, iteration)
 
-                self.monitor_log(iteration)
+                # self.monitor_log(iteration)
                 iteration += 1
 
-        except KeyboardInterrupt:
-            print("Interrupted")
         except Exception as e:
-            print("Caught an unexpected exception:")
+            print("Caught an unexpected exception:", e)
+            traceback.print_exc()
         finally:
-            self.monitor.save_logs()
+            # self.monitor.save_logs()
             self.save_time_log(self.time_save_path)
             self.make_agents_plots()
 
@@ -101,18 +91,19 @@ class Environment:
         if sleeping_time < 0:
             sleeping_time = 0
             if monitor_config['settings']['time']:
-                self.monitor.add_time(time_len, iteration)
+                # self.monitor.add_time(time_len, iteration)
                 self.time_log.append(time_len)
         else:
             if monitor_config['settings']['time']:
-                self.monitor.add_time(self.cycle_wait, iteration)
+                # self.monitor.add_time(self.cycle_wait, iteration)
                 self.time_log.append(self.cycle_wait)
         time.sleep(sleeping_time)
 
     def monitor_log(self, iteration):
         if monitor_config['settings']['main']:
-            self.monitor.set_env_log(self.state.get(), self.window_manager.get_log(),
-                                     self.preprocessor.get_log(), iteration)
+            pass
+            # self.monitor.set_env_log(self.state.get(), self.window_manager.get_log(),
+            #  self.preprocessor.get_log(), iteration)
 
     def save_time_log(self, path):
         y_values = self.time_log
