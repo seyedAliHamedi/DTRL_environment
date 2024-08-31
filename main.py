@@ -55,8 +55,8 @@ if __name__ == '__main__':
 
     print("Creating environment...")
     env = Environment(1000, False, {
-        "multi_agent": 5,
-        "window": {"size": 15, "max_jobs": 5, "clock": 10},
+        "multi_agent": 25,
+        "window": {"size": 75, "max_jobs": 30, "clock": 15},
         "environment": environment_config['environment']
     }, path=f'environment/config_testing/time_plot.png')
     print("Running environment...")

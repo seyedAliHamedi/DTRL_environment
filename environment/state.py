@@ -47,60 +47,65 @@ class State:
 
     ##### Functionality
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
+        
+        # retriving the data from the database and the live values from state
         with self.lock:
-            # retriving the data from the database and the live values from state
             pe_dict = self.get_PEs()[pe_ID]
             pe = self.database.get_device(pe_ID)
             task = self.database.get_task(task_ID)
             job_ID = task["job_id"]
             job_dict = self.get_jobs().get(job_ID)
-
-            # calculating the execution time
-            execution_time = t = np.ceil(task["computational_load"] / freq)
-            # placing_slot = (execution_time, task_ID)
-            placing_slot = (1, task_ID)
-
-            #finding the empty slot in queue for the selected device & core
-            queue_index, core_index = find_place(pe_dict, core_i)
-
-            fail_flag = 0
-            if (task["is_safe"] and not pe['handleSafeTask']):
-                # fail : assigned safe task to unsafe device
-                fail_flag += 1
-            elif task["task_kind"] not in pe["acceptableTasks"]:
-                # fail : assigned a kind of task to the inappropriate device
-                fail_flag += 1
-            elif queue_index == -1 and core_index == -1:
-                # fail : assigned a task to a full queue core
-                fail_flag += 1
-
-            # manage failed assingments
-            if fail_flag:
-                return reward_function(punish=True), fail_flag, 0, 0
-
-            # updating the queue slots
-            pe_dict["queue"][core_index] = [placing_slot]+  pe_dict["queue"][core_index][1:]
-
-            # updating the live status of the state after the schedule
-            job_dict["remainingTasks"].remove(task_ID)
+        
+        # calculating the execution time
+        execution_time = t = np.ceil(task["computational_load"] / freq)
+        
+        # placing_slot = (execution_time, task_ID)
+        placing_slot = (1, task_ID)
+        
+        #finding the empty slot in queue for the selected device & core
+        queue_index, core_index = find_place(pe_dict, core_i)
+        fail_flag = 0
+        if (task["is_safe"] and not pe['handleSafeTask']):
+            # fail : assigned safe task to unsafe device
+            fail_flag += 1
+        elif task["task_kind"] not in pe["acceptableTasks"]:
+            # fail : assigned a kind of task to the inappropriate device
+            fail_flag += 1
+        elif queue_index == -1 and core_index == -1:
+            # fail : assigned a task to a full queue core
+            fail_flag += 1
+        # manage failed assingments
+        if fail_flag:
+            return reward_function(punish=True), fail_flag, 0, 0
+        
+        # updating the queue slots
+        pe_dict["queue"][core_index] = [placing_slot]+  pe_dict["queue"][core_index][1:]
+        
+        # updating the live status of the state after the schedule
+        with self.lock:
             job_dict["runningTasks"].append(task_ID)
-
-            # updating the pre processor queue
-            self.preprocessor.remove_from_queue(task_ID)
-
-            # calc and power consumption for different devices
-            if pe_dict['type'] == 'cloud':
-                pe_dict["energyConsumption"][core_index] = volt
-                e = volt * t
-            else:
-                capacitance = self.database.get_device(
-                    pe_ID)["capacitance"][core_index]
-                pe_dict["energyConsumption"][
-                    core_index] = capacitance * (volt * volt) * freq
-                e = capacitance * (volt * volt) * freq * t
-            # returning the results
-            print("task ",task_ID , "----- scheduleed")
-            return reward_function(e=e, t=t), fail_flag, e, t
+            job_dict["remainingTasks"].remove(task_ID)
+        
+        # updating the pre processor queue
+        
+        self.preprocessor.queue.remove(task_ID)
+        while task_ID in self.preprocessor.queue:
+            self.preprocessor.queue.remove(task_ID)
+            
+        
+        # calc and power consumption for different devices
+        if pe_dict['type'] == 'cloud':
+            pe_dict["energyConsumption"][core_index] = volt
+            e = volt * t
+        else:
+            capacitance = self.database.get_device(
+                pe_ID)["capacitance"][core_index]
+            pe_dict["energyConsumption"][
+                core_index] = capacitance * (volt * volt) * freq
+            e = capacitance * (volt * volt) * freq * t
+            
+        # returning the results
+        return reward_function(e=e, t=t), fail_flag, e, t
 
     def _init_PEs(self, PEs, manager):
         # initlizeing the PEs live variable from db
@@ -199,7 +204,8 @@ class State:
             # initaling job if not; and if appending the new tasks that arrived
             if not self.__is_active_job(job_id):
                 self._set_jobs([self.database.get_job(job_id)], manager)
-            self.get_jobs().get(job_id)["remainingTasks"].append(task)
+            with self.lock:
+                self.get_jobs().get(job_id)["remainingTasks"].append(task)
         
     def __is_active_job(self, job_ID):
         # checking if the job is initlized in the live status or not
@@ -273,10 +279,11 @@ class State:
             del pe["energyConsumption"][item - i]
 
     def __task_finished(self, task_ID):
-        task = self.database.get_task(task_ID)
-        job_ID = task["job_id"]
-        job = self.get_jobs().get(job_ID)
-        task_suc = task['successors']
+        with self.lock:
+            task = self.database.get_task(task_ID)
+            job_ID = task["job_id"]
+            job = self.get_jobs().get(job_ID)
+            task_suc = task['successors']
 
         # updating the predecessors count for the successors tasks of the finished task(ready state)
         for t in task_suc:
@@ -284,10 +291,15 @@ class State:
             if self.database.get_task(t)['pred_count'] == 0:
                 # if the task is in the state and the dependencies meet; added it to the queue
                 if t in job['remainingTasks']:
-                    self.preprocessor.queue.append(t)
+                    with self.lock:
+                        self.preprocessor.queue.append(t)
         # adding the task to the finisheds and removing it from the runnigs
-        job["finishedTasks"].append(task_ID)
-        job["runningTasks"].remove(task_ID)
+        
+        with self.lock:
+            if task_ID==0 and 0 not in job["runningTasks"]:
+                return
+            job["finishedTasks"].append(task_ID)
+            job["runningTasks"].remove(task_ID)
 
 ####### UTILITY #######
 def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):

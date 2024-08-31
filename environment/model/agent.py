@@ -49,15 +49,15 @@ class Agent(mp.Process):
                 self.local_actor_critic.clear_memory()
                 self.init_logs()
             agent_queue = self.state.preprocessor.get_agent_queue()
-            print("^^^^^^ ", agent_queue)
+            # print("^^^^^^ ", agent_queue)
             task_queue = agent_queue.get(self.assigned_job)
-            print("----- ", self.name, self.assigned_job, task_queue)
-            for task in task_queue:
+            # print("----- ", self.name, self.assigned_job, task_queue)
+            for task in self.state.preprocessor.get_agent_queue().get(self.assigned_job):
                 self.schedule(task)
 
             current_job = self.state.get_job(self.assigned_job)
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
-                print("DONE")
+                print("DONE",self.assigned_job)
                 self.update()
                 self.assigned_job = None
 

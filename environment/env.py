@@ -26,8 +26,9 @@ class Environment:
         self.__runner_flag = True
         self.__worker_flags = []
         self.config = config
-        self.manager = mp.Manager()
-        self.state = State(display=display, manager=self.manager)
+        manager = mp.Manager()
+        self.state = State(display=display, manager=manager)
+        self.manager = manager
         self.db = self.state.database
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
