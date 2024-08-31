@@ -71,14 +71,13 @@ class Preprocessing:
         self.queue[:] = sorted_tasks
 
     def get_agent_queue(self):
-        with self.state.lock:
-            # creating the agent queue dict
-            agent_queue = {}
-            for job_ID in self.active_jobs.keys():
-                agent_queue[job_ID] = []
-                for task_ID in self.queue:
-                    task = self.state.database.get_task(task_ID)
-                    if task['job_id'] == job_ID:
-                        agent_queue[job_ID].append(task_ID)
-            return agent_queue
+        # creating the agent queue dict
+        agent_queue = {}
+        for job_ID in self.active_jobs.keys():
+            agent_queue[job_ID] = []
+            for task_ID in list(self.queue):
+                task = self.state.database.get_task(task_ID)
+                if task['job_id'] == job_ID:
+                    agent_queue[job_ID].append(task_ID)
+        return agent_queue
 

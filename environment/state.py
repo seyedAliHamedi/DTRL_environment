@@ -35,26 +35,25 @@ class State:
         return self.get()[1]
 
     def set_task_window(self, task_window):
-        with self.lock:
-            self._task_window = task_window
+        self._task_window = task_window
 
     def get_task_window(self):
-        with self.lock:
-            return self._task_window
+        return self._task_window
 
     def get_job(self, job_id):
         return self.get_jobs().get(job_id)
 
     ##### Functionality
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        
-        # retriving the data from the database and the live values from state
-        with self.lock:
+        try:
             pe_dict = self.get_PEs()[pe_ID]
             pe = self.database.get_device(pe_ID)
             task = self.database.get_task(task_ID)
             job_ID = task["job_id"]
             job_dict = self.get_jobs().get(job_ID)
+        except:
+            print("a")
+            return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
         
         # calculating the execution time
         execution_time = t = np.ceil(task["computational_load"] / freq)
@@ -82,14 +81,14 @@ class State:
         pe_dict["queue"][core_index] = [placing_slot]+  pe_dict["queue"][core_index][1:]
         
         # updating the live status of the state after the schedule
-        with self.lock:
-            job_dict["runningTasks"].append(task_ID)
-            job_dict["remainingTasks"].remove(task_ID)
+        job_dict["runningTasks"].append(task_ID)
+        job_dict["remainingTasks"].remove(task_ID)
         
         # updating the pre processor queue
         
         self.preprocessor.queue.remove(task_ID)
         while task_ID in self.preprocessor.queue:
+            print(1)
             self.preprocessor.queue.remove(task_ID)
             
         
@@ -204,8 +203,7 @@ class State:
             # initaling job if not; and if appending the new tasks that arrived
             if not self.__is_active_job(job_id):
                 self._set_jobs([self.database.get_job(job_id)], manager)
-            with self.lock:
-                self.get_jobs().get(job_id)["remainingTasks"].append(task)
+            self.get_jobs().get(job_id)["remainingTasks"].append(task)
         
     def __is_active_job(self, job_ID):
         # checking if the job is initlized in the live status or not
@@ -257,7 +255,7 @@ class State:
         for core_index, _ in enumerate(pe["queue"]):
             if pe["queue"][core_index][0][0] == 0:
                 # removing the finished task from queue
-                if pe["queue"][core_index][0][1] != -1:
+                if pe["queue"][core_index][0][1] != -1 and pe["queue"][core_index][0][1]!=0:
                     self.__task_finished(pe["queue"][core_index][0][1])
                     pe["queue"][core_index] =  pe["queue"][core_index][1:] + [(0,0)]
                 # TODO cloud shit
@@ -279,11 +277,17 @@ class State:
             del pe["energyConsumption"][item - i]
 
     def __task_finished(self, task_ID):
-        with self.lock:
+        try:
             task = self.database.get_task(task_ID)
             job_ID = task["job_id"]
             job = self.get_jobs().get(job_ID)
             task_suc = task['successors']
+        except:
+            print("b")
+            return self.__task_finished(task_ID)
+        if job is None:
+            print("c")
+            return
 
         # updating the predecessors count for the successors tasks of the finished task(ready state)
         for t in task_suc:
@@ -291,15 +295,11 @@ class State:
             if self.database.get_task(t)['pred_count'] == 0:
                 # if the task is in the state and the dependencies meet; added it to the queue
                 if t in job['remainingTasks']:
-                    with self.lock:
-                        self.preprocessor.queue.append(t)
+                    self.preprocessor.queue.append(t)
         # adding the task to the finisheds and removing it from the runnigs
         
-        with self.lock:
-            if task_ID==0 and 0 not in job["runningTasks"]:
-                return
-            job["finishedTasks"].append(task_ID)
-            job["runningTasks"].remove(task_ID)
+        job["finishedTasks"].append(task_ID)
+        job["runningTasks"].remove(task_ID)
 
 ####### UTILITY #######
 def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):

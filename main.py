@@ -4,6 +4,7 @@ from environment.env import Environment
 import pandas as pd
 from data.configs import environment_config, monitor_config
 import itertools
+import torch.multiprocessing as mp
 
 
 def run_env(run_index, iteration, config, path=monitor_config['paths']['time']['plot'],
@@ -14,7 +15,7 @@ def run_env(run_index, iteration, config, path=monitor_config['paths']['time']['
     start_msg = (f"Started test={run_index} | CONFIG:: multi_agent={config['multi_agent']}, "
                  f"size: {config['window']['size']}, max_jobs: {
                      config['window']['max_jobs']}, "
-                 f"clock: {config['window']['clock']}\n")
+                 f"clock : {config['window']['clock']}\n")
     print(start_msg)
     env = Environment(n_iterations=iteration, display=False,
                       config=config, path=path)
@@ -47,6 +48,7 @@ def test_configs(configs, iteration, log_file="env_run_log.txt"):
 
 
 if __name__ == '__main__':
+    mp.set_start_method("spawn")
     pd.set_option('display.max_rows', None)
     pd.set_option('display.max_columns', None)
     pd.set_option('display.width', None)
@@ -55,8 +57,8 @@ if __name__ == '__main__':
 
     print("Creating environment...")
     env = Environment(1000, False, {
-        "multi_agent": 25,
-        "window": {"size": 75, "max_jobs": 30, "clock": 15},
+        "multi_agent": 15,
+        "window":{"size": 80, "max_jobs": 15, "clock": 25},
         "environment": environment_config['environment']
     }, path=f'environment/config_testing/time_plot.png')
     print("Running environment...")

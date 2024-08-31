@@ -48,9 +48,9 @@ class Agent(mp.Process):
                     continue
                 self.local_actor_critic.clear_memory()
                 self.init_logs()
-            agent_queue = self.state.preprocessor.get_agent_queue()
+            # agent_queue = self.state.preprocessor.get_agent_queue()
             # print("^^^^^^ ", agent_queue)
-            task_queue = agent_queue.get(self.assigned_job)
+            # task_queue = agent_queue.get(self.assigned_job)
             # print("----- ", self.name, self.assigned_job, task_queue)
             for task in self.state.preprocessor.get_agent_queue().get(self.assigned_job):
                 self.schedule(task)
@@ -91,7 +91,6 @@ class Agent(mp.Process):
             selected_core_index = -1
             i = np.random.randint(0, 1)
             dvfs = [(50000, 13.85), (80000, 24.28)][i]
-
         reward, fail_flag, energy, time = self.state.apply_action(
             selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
         

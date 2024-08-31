@@ -55,6 +55,7 @@ class Environment:
                 if iteration % 10 == 0:
                     print(f"iteration : {iteration}")
                 if iteration % 500 == 0:
+                    self.save_time_log(self.time_save_path)
                     self.make_agents_plots()
 
                 starting_time = time.time()
@@ -66,12 +67,17 @@ class Environment:
 
                 # self.monitor_log(iteration)
                 iteration += 1
+            print("Simulation Finished")
+            print("Saving Logs......")
+            self.save_time_log(self.time_save_path)
+            self.make_agents_plots()
 
         except Exception as e:
             print("Caught an unexpected exception:", e)
             traceback.print_exc()
         finally:
-            # self.monitor.save_logs()
+            print("Simulation Finished")
+            print("Saving Logs......")
             self.save_time_log(self.time_save_path)
             self.make_agents_plots()
 

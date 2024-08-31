@@ -14,7 +14,7 @@ class WindowManager:
         self.current_cycle = config['window']["clock"]
         self.__cycle = config['window']["clock"]
         # head index to keep track of jobs read from db
-        self.__head_index = 0
+        self.__head_index = 1
 
 
     def run(self):
