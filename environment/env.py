@@ -52,13 +52,13 @@ class Environment:
             while iteration <= self.n_iterations:
                 if iteration % 10 == 0:
                     print(f"iteration : {iteration}")
-                if iteration % 500 == 0:
+                if iteration % 100 == 0:
                     self.save_time_log(monitor_config['paths']['time']['plot'])
                     self.make_agents_plots()
 
                 starting_time = time.time()
                 self.state.update(self.manager)
-
+        
                 barrier.wait()
                 time_len = time.time() - starting_time
                 self.sleep(time_len, iteration)
@@ -88,26 +88,19 @@ class Environment:
                     worker.join()
 
             self.memory_monitor.stop()
-            return sum(self.time_log), len(self.state.agent_log), len(self.preprocessor.wait_queue)
+            return sum(self.time_log), len(self.state.agent_log)
 
     def sleep(self, time_len, iteration):
         sleeping_time = self.cycle_wait - time_len
         if sleeping_time < 0:
             sleeping_time = 0
             if monitor_config['settings']['time']:
-                # self.monitor.add_time(time_len, iteration)
                 self.time_log.append(time_len)
         else:
             if monitor_config['settings']['time']:
-                # self.monitor.add_time(self.cycle_wait, iteration)
                 self.time_log.append(self.cycle_wait)
         time.sleep(sleeping_time)
 
-    def monitor_log(self, iteration):
-        if monitor_config['settings']['main']:
-            pass
-            # self.monitor.set_env_log(self.state.get(), self.window_manager.get_log(),
-            #  self.preprocessor.get_log(), iteration)
 
     def save_time_log(self, path):
         y_values = self.time_log

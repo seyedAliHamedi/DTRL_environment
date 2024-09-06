@@ -15,6 +15,6 @@ if __name__ == '__main__':
     pd.options.display.float_format = '{:,.5f}'.format
 
     print("Creating environment...")
-    env = Environment(100000, False)
+    env = Environment(10000, False)
     print("Running environment...")
     env.run()

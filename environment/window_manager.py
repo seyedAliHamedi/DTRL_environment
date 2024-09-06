@@ -25,8 +25,11 @@ class WindowManager:
             self.current_cycle += 1
             self.state.set_task_window([])
         else:
-            self.current_cycle = 0
-            self.state.set_task_window(self.get_window())
+            if len(self.state.get_jobs())>30:
+                self.current_cycle -=1
+            else:
+                self.current_cycle = 0
+                self.state.set_task_window(self.get_window())
 
     def get_window(self):
         # return the entire pool or a protion of it(window size)

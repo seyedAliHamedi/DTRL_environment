@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import pandas as pd
 from data.db import Database
@@ -96,7 +97,7 @@ class State:
             fail_flag[1]= 1
         elif queue_index == -1 and core_index == -1:
             # fail : assigned a task to a full queue core
-            fail_flag[2]= 1
+            fail_flag[2]= 0
         # manage failed assingments
         if sum(fail_flag)>0:
             return sum(fail_flag)*reward_function(punish=True), fail_flag, 0, 0
@@ -182,7 +183,7 @@ class State:
             jobs_list=self.get_jobs()
         except:
             print("Retrying update jobs ")
-            self.__add_new_active_jobs(self, manager)
+            self.__update_jobs(self, manager)
         
         
         # adding new jobs from the window manager to state if there is any
@@ -247,8 +248,9 @@ class State:
             # TODO occupation ?? queue
             #  2. updating the core occupations
             #  3. updating the battery capcities
+            
             self.__update_PEs_queue(pe)
-            self.__update_occupied_cores(pe)
+            # self.__update_occupied_cores(pe)
             self.__update_batteries_capp(pe)
 
 
@@ -260,15 +262,17 @@ class State:
             print("Retrying update occupied cores")
             self.__update_occupied_cores(pe_dict)
             
-        for core_index, _ in enumerate(pe_dict["occupiedCores"]):
-            queue = pe_dict["queue"][core_index]
-            # seting the core free and adjusting the power consumption to the Idle mode
-            if queue[0] == (0, -1):
-                pe_dict["occupiedCores"][core_index] = 0
-                pe_dict["energyConsumption"][core_index] = pe["powerIdle"][core_index]
-        else:
-            # core occupied
-            pe_dict["occupiedCores"][core_index] = 1
+        occupied_cores = pe_dict["occupiedCores"]
+        energy_consumption = pe_dict["energyConsumption"]
+        queue_list = pe_dict["queue"]
+        power_idle = pe["powerIdle"]
+
+        for core_index, (occupied, queue) in enumerate(zip(occupied_cores, queue_list)):
+            if queue[0] == (0, -1):  # If core is free
+                occupied_cores[core_index] = 0
+                energy_consumption[core_index] = power_idle[core_index]
+            else:  # Core is occupied
+                occupied_cores[core_index] = 1
 
     def __update_batteries_capp(self, pe):
         if pe["type"] == "iot" :
@@ -284,12 +288,16 @@ class State:
     def __update_PEs_queue(self, pe):
         deleting_queues_on_pe = []
 
-        for core_index, _ in enumerate(pe["queue"]):
-            if pe["queue"][core_index][0][0] == 0:
-                # removing the finished task from queue
-                if pe["queue"][core_index][0][1] != -1 and pe["queue"][core_index][0][1]!=0:
-                    self.__task_finished(pe["queue"][core_index][0][1])
-                    pe["queue"][core_index] =  pe["queue"][core_index][1:] + [(0,0)]
+        for core_index, core_queue in enumerate(pe["queue"]):
+            first_task = core_queue[0]
+
+            if first_task[0] == 0:
+                # Removing the finished task from queue
+                if first_task[1] != -1 and first_task[1] != 0:
+                    self.__task_finished(first_task[1])
+                    # Shift queue and append (0,0)
+                    pe["queue"][core_index] = core_queue[1:] + [(0, 0)]
+                    
                 # TODO cloud shit
                 # if pe["type"] == "cloud":
                 #     deleting_queues_on_pe.append(core_index)

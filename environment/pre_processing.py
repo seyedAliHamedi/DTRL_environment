@@ -11,8 +11,7 @@ class Preprocessing:
         self.assigned_jobs = manager.list()
         # the no ready pool
         self.job_pool = manager.dict()
-        # the ready & wait queue
-        self.wait_queue = manager.list()
+        # the ready 
         self.queue = manager.list()
         
         self.max_jobs = config['multi_agent']
@@ -61,8 +60,6 @@ class Preprocessing:
             # check if the task is ready upon adding it to the queue
             if task['pred_count'] == 0:
                 self.queue.append(task_id)
-            else:
-                self.wait_queue.append(task_id)
         # sort main queue by mobility
         self.__sort_by_mobility()
 
@@ -82,7 +79,7 @@ class Preprocessing:
         agent_queue = {}
         for job_ID in self.active_jobs.keys():
             agent_queue[job_ID] = []
-            for task_ID in self.queue:
+            for task_ID in list(self.queue):
                 task = self.state.database.get_task(task_ID)
                 if task['job_id'] == job_ID:
                     agent_queue[job_ID].append(task_ID)

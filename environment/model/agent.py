@@ -51,19 +51,18 @@ class Agent(mp.Process):
         self.mec_usuage=0
         self.cc_usuage=0
 
-    def retrive_job(self):
-        if self.assigned_job is None:
-            self.assigned_job = self.state.assign_job_to_agent()
-            if self.assigned_job:
-                self.local_actor_critic.clear_memory()
-                self.init_logs()
-        return self.assigned_job
+  
 
     def run(self):
         while self.runner_flag:
             self.barrier.wait()
-            if self.retrive_job() is None:
-                return
+            if self.assigned_job is None:
+                self.assigned_job = self.state.assign_job_to_agent()
+                if self.assigned_job is None:
+                    continue
+                self.local_actor_critic.clear_memory()
+                self.init_logs()
+            agent_queue=self.state.preprocessor.get_agent_queue()
             agent_queue = self.state.preprocessor.get_agent_queue()
             task_queue = agent_queue.get(self.assigned_job)
             for task in task_queue:
@@ -74,8 +73,11 @@ class Agent(mp.Process):
                 print("DONE")
                 self.update()
                 self.assigned_job = None
+                
 
-
+    def stop(self):
+        self.runner_flag = False
+        
     def schedule(self, current_task_id):
         # Multiprocess Robustness
         try:
