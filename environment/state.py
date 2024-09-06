@@ -63,18 +63,18 @@ class State:
         
         #finding the empty slot in queue for the selected device & core
         queue_index, core_index = find_place(pe_dict, core_i)
-        fail_flag = 0
+        fail_flag = [0,0,0]
         if (task["is_safe"] and not pe['handleSafeTask']):
             # fail : assigned safe task to unsafe device
-            fail_flag += 1
+            fail_flag[0]= 1
         elif task["task_kind"] not in pe["acceptableTasks"]:
             # fail : assigned a kind of task to the inappropriate device
-            fail_flag += 1
+            fail_flag[1]= 1
         elif queue_index == -1 and core_index == -1:
             # fail : assigned a task to a full queue core
-            fail_flag += 1
+            fail_flag[2]= 1
         # manage failed assingments
-        if fail_flag:
+        if sum(fail_flag)>0:
             return reward_function(punish=True), fail_flag, 0, 0
         
         # updating the queue slots
@@ -87,9 +87,6 @@ class State:
         # updating the pre processor queue
         
         self.preprocessor.queue.remove(task_ID)
-        while task_ID in self.preprocessor.queue:
-            print(1)
-            self.preprocessor.queue.remove(task_ID)
             
         
         # calc and power consumption for different devices
@@ -259,9 +256,9 @@ class State:
                     self.__task_finished(pe["queue"][core_index][0][1])
                     pe["queue"][core_index] =  pe["queue"][core_index][1:] + [(0,0)]
                 # TODO cloud shit
-                if pe["type"] == "cloud":
-                    deleting_queues_on_pe.append(core_index)
-                    continue
+                # if pe["type"] == "cloud":
+                #     deleting_queues_on_pe.append(core_index)
+                #     continue
             else:
                 # updating the queue for mec and iot (reducing the remaining time by 1 clock)
                 slot = (pe["queue"][core_index][0][0] -1, pe["queue"][core_index][0][1])
@@ -285,9 +282,6 @@ class State:
         except:
             print("b")
             return self.__task_finished(task_ID)
-        if job is None:
-            print("c")
-            return
 
         # updating the predecessors count for the successors tasks of the finished task(ready state)
         for t in task_suc:
@@ -296,8 +290,8 @@ class State:
                 # if the task is in the state and the dependencies meet; added it to the queue
                 if t in job['remainingTasks']:
                     self.preprocessor.queue.append(t)
+                    
         # adding the task to the finisheds and removing it from the runnigs
-        
         job["finishedTasks"].append(task_ID)
         job["runningTasks"].remove(task_ID)
 

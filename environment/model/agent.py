@@ -1,18 +1,10 @@
-import traceback
-import threading
-import time
-
 import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
 
 from environment.model.actor_critic import ActorCritic
-from environment.model.shared_adam import SharedAdam
 from environment.model.core_scheduler import CoreScheduler
-from environment.state import State
-from utilities.monitor import Monitor
-from data.configs import monitor_config, agent_config
 
 
 class Agent(mp.Process):
@@ -35,9 +27,20 @@ class Agent(mp.Process):
     def init_logs(self):
         self.state.agent_log[self.assigned_job] = {}
         self.reward_log = []
+        # reward based objectives
         self.time_log = []
         self.energy_log = []
-        self.fails_log = []
+        # punish based objectives
+        self.kind_fails_log = 0
+        self.safe_fails_log = 0
+        self.queue_fails_log = 0
+        self.battery_fails_log = 0
+        self.fails_log=0
+        # usuage and explore
+        self.iot_usuage=0
+        self.mec_usuage=0
+        self.cc_usuage=0
+
 
     def run(self):
         while self.runner_flag:
@@ -48,11 +51,9 @@ class Agent(mp.Process):
                     continue
                 self.local_actor_critic.clear_memory()
                 self.init_logs()
-            # agent_queue = self.state.preprocessor.get_agent_queue()
-            # print("^^^^^^ ", agent_queue)
-            # task_queue = agent_queue.get(self.assigned_job)
-            # print("----- ", self.name, self.assigned_job, task_queue)
-            for task in self.state.preprocessor.get_agent_queue().get(self.assigned_job):
+            agent_queue=self.state.preprocessor.get_agent_queue()
+            task_queue = agent_queue.get(self.assigned_job)
+            for task in task_queue:
                 self.schedule(task)
 
             current_job = self.state.get_job(self.assigned_job)
@@ -98,8 +99,19 @@ class Agent(mp.Process):
         self.reward_log.append(reward)
         self.time_log.append(time)
         self.energy_log.append(energy)
-        self.fails_log.append(fail_flag)
-
+        if fail_flag[0]:
+            self.safe_fails_log +=1
+        if fail_flag[1]:
+            self.kind_fails_log +=1
+        if fail_flag[2]:
+            self.queue_fails_log +=1
+        self.fails_log+= sum(fail_flag)
+        if selected_device['type']=="iot":
+            self.iot_usuage+=1
+        if selected_device['type']=="mec":
+            self.mec_usuage+=1
+        if selected_device['type']=="cloud":
+            self.cc_usuage+=1
     def update(self):
 
         loss = self.local_actor_critic.calc_loss()
@@ -109,7 +121,13 @@ class Agent(mp.Process):
                 "reward": sum(self.reward_log)/len(self.reward_log),
                 "time": sum(self.time_log)/len(self.time_log),
                 "energy": sum(self.energy_log)/len(self.energy_log),
-                "fails": sum(self.fails_log)/len(self.fails_log),
+                "safe_fails": self.safe_fails_log/len(self.energy_log),
+                "kind_fails": self.kind_fails_log/len(self.energy_log),
+                "queue_fails": self.queue_fails_log/len(self.energy_log),
+                "fails": self.fails_log/len(self.energy_log),
+                "iot_usuage": self.iot_usuage/len(self.energy_log),
+                "mec_usuage": self.mec_usuage/len(self.energy_log),
+                "cc_usuage": self.cc_usuage/len(self.energy_log),
             }
         loss.backward()
         for local_param, global_param in zip(self.local_actor_critic.parameters(),
