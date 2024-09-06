@@ -56,7 +56,10 @@ class Agent(mp.Process):
             for task in task_queue:
                 self.schedule(task)
 
-            current_job = self.state.get_job(self.assigned_job)
+            try:
+                current_job = self.state.get_job(self.assigned_job)
+            except:
+                current_job = self.state.get_job(self.assigned_job)
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
                 print("DONE",self.assigned_job)
                 self.update()

@@ -75,7 +75,7 @@ class State:
             fail_flag[2]= 1
         # manage failed assingments
         if sum(fail_flag)>0:
-            return reward_function(punish=True), fail_flag, 0, 0
+            return sum(fail_flag)*reward_function(punish=True), fail_flag, 0, 0
         
         # updating the queue slots
         pe_dict["queue"][core_index] = [placing_slot]+  pe_dict["queue"][core_index][1:]

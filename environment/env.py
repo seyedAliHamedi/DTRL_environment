@@ -143,7 +143,7 @@ class Environment:
         
         
         
-        fig, axs = plt.subplots(5, 2, figsize=(30, 15))
+        fig, axs = plt.subplots(5, 2, figsize=(15, 30))
         axs[0, 0].plot(loss_list,
                        label='Loss', color="blue", marker='o')
         axs[0, 0].set_title('Loss')

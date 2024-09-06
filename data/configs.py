@@ -71,8 +71,8 @@ jobs_config = {
 
 environment_config = {
     # TODO : test this params
-    "multi_agent": 5,
-    "window": {"size": 80, "max_jobs": 10, "clock": 15},
+    "multi_agent": 15,
+    "window": {"size": 100, "max_jobs": 20, "clock": 10},
     "environment": {"cycle": 0.01, "anomaly_th": 0.5},
 }
 
