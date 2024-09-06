@@ -75,12 +75,10 @@ class State:
             pe_dict = self.get_PEs()[pe_ID]
             pe = self.database.get_device(pe_ID)
             task = self.database.get_task(task_ID)
-            job_ID = task["job_id"]
-            job_dict = self.get_job(job_ID)
+            job_dict = self.get_job(task["job_id"])
         except:
             print("Retry apply action")
             return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
-        
         # calculating the execution time
         execution_time = t = np.ceil(task["computational_load"] / freq)
         
@@ -127,6 +125,12 @@ class State:
         # returning the results
         return reward_function(e=e, t=t), fail_flag, e, t
 
+    def save_agent_log(self,assigned_job,dict):
+        with self.lock:
+            self.agent_log[assigned_job] = dict
+    def assign_job_to_agent(self):
+        with self.lock:
+            return self.preprocessor.assign_job()
     ####### ENVIRONMENT #######
     def update(self, manager):
         # the state main functionality
@@ -201,10 +205,10 @@ class State:
         if self.display:
             print(f"new window {new_tasks}")
         # updating the jobs in the live status from the task window
-        for task in new_tasks:
+        for task_id in new_tasks:
             # Multiprocess Robustness
             try:
-                task=self.database.get_task(task)
+                task=self.database.get_task(task_id)
                 job =self.database.get_job(task['job_id'])
             except:
                 print("Retrying add new active jobs ")
@@ -213,7 +217,7 @@ class State:
             # initaling job if not; and if appending the new tasks that arrived
             if not self.__is_active_job(task['job_id']):
                 self._set_jobs([job], manager)
-            self.get_job(task['job_id'])["remainingTasks"].append(task)
+            self.get_job(task['job_id'])["remainingTasks"].append(task_id)
         
     def __is_active_job(self, job_ID):
         # Multiprocess Robustness

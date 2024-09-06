@@ -4,8 +4,10 @@ from data.configs import environment_config
 class WindowManager:
 
     def __init__(self, state, manager, config=environment_config):
+        # the shared state
         self.state = state
         self.__pool = manager.list()
+        # the active jobs in the window manager
         self.active_jobs_ID = manager.list()
         # max jobs in a window & window size
         self.__max_jobs = config['window']["max_jobs"]
@@ -52,10 +54,3 @@ class WindowManager:
                 selected_tasks.append(task)
         random.shuffle(selected_tasks)
         return selected_tasks
-
-    def get_log(self):
-        return {
-            'pool': self._instance.__pool,
-            'current_cycle': self._instance.current_cycle,
-            'active_jobs_ID': self._instance.active_jobs_ID,
-        }

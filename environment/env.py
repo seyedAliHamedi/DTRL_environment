@@ -36,13 +36,13 @@ class Environment:
     def run(self):
         global_actor_critic = ActorCritic(input_dims=5, n_actions=len(self.db.get_all_devices()))
         global_actor_critic.share_memory()
-        optim = SharedAdam(global_actor_critic.parameters())
+        global_optimizer = SharedAdam(global_actor_critic.parameters())
         workers = []
         barrier = mp.Barrier(environment_config['multi_agent'] + 1)
 
         self.state.update(self.manager)
         for i in range(environment_config['multi_agent']):
-            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic, optimizer=optim, barrier=barrier,shared_state=self.state)
+            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic, global_optimizer=global_optimizer, barrier=barrier,shared_state=self.state)
             workers.append(worker)
             worker.start()
 

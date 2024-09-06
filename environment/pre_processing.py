@@ -3,28 +3,33 @@ from data.configs import environment_config
 
 class Preprocessing:
     def __init__(self, state, manager, config=environment_config):
+        # the shared state
         self.state = state
+        # the active jobs of the preprocessor
         self.active_jobs = manager.dict()
+        # the assigned jobs to the agents
         self.assigned_jobs = manager.list()
+        # the no ready pool
         self.job_pool = manager.dict()
         # the ready & wait queue
         self.wait_queue = manager.list()
         self.queue = manager.list()
+        
         self.max_jobs = config['multi_agent']
 
     def run(self):
-        jobs = self.state.get_jobs()
-        self.update_active_jobs(jobs)
+        self.update_active_jobs()
         self.process()
 
     def assign_job(self):
-        with self.state.lock:
-            for job in self.active_jobs.keys():
-                if job not in self.assigned_jobs:
-                    self.assigned_jobs.append(job)
-                    return job
+        # assign jobs to agents
+        for job in self.active_jobs.keys():
+            if job not in self.assigned_jobs:
+                self.assigned_jobs.append(job)
+                return job
 
-    def update_active_jobs(self, state_jobs):
+    def update_active_jobs(self):
+        state_jobs = self.state.get_jobs()
         # Add or update jobs in active_jobs
         for job_ID in state_jobs.keys():
             self.active_jobs[job_ID] = state_jobs[job_ID]
@@ -62,6 +67,8 @@ class Preprocessing:
         self.__sort_by_mobility()
 
     def __sort_by_mobility(self):
+        # sort main queue by mobility
+        # mobility -> number of successors(necassity)
         mobility_dict = {}
         for task_id in self.queue:
             task = self.state.database.get_task(task_id)
@@ -75,7 +82,7 @@ class Preprocessing:
         agent_queue = {}
         for job_ID in self.active_jobs.keys():
             agent_queue[job_ID] = []
-            for task_ID in list(self.queue):
+            for task_ID in self.queue:
                 task = self.state.database.get_task(task_ID)
                 if task['job_id'] == job_ID:
                     agent_queue[job_ID].append(task_ID)
