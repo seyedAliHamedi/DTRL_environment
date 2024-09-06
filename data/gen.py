@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
-from data.configs import devices_config, jobs_config, environment_config
+from data.configs import devices_config, jobs_config
 import os
-import time
 import ast
 
 
@@ -10,12 +9,9 @@ class Generator:
     _task_id_counter = 0
     _device_id_counter = 0
     _job_id_counter = 0
-    _devices_path = os.path.join(os.path.dirname(
-        __file__), "resources", "devices.csv")
-    _job_path = os.path.join(os.path.dirname(
-        __file__), "resources", "jobs.csv")
-    _tasks_path = os.path.join(os.path.dirname(
-        __file__), "resources", "tasks.csv")
+    _devices_path = os.path.join(os.path.dirname(__file__), "resources", "devices.csv")
+    _job_path = os.path.join(os.path.dirname(__file__), "resources", "jobs.csv")
+    _tasks_path = os.path.join(os.path.dirname(__file__), "resources", "tasks.csv")
 
     @classmethod
     def get_devices(cls, file_path=_devices_path):

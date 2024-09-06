@@ -3,8 +3,8 @@ import pandas as pd
 from data.db import Database
 from environment.pre_processing import Preprocessing
 from environment.window_manager import WindowManager
-import torch.multiprocessing as mp
 
+import torch.multiprocessing as mp
 
 class State:
 
@@ -20,6 +20,8 @@ class State:
         # intilizing the preprocessor and the window manager
         self.preprocessor = Preprocessing(state=self, manager=manager)
         self.window_manager = WindowManager(state=self, manager=manager)
+        
+        # TODO : rest
         self.agent_log = manager.dict({})
         self.display = display
         self.lock = mp.Lock()
@@ -43,6 +45,30 @@ class State:
     def get_job(self, job_id):
         return self.get_jobs().get(job_id)
 
+    ##### Intializations
+    def _init_PEs(self, PEs, manager):
+        # initlizeing the PEs live variable from db
+        for pe in PEs:
+            self._PEs[pe["id"]] = {
+                "id": pe["id"],
+                "type": pe["type"],
+                "batteryLevel": pe["battery_capacity"],
+                "occupiedCores": manager.list([0 for _ in range(pe["num_cores"])]),
+                "energyConsumption": manager.list(pe["powerIdle"]),
+                "queue": manager.list([manager.list([(0, -1) for _ in range(pe["maxQueue"])]) for _ in range(pe["num_cores"])]),
+            }
+
+    def _set_jobs(self, jobs, manager):
+        # add new job the state live status (from window manager)
+        for job in jobs:
+            self._jobs[job["id"]] = {
+                "task_count": job["task_count"],
+                "finishedTasks": manager.list([]),
+                "runningTasks": manager.list([]),
+                "remainingTasks": manager.list([]),
+                "remainingDeadline": job["deadline"],
+            }
+    
     ##### Functionality
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
         try:
@@ -50,9 +76,9 @@ class State:
             pe = self.database.get_device(pe_ID)
             task = self.database.get_task(task_ID)
             job_ID = task["job_id"]
-            job_dict = self.get_jobs().get(job_ID)
+            job_dict = self.get_job(job_ID)
         except:
-            print("a")
+            print("Retry apply action")
             return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
         
         # calculating the execution time
@@ -85,7 +111,6 @@ class State:
         job_dict["remainingTasks"].remove(task_ID)
         
         # updating the pre processor queue
-        
         self.preprocessor.queue.remove(task_ID)
             
         
@@ -94,8 +119,7 @@ class State:
             pe_dict["energyConsumption"][core_index] = volt
             e = volt * t
         else:
-            capacitance = self.database.get_device(
-                pe_ID)["capacitance"][core_index]
+            capacitance = pe["capacitance"][core_index]
             pe_dict["energyConsumption"][
                 core_index] = capacitance * (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
@@ -103,31 +127,7 @@ class State:
         # returning the results
         return reward_function(e=e, t=t), fail_flag, e, t
 
-    def _init_PEs(self, PEs, manager):
-        # initlizeing the PEs live variable from db
-        for pe in PEs:
-            self._PEs[pe["id"]] = {
-                "id": pe["id"],
-                "type": pe["type"],
-                "batteryLevel": pe["battery_capacity"],
-                "occupiedCores": manager.list([0 for _ in range(pe["num_cores"])]),
-                "energyConsumption": manager.list(pe["powerIdle"]),
-                "queue": manager.list([manager.list([(0, -1) for _ in range(pe["maxQueue"])]) for _ in range(pe["num_cores"])]),
-            }
-
-    def _set_jobs(self, jobs, manager):
-        # add new job the state live status (from window manager)
-        for job in jobs:
-            self._jobs[job["id"]] = {
-                "task_count": job["task_count"],
-                "finishedTasks": manager.list([]),
-                "runningTasks": manager.list([]),
-                "remainingTasks": manager.list([]),
-                "remainingDeadline": job["deadline"],
-            }
-
     ####### ENVIRONMENT #######
-
     def update(self, manager):
         # the state main functionality
         #   1 . getting task window from the window manager if avaliable
@@ -146,10 +146,10 @@ class State:
             for pe_id, pe in self.get_PEs().items():
                 pe_data[pe_id] = {
                     "id": pe["id"],
-                    # "type": pe["type"],
-                    # "batteryLevel": pe["batteryLevel"],
-                    # "occupiedCores": list(pe["occupiedCores"]),
-                    # "energyConsumption": list(pe["energyConsumption"]),
+                    "type": pe["type"],
+                    "batteryLevel": pe["batteryLevel"],
+                    "occupiedCores": list(pe["occupiedCores"]),
+                    "energyConsumption": list(pe["energyConsumption"]),
                     "queue": [list(core_queue) for core_queue in pe["queue"]]
                 }
             print(pd.DataFrame(pe_data).T, '\n')
@@ -173,38 +173,57 @@ class State:
 
     def __update_jobs(self, manager):
         # updating the jobs live status
+        # Multiprocess Robustness
+        try:
+            jobs_list=self.get_jobs()
+        except:
+            print("Retrying update jobs ")
+            self.__add_new_active_jobs(self, manager)
+        
         
         # adding new jobs from the window manager to state if there is any
         self.__add_new_active_jobs(self._task_window, manager)
 
         removing_items = []
-        for job_ID in self.get_jobs().keys():
+        for job_ID in jobs_list.keys():
             # decreasing the deadline of the jobs by 1 cycle
-            job = self.get_jobs().get(job_ID)
+            job = jobs_list.get(job_ID)
             job["remainingDeadline"] -= 1
 
             # removing the finished jobs from the state
             if len(job["finishedTasks"]) == job["task_count"]:
                 removing_items.append(job_ID)
 
-        jobs = self.get_jobs()  
         for item in removing_items:
-            del jobs[item]
+            del jobs_list[item]
 
     def __add_new_active_jobs(self, new_tasks, manager):
         if self.display:
             print(f"new window {new_tasks}")
         # updating the jobs in the live status from the task window
         for task in new_tasks:
-            job_id = self.database.get_task(task)["job_id"]
+            # Multiprocess Robustness
+            try:
+                task=self.database.get_task(task)
+                job =self.database.get_job(task['job_id'])
+            except:
+                print("Retrying add new active jobs ")
+                self.__add_new_active_jobs(self, new_tasks, manager)
+            
             # initaling job if not; and if appending the new tasks that arrived
-            if not self.__is_active_job(job_id):
-                self._set_jobs([self.database.get_job(job_id)], manager)
-            self.get_jobs().get(job_id)["remainingTasks"].append(task)
+            if not self.__is_active_job(task['job_id']):
+                self._set_jobs([job], manager)
+            self.get_job(task['job_id'])["remainingTasks"].append(task)
         
     def __is_active_job(self, job_ID):
+        # Multiprocess Robustness
+        try:
+            jobs_list = self.get_jobs().keys()
+        except:
+            print("Retrying is job active ")
+            self.__is_active_job(job_ID)
         # checking if the job is initlized in the live status or not
-        for job_ID_key in self.get_jobs().keys():
+        for job_ID_key in jobs_list:
             if job_ID_key == job_ID:
                 return True
         return False
@@ -212,7 +231,13 @@ class State:
     ####### UPDATE PEs #######
     def __update_PEs(self):
         for pe_ID in self.get_PEs().keys():
-            pe = self.get_PEs()[pe_ID]
+            # Multiprocess Robustness
+            try:
+                 pe = self.get_PEs()[pe_ID]
+            except:
+                print("Retrying update PEs")
+                self.__update_PEs()
+           
             # updating the PEs live status
             #  1. updating the quques
             # TODO occupation ?? queue
@@ -224,7 +249,13 @@ class State:
 
 
     def __update_occupied_cores(self, pe_dict):
-        pe = self.database.get_device(pe_dict['id'])
+        # Multiprocess Robustness
+        try:
+            pe = self.database.get_device(pe_dict['id'])
+        except:
+            print("Retrying update occupied cores")
+            self.__update_occupied_cores(pe_dict)
+            
         for core_index, _ in enumerate(pe_dict["occupiedCores"]):
             queue = pe_dict["queue"][core_index]
             # seting the core free and adjusting the power consumption to the Idle mode
@@ -235,12 +266,12 @@ class State:
             # core occupied
             pe_dict["occupiedCores"][core_index] = 1
 
-
     def __update_batteries_capp(self, pe):
         if pe["type"] == "iot" :
             pe["batteryLevel"] -= sum(pe["energyConsumption"])
 
     def __update_energy_consumption(self, pe, pe_ID):
+        #TODO:finish and robust via try catch
         for core_index, core_av in enumerate(pe["occupiedCores"]):
             if core_av == 0:
                 pe["energyConsumption"][core_index] = self.database.get_device(pe_ID)[
@@ -274,13 +305,14 @@ class State:
             del pe["energyConsumption"][item - i]
 
     def __task_finished(self, task_ID):
+        # Multiprocess Robustness
         try:
             task = self.database.get_task(task_ID)
             job_ID = task["job_id"]
-            job = self.get_jobs().get(job_ID)
+            job = self.get_job(job_ID)
             task_suc = task['successors']
         except:
-            print("b")
+            print("Retrying task finished")
             return self.__task_finished(task_ID)
 
         # updating the predecessors count for the successors tasks of the finished task(ready state)
@@ -315,7 +347,6 @@ def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
     elif setup == 7:
         return -((alpha * e + beta * t) ** 2)
 
-
 def find_place(pe, core_i):
     if pe["type"] == "cloud":
         pe["queue"].append([])
@@ -328,9 +359,3 @@ def find_place(pe, core_i):
             if slot == (0, -1):
                 return i, core_i
     return -1, -1
-
-
-
-def queue_shift_left(queue):
-    queue.pop(0)
-    queue.append((0, -1))

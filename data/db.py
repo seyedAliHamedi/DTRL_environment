@@ -1,6 +1,5 @@
 from data.gen import Generator
 
-
 class Database:
 
     def __init__(self):
@@ -18,16 +17,6 @@ class Database:
     def get_all_tasks(self):
         return self._tasks.to_dict(orient='records')
 
-    # ---------- multiple ------------
-
-    def get_devices(self, count):
-        return self._devices.head(count).to_dict(orient='records')
-
-    def get_jobs(self, count):
-        return self._jobs.head(count).to_dict(orient='records')
-
-    def get_tasks(self, count):
-        return self._tasks.head(count).to_dict(orient='records')
 
     # ---------- single ------------
 
