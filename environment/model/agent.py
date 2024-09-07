@@ -6,6 +6,7 @@ import torch.multiprocessing as mp
 from environment.model.actor_critic import ActorCritic, CoreScheduler
 
 
+
 class Agent(mp.Process):
     def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state):
         super(Agent, self).__init__()
@@ -18,7 +19,7 @@ class Agent(mp.Process):
         self.global_actor_critic = global_actor_critic
         self.global_optimizer = global_optimizer
         # the local actor-critic and the core scheduler
-        self.local_actor_critic = ActorCritic(self.global_actor_critic.input_dims, self.global_actor_critic.n_actions)
+        self.local_actor_critic = ActorCritic(self.global_actor_critic.input_dims, self.global_actor_critic.n_actions,devices=self.devices)
         self.core = CoreScheduler(self.devices)
         
       
@@ -89,8 +90,7 @@ class Agent(mp.Process):
             # retrive the necassary data
             job_state, pe_state = self.state.get()
             current_task = self.state.database.get_task(current_task_id)
-            current_job = self.state.get_job(self.assigned_job)
-            input_state = self.get_input(current_task, {})
+            input_state = self.get_input(current_task, pe_state)
         except:
             print("Retyrin schedule on : ",self.name)
             self.schedule(current_task_id)

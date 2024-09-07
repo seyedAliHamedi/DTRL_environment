@@ -40,8 +40,9 @@ class Environment:
         self.display = display
 
     def run(self):
+        devices = self.db.get_all_devices()
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(input_dims=5, n_actions=len(self.db.get_all_devices()))
+        global_actor_critic = ActorCritic(input_dims=5, n_actions=len(devices),devices=devices)
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
         # setting up workers and their barriers

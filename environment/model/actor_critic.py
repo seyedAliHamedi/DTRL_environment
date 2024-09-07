@@ -1,20 +1,20 @@
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
-
+from sklearn.cluster import KMeans
 import torch.optim as optim
 
 class ActorCritic(nn.Module):
-    def __init__(self, input_dims, n_actions):
+    def __init__(self, input_dims, n_actions,devices):
         super(ActorCritic, self).__init__()
         self.input_dims = input_dims
         self.n_actions = n_actions
-        self.actor = DDT(num_input=input_dims,
-                         num_output=n_actions, depth=0, max_depth=3)
+        self.actor = DeviceDDT(devices=devices,depth=0,max_depth=3)
         self.critic = nn.Sequential(
-            nn.Linear(input_dims, 128), nn.ReLU(), nn.Linear(128, 1))
+            nn.Linear (5 + 4 * len(devices), 128), nn.ReLU(), nn.Linear(128, 1))
 
         self.rewards = []
         self.actions = []
@@ -90,6 +90,20 @@ class ActorCritic(nn.Module):
         return total_loss
 
 
+class CoreScheduler(nn.Module):
+    def __init__(self, devices):
+        super(CoreScheduler, self).__init__()
+        self.devices = devices
+        self.num_features = 9
+        self.forest = [self.createTree(device) for device in devices if device['type'] != 'cloud']
+        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005)for tree in self.forest]
+
+    def createTree(self, device):
+        return DDT(num_input=self.num_features, num_output=device['num_cores']*3, depth=0, max_depth=np.log2(device['num_cores']))
+    
+    
+
+
 
 
 class DDT(nn.Module):
@@ -124,15 +138,139 @@ class DDT(nn.Module):
             left_output, left_path = self.left(x, path + "L")
             return (1 - val) * left_output, left_path
 
+class DeviceDDT(nn.Module):
+    def __init__(self, devices, depth, max_depth ):
+        super(DeviceDDT, self).__init__()
+        self.depth = depth
+        self.max_depth = max_depth
+
+        if depth != max_depth:
+            self.weights = nn.Parameter(torch.empty(5+4*len(devices)).normal_(mean=0, std=0.1))
+            self.bias = nn.Parameter(torch.zeros(1))
+            self.alpha = nn.Parameter(torch.zeros(1))
+        if depth == max_depth:
+            self.prob_dist = nn.Parameter(torch.zeros(len(devices)))
+        if depth < max_depth:
+            self.left = DeviceDDT(devices, depth + 1,max_depth)
+            self.right = DeviceDDT(devices, depth + 1,max_depth)
+
+    def forward(self, x,path=""):
+        if self.depth == self.max_depth:
+            return self.prob_dist, path
+        val = torch.sigmoid(
+            self.alpha * (torch.matmul(x, self.weights) + self.bias))
+
+        if val >= 0.5:
+            right_output, right_path = self.right(x, path + "R")
+            return val * right_output, right_path
+        else:
+            left_output, left_path = self.left(x, path + "L")
+            return (1 - val) * left_output, left_path
 
 
-class CoreScheduler(nn.Module):
-    def __init__(self, devices):
-        super(CoreScheduler, self).__init__()
-        self.devices = devices
-        self.num_features = 9
-        self.forest = [self.createTree(device) for device in devices if device['type'] != 'cloud']
-        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005)for tree in self.forest]
 
-    def createTree(self, device):
-        return DDT(num_input=self.num_features, num_output=device['num_cores']*3, depth=0, max_depth=np.log2(device['num_cores']))
+# class ClusterTree(nn.Module):
+#     def __init__(self, devices, depth, max_depth):
+#         super(ClusterTree, self).__init__()
+#         self.depth = depth
+#         self.max_depth = max_depth
+        
+        
+#         self.devices = devices
+#         num_features = 5 + 4 * len(devices)
+#         self.max_depth = max_depth
+
+#         if depth != max_depth:
+#             self.weights = nn.Parameter(torch.empty(
+#                 num_features).normal_(mean=0, std=0.1))
+#             self.bias = nn.Parameter(torch.zeros(1))
+#             self.alpha = nn.Parameter(torch.zeros(1))
+#         if depth == max_depth:
+#             self.prob_dist = nn.Parameter(torch.zeros(len(devices)))
+
+#         if depth < max_depth:
+#             clusters = self.cluster(self.devices)
+#             left_cluster = clusters[0]
+#             right_cluster = clusters[1]
+#             self.left = ClusterTree(left_cluster, depth+1, max_depth)
+#             self.right = ClusterTree(right_cluster, depth+1, max_depth)
+
+#     def forward(self, x, path=""):
+#         if self.depth == self.max_depth:
+#             return self.prob_dist,path
+
+#         val = torch.sigmoid(
+#             self.alpha * (torch.matmul(x, self.weights.t()) + self.bias))
+
+#         if val >= 0.5:
+#             indices = [self.devices.index(device)
+#                        for device in self.right.devices]
+#             temp = x[5:].view(-1, 4)
+#             indices_tensor = torch.tensor(indices)
+#             x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
+#             right_output, right_path  = self.right(x, path + "R")
+#             return val * right_output,right_path
+        
+#         else:
+#             indices = [self.devices.index(device)
+#                        for device in self.left.devices]
+#             temp = x[5:].view(-1, 4)
+#             indices_tensor = torch.tensor(indices)
+#             x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
+#             left_output, left_path = self.left(x, path + "L")
+#             return (1 - val) * left_output, left_path
+
+#     def get_devices(self, x):
+#         if self.depth == self.max_depth:
+#             return self.devices
+
+#         val = torch.sigmoid(
+#             self.alpha * (torch.matmul(x, self.weights.t()) + self.bias))
+
+#         if val >= 0.5:
+#             indices = [self.devices.index(device)
+#                        for device in self.right.devices]
+#             temp = x[5:].view(-1, 4)
+#             indices_tensor = torch.tensor(indices)
+#             x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
+#             return self.right.get_devices(x)
+#         else:
+#             indices = [self.devices.index(device)
+#                        for device in self.left.devices]
+#             temp = x[5:].view(-1, 4)
+#             indices_tensor = torch.tensor(indices)
+#             x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
+#             return self.left.get_devices(x)
+#     def cluster(self, devices, k=2):
+#         data = [self.get_pe_data(device) for device in devices]
+#         if len(devices) < k:
+#             return [devices]*k
+#         X = np.array(data)
+#         kmeans = KMeans(n_clusters=k, init="random")
+#         kmeans.fit(X)
+#         cluster_labels = kmeans.labels_
+#         clusters = [[] for _ in range(k)]
+
+#         for device, label in zip(devices, cluster_labels):
+#             clusters[label].append(device)
+#         return clusters
+
+#     def get_pe_data(self, pe):
+        capacitance = sum(pe['capacitance'])
+        handleSafeTask = pe['handleSafeTask']
+        kind = sum(pe['acceptableTasks'])
+
+        if pe['id'] != "cloud":
+            devicePower = 0
+            for index, core in enumerate(pe["voltages_frequencies"]):
+                corePower = 0
+                for mod in core:
+                    freq, vol = mod
+                    corePower += freq / vol
+                devicePower += corePower
+            devicePower = devicePower / pe['num_cores']
+        else:
+            devicePower = 1e9
+
+
+        return [devicePower, capacitance,handleSafeTask,kind]
