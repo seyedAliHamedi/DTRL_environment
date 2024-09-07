@@ -18,30 +18,37 @@ import torch.multiprocessing as mp
 class Environment:
 
     def __init__(self, n_iterations, display):
+        # numver of iterations for the environment/simulation
         self.n_iterations = n_iterations
+        # the memory monitor and it's thread
         self.memory_monitor = MemoryMonitor()
         self.mem_monitor_thread = threading.Thread(target=self.memory_monitor.run)
+        # the minimumm wait between iterations
         self.cycle_wait = environment_config["environment"]["cycle"]
-        self.__runner_flag = True
-        self.__worker_flags = []
+        # the shared state and the manager for shared memory variables/dictionaries/lists
         manager = mp.Manager()
         self.state = State(display=display, manager=manager)
         self.manager = manager
+        # the 3 global enteties of the shared state (preProcessor,windowManager,database)
         self.db = self.state.database
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
+        
         self.time_log = []
         self.display = display
 
     def run(self):
+        # define the global Actor-Critic and the shared optimizer (A3C)
         global_actor_critic = ActorCritic(input_dims=5, n_actions=len(self.db.get_all_devices()))
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
+        # setting up workers and their barriers
         workers = []
         barrier = mp.Barrier(environment_config['multi_agent'] + 1)
-
+        # kick off the state
         self.state.update(self.manager)
         for i in range(environment_config['multi_agent']):
+            # oragnize and start the agents
             worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic, global_optimizer=global_optimizer, barrier=barrier,shared_state=self.state)
             workers.append(worker)
             worker.start()
@@ -51,25 +58,20 @@ class Environment:
             self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
                 if iteration % 10 == 0:
-                    print(f"iteration : {iteration}")
+                    print(f"iteration : {iteration}",len(self.state.get_jobs()))
                 if iteration % 100 == 0:
                     self.save_time_log(monitor_config['paths']['time']['plot'])
                     self.make_agents_plots()
-
+                    
                 starting_time = time.time()
                 self.state.update(self.manager)
+                print("Agent Queue: ",self.preprocessor.get_agent_queue())
         
                 barrier.wait()
                 time_len = time.time() - starting_time
-                self.sleep(time_len, iteration)
+                self.sleep(time_len)
 
-                # self.monitor_log(iteration)
                 iteration += 1
-            print("Simulation Finished")
-            print("Saving Logs......")
-            self.save_time_log(monitor_config['paths']['time']['plot'])
-            self.make_agents_plots()
-
         except Exception as e:
             print("Caught an unexpected exception:", e)
             traceback.print_exc()
@@ -79,30 +81,29 @@ class Environment:
             self.save_time_log(monitor_config['paths']['time']['plot'])
             self.make_agents_plots()
 
+            # stopping and terminating the workers
             for worker in workers:
                 worker.stop()
-
             for worker in workers:
                 if worker.is_alive():
                     worker.terminate()
                     worker.join()
 
             self.memory_monitor.stop()
-            return sum(self.time_log), len(self.state.agent_log)
 
-    def sleep(self, time_len, iteration):
+    def sleep(self, time_len,):
+        # sleep for the minimumm time or the time that the actual simulation took
         sleeping_time = self.cycle_wait - time_len
         if sleeping_time < 0:
             sleeping_time = 0
-            if monitor_config['settings']['time']:
-                self.time_log.append(time_len)
+            self.time_log.append(time_len)
         else:
-            if monitor_config['settings']['time']:
-                self.time_log.append(self.cycle_wait)
+            self.time_log.append(self.cycle_wait)
         time.sleep(sleeping_time)
 
 
     def save_time_log(self, path):
+        # saving time log gatherd in the simulation
         y_values = self.time_log
         plt.figure(figsize=(10, 5))
         plt.plot(y_values, marker='o', linestyle='-')
@@ -119,7 +120,7 @@ class Environment:
             json.dump(self.time_log, f, indent=4)
 
     def make_agents_plots(self, path=monitor_config['paths']['agent']['plots']):
-
+        # saving the agent logs gatherd from the state
         filtered_data = {k: v for k, v in self.state.agent_log.items() if v}
         time_list = [v["time"] for v in filtered_data.values()]
         energy_list = [v["energy"] for v in filtered_data.values()]

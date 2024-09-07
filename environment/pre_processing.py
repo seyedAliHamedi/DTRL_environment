@@ -9,8 +9,6 @@ class Preprocessing:
         self.active_jobs = manager.dict()
         # the assigned jobs to the agents
         self.assigned_jobs = manager.list()
-        # the no ready pool
-        self.job_pool = manager.dict()
         # the ready 
         self.queue = manager.list()
         
@@ -43,22 +41,13 @@ class Preprocessing:
         for job_ID in deleting_list:
             self.active_jobs.pop(job_ID)
 
-        # Move excess jobs from active_jobs to job_pool
-        while len(self.active_jobs) > self.max_jobs:
-            job_ID, job = self.active_jobs.popitem()
-            self.job_pool[job_ID] = job
-
-        # Move jobs from job_pool to active_jobs if there's space
-        while len(self.active_jobs) < self.max_jobs and len(self.job_pool) > 0:
-            job_ID, job = self.job_pool.popitem()
-            self.active_jobs[job_ID] = job
 
     def process(self):
         # add window tasks to the queues
         for task_id in self.state.get_task_window():
             task = self.state.database.get_task(task_id)
             # check if the task is ready upon adding it to the queue
-            if task['pred_count'] == 0:
+            if task['pred_count'] <= 0:
                 self.queue.append(task_id)
         # sort main queue by mobility
         self.__sort_by_mobility()

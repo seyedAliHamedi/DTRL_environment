@@ -7,8 +7,6 @@ class WindowManager:
         # the shared state
         self.state = state
         self.__pool = manager.list()
-        # the active jobs in the window manager
-        self.active_jobs_ID = manager.list()
         # max jobs in a window & window size
         self.__max_jobs = config['window']["max_jobs"]
         self.__window_size = config['window']["size"]

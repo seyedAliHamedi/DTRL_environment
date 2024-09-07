@@ -39,6 +39,7 @@ class State:
 
     def set_task_window(self, task_window):
         self._task_window = task_window
+        self.check_up_jobs()
 
     def get_task_window(self):
         return self._task_window
@@ -129,6 +130,7 @@ class State:
     def save_agent_log(self,assigned_job,dict):
         with self.lock:
             self.agent_log[assigned_job] = dict
+    
     def assign_job_to_agent(self):
         with self.lock:
             return self.preprocessor.assign_job()
@@ -157,7 +159,7 @@ class State:
                     "energyConsumption": list(pe["energyConsumption"]),
                     "queue": [list(core_queue) for core_queue in pe["queue"]]
                 }
-            print(pd.DataFrame(pe_data).T, '\n')
+            # print(pd.DataFrame(pe_data).T, '\n')
 
             print("Jobs::")
             job_data = {}
@@ -165,9 +167,9 @@ class State:
                 job_data[job_id] = {
                     "task_count": job["task_count"],
                     "finishedTasks": list(job["finishedTasks"]),
-                    "runningTasks": list(job["runningTasks"]),
+                    # "runningTasks": list(job["runningTasks"]),
                     "remainingTasks": list(job["remainingTasks"]),
-                    "remainingDeadline": job["remainingDeadline"]
+                    # "remainingDeadline": job["remainingDeadline"]
                 }
             print(pd.DataFrame(job_data), "\n")
 
@@ -323,14 +325,17 @@ class State:
             job_ID = task["job_id"]
             job = self.get_job(job_ID)
             task_suc = task['successors']
+            if job is None or task_ID not in job["runningTasks"]:
+                return 
         except:
             print("Retrying task finished")
             return self.__task_finished(task_ID)
+        
 
         # updating the predecessors count for the successors tasks of the finished task(ready state)
         for t in task_suc:
             self.database.task_pred_dec(t)
-            if self.database.get_task(t)['pred_count'] == 0:
+            if self.database.get_task(t)['pred_count'] <= 0:
                 # if the task is in the state and the dependencies meet; added it to the queue
                 if t in job['remainingTasks']:
                     self.preprocessor.queue.append(t)
@@ -338,7 +343,20 @@ class State:
         # adding the task to the finisheds and removing it from the runnigs
         job["finishedTasks"].append(task_ID)
         job["runningTasks"].remove(task_ID)
-
+    
+    def check_up_jobs(self):
+        #TODO : cheap move
+        # Multiprocessing Robustness
+        try:
+            jobs = self.get_jobs()
+        except:
+            print("Retrying clean running tasks")
+            self.check_up_jobs()
+        for job in jobs:
+            for task_ID in jobs[job]['runningTasks']:
+                self.__task_finished(task_ID)
+                    
+                
 ####### UTILITY #######
 def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
     if punish:

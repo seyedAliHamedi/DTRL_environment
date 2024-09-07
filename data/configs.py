@@ -70,29 +70,16 @@ jobs_config = {
 }
 
 environment_config = {
-    # TODO : test this params
     "multi_agent": 15,
     "window": {"size": 100, "max_jobs": 20, "clock": 10},
     "environment": {"cycle": 0.01, "anomaly_th": 0.5},
 }
 
 monitor_config = {
-    'settings': {
-        'time': True,
-        'main': False,
-        'summary': False,
-        'agent': False
-    },
     'paths': {
         'time': {
             'plot': './logs/simulation/time_plot.png',
             'summery': './logs/simulation/summery.csv',
-        },
-        'main': {
-            'pes': './logs/main/pe.csv',
-            'jobs': './logs/main/job.csv',
-            'window': './logs/main/window.csv',
-            'preprocessing': './logs/main/preprocessing.csv',
         },
         'summary': './logs/summary.txt',
         'agent': {
@@ -103,12 +90,4 @@ monitor_config = {
     }
 }
 
-agent_config = {
-    'learning_mod': 1,
-    'alpha': 1,
-    'beta': 1,
-    'learning_rate': 0.1,
-    'gamma': 0.99
-}
 
-summary_log_string = '|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||'

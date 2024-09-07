@@ -51,20 +51,22 @@ class Agent(mp.Process):
         self.mec_usuage=0
         self.cc_usuage=0
 
-  
 
     def run(self):
         while self.runner_flag:
             self.barrier.wait()
+            print(self.name,"assigned ",self.assigned_job)
             if self.assigned_job is None:
                 self.assigned_job = self.state.assign_job_to_agent()
                 if self.assigned_job is None:
                     continue
                 self.local_actor_critic.clear_memory()
                 self.init_logs()
-            agent_queue=self.state.preprocessor.get_agent_queue()
-            agent_queue = self.state.preprocessor.get_agent_queue()
-            task_queue = agent_queue.get(self.assigned_job)
+            
+            task_queue = self.state.preprocessor.get_agent_queue().get(self.assigned_job)
+            if task_queue is None:
+                continue
+            
             for task in task_queue:
                 self.schedule(task)
 
