@@ -159,7 +159,7 @@ class State:
                     "energyConsumption": list(pe["energyConsumption"]),
                     "queue": [list(core_queue) for core_queue in pe["queue"]]
                 }
-            # print(pd.DataFrame(pe_data).T, '\n')
+            print(pd.DataFrame(pe_data).T, '\n')
 
             print("Jobs::")
             job_data = {}
@@ -167,9 +167,9 @@ class State:
                 job_data[job_id] = {
                     "task_count": job["task_count"],
                     "finishedTasks": list(job["finishedTasks"]),
-                    # "runningTasks": list(job["runningTasks"]),
+                    "runningTasks": list(job["runningTasks"]),
                     "remainingTasks": list(job["remainingTasks"]),
-                    # "remainingDeadline": job["remainingDeadline"]
+                    "remainingDeadline": job["remainingDeadline"]
                 }
             print(pd.DataFrame(job_data), "\n")
 

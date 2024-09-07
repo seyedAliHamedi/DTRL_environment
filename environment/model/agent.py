@@ -55,7 +55,6 @@ class Agent(mp.Process):
     def run(self):
         while self.runner_flag:
             self.barrier.wait()
-            print(self.name,"assigned ",self.assigned_job)
             if self.assigned_job is None:
                 self.assigned_job = self.state.assign_job_to_agent()
                 if self.assigned_job is None:
@@ -69,8 +68,10 @@ class Agent(mp.Process):
             
             for task in task_queue:
                 self.schedule(task)
-
-            current_job = self.state.get_job(self.assigned_job)
+            try:
+                current_job = self.state.get_job(self.assigned_job)
+            except:
+                pass
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
                 print("DONE")
                 self.update()

@@ -65,7 +65,6 @@ class Environment:
                     
                 starting_time = time.time()
                 self.state.update(self.manager)
-                print("Agent Queue: ",self.preprocessor.get_agent_queue())
         
                 barrier.wait()
                 time_len = time.time() - starting_time
