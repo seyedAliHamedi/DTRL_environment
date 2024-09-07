@@ -1,3 +1,5 @@
+import numpy as np
+import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 import json
@@ -118,7 +120,7 @@ class Environment:
         with open(monitor_config['paths']['time']['summery'], 'w') as f:
             json.dump(self.time_log, f, indent=4)
 
-    def make_agents_plots(self, path=monitor_config['paths']['agent']['plots']):
+    def make_agents_plots(self, plot_path=monitor_config['paths']['agent']['plots']):
         # saving the agent logs gatherd from the state
         filtered_data = {k: v for k, v in self.state.agent_log.items() if v}
         time_list = [v["time"] for v in filtered_data.values()]
@@ -133,6 +135,8 @@ class Environment:
         iot_usage = [v["iot_usuage"] for v in filtered_data.values()]
         mec_usuage = [v["mec_usuage"] for v in filtered_data.values()]
         cc_usuage = [v["cc_usuage"] for v in filtered_data.values()]
+        
+        path_history = self.state.paths
         
         
         
@@ -194,9 +198,29 @@ class Environment:
         axs[4, 0].set_ylabel('Usage')
         axs[4, 0].legend()
         axs[4, 0].grid(True)
+        
+        # Heatmap for path history
+        # print(path_history)
+        if path_history and len(path_history) > 0: 
+            output_classes = ["LLL", "LLR", "LRL", "LRR", "RLL", "RLR", "RRL", "RRR"]
+            path_counts = np.zeros((len(path_history), len(output_classes)))
+
+            for epoch in range(len(path_history)):
+                epoch_paths = path_history[epoch]
+
+                for path in epoch_paths:
+                    path_index = output_classes.index(path)
+                    path_counts[epoch, path_index] += 1
+
+            sns.heatmap(path_counts, cmap="YlGnBu",
+                        xticklabels=output_classes, ax=axs[4, 1])
+            axs[4, 1].set_title(f'Path History Heatmap ')
+            axs[4, 1].set_xlabel('Output Classes')
+            axs[4, 1].set_ylabel('Epochs')
+
 
         # Adjust layout to prevent overlap
         plt.tight_layout()
 
         # Save the plots to an image file
-        plt.savefig(path)
+        plt.savefig(plot_path)

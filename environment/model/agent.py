@@ -50,6 +50,8 @@ class Agent(mp.Process):
         self.iot_usuage=0
         self.mec_usuage=0
         self.cc_usuage=0
+        
+        self.path_history=[]
 
 
     def run(self):
@@ -94,7 +96,7 @@ class Agent(mp.Process):
             self.schedule(current_task_id)
 
         # first-level schedule , select a device
-        option = self.local_actor_critic.choose_action(input_state)
+        option,path = self.local_actor_critic.choose_action(input_state)
         selected_device_index = option
         selected_device = self.devices[option]
 
@@ -102,12 +104,14 @@ class Agent(mp.Process):
             # second-level schedule for non cloud PEs , select a core and a Voltage Frequncy Pair
             sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]})
             sub_state = torch.tensor(sub_state, dtype=torch.float32)
-            action_logits = self.core.forest[selected_device_index](sub_state)
+            action_logits,sub_path = self.core.forest[selected_device_index](sub_state)
             action_dist = torch.distributions.Categorical(F.softmax(action_logits, dim=-1))
             action = action_dist.sample()
-            selected_core_index = action.item()
+            selected_core_dvfs_index = action.item()
+            selected_core_index = int(selected_core_dvfs_index /3)
             selected_core = selected_device["voltages_frequencies"][selected_core_index]
-            dvfs = selected_core[np.random.randint(0, 3)]
+            dvfs = selected_core[selected_core_dvfs_index %3]
+            
 
         if selected_device['type'] == "cloud":
             selected_core_index = -1
@@ -117,14 +121,19 @@ class Agent(mp.Process):
         # applying action on the state and retriving the result
         reward, fail_flag, energy, time = self.state.apply_action(
             selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
+        if action:
+            sub_tree_loss = (-action_dist.log_prob(action) * reward)
+            self.core.optimizers[selected_device_index].zero_grad()
+            sub_tree_loss.backward()
+            self.core.optimizers[selected_device_index].step()
         
         # archive the result to the agent 
         self.local_actor_critic.archive(input_state, option, reward)
         
         # saving agent logs 
-        self.update_agent_logs(reward,time,energy,fail_flag,selected_device)
+        self.update_agent_logs(reward,time,energy,fail_flag,selected_device,path)
             
-    def update_agent_logs(self,reward,time,energy,fail_flag,selected_device):
+    def update_agent_logs(self,reward,time,energy,fail_flag,selected_device,path):
         self.reward_log.append(reward)
         self.time_log.append(time)
         self.energy_log.append(energy)
@@ -141,6 +150,7 @@ class Agent(mp.Process):
             self.mec_usuage+=1
         if selected_device['type']=="cloud":
             self.cc_usuage+=1
+        self.path_history.append(path)
     def save_agent_log(self,loss):
         result={
             "loss": loss,
@@ -155,7 +165,7 @@ class Agent(mp.Process):
             "mec_usuage": self.mec_usuage/len(self.energy_log),
             "cc_usuage": self.cc_usuage/len(self.energy_log),
         }
-        self.state.save_agent_log(self.assigned_job,result)
+        self.state.save_agent_log(self.assigned_job,result,self.path_history)
         
         
             

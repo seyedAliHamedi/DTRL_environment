@@ -24,6 +24,7 @@ class State:
         
         # TODO : rest
         self.agent_log = manager.dict({})
+        self.paths=manager.list([])
         self.display = display
         self.lock = mp.Lock()
 
@@ -127,9 +128,10 @@ class State:
         # returning the results
         return reward_function(e=e, t=t), fail_flag, e, t
 
-    def save_agent_log(self,assigned_job,dict):
+    def save_agent_log(self,assigned_job,dict,path_history):
         with self.lock:
             self.agent_log[assigned_job] = dict
+            self.paths.append(path_history)
     
     def assign_job_to_agent(self):
         with self.lock:

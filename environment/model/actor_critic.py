@@ -31,13 +31,13 @@ class ActorCritic(nn.Module):
         self.states = []
 
     def forward(self, x):
-        p = self.actor(x)
+        p,path = self.actor(x)
         v = self.critic(x)
-        return p, v
+        return p,path, v
 
     def choose_action(self, ob):
         state = torch.tensor([ob], dtype=torch.float)
-        pi, _ = self.forward(state)
+        pi,path, _ = self.forward(state)
 
         # Ensure numerical stability for softmax
         pi = pi - pi.max()
@@ -46,7 +46,7 @@ class ActorCritic(nn.Module):
         dist = Categorical(probs)
         action = dist.sample()
 
-        return action.item()
+        return action.item(),path
 
     def calculate_returns(self):
         G = 0
@@ -69,7 +69,7 @@ class ActorCritic(nn.Module):
         pis = []
         values = []
         for state in states:
-            pi, value = self.forward(state)
+            pi, _,value = self.forward(state)
             pis.append(pi)
             values.append(value)
         pis = torch.stack(pis, dim=0)
@@ -111,15 +111,18 @@ class DDT(nn.Module):
             self.right = DDT(num_input, num_output, depth + 1,
                              max_depth)
 
-    def forward(self, x):
+    def forward(self, x,path=""):
         if self.depth == self.max_depth:
-            return self.prob_dist
+            return self.prob_dist, path
         val = torch.sigmoid(
             self.alpha * (torch.matmul(x, self.weights) + self.bias))
+
         if val >= 0.5:
-            return val * self.right(x)
+            right_output, right_path = self.right(x, path + "R")
+            return val * right_output, right_path
         else:
-            return (1 - val) * self.left(x)
+            left_output, left_path = self.left(x, path + "L")
+            return (1 - val) * left_output, left_path
 
 
 
@@ -128,10 +131,8 @@ class CoreScheduler(nn.Module):
         super(CoreScheduler, self).__init__()
         self.devices = devices
         self.num_features = 9
-        self.forest = [self.createTree(
-            device) for device in devices if device['type'] != 'cloud']
-        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005)
-                           for tree in self.forest]
+        self.forest = [self.createTree(device) for device in devices if device['type'] != 'cloud']
+        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005)for tree in self.forest]
 
     def createTree(self, device):
-        return DDT(num_input=self.num_features, num_output=device['num_cores'], depth=0, max_depth=np.log2(device['num_cores']))
+        return DDT(num_input=self.num_features, num_output=device['num_cores']*3, depth=0, max_depth=np.log2(device['num_cores']))
