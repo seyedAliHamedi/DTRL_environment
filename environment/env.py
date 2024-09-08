@@ -40,8 +40,9 @@ class Environment:
         self.display = display
 
     def run(self):
+        devices = self.db.get_all_devices()
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(input_dims=5, n_actions=len(self.db.get_all_devices()))
+        global_actor_critic = ActorCritic(input_dims=5, n_actions=len(devices),devices=devices)
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
         # setting up workers and their barriers
@@ -51,8 +52,7 @@ class Environment:
         self.state.update(self.manager)
         for i in range(environment_config['multi_agent']):
             # oragnize and start the agents
-            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic,
-                           global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state)
+            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic, global_optimizer=global_optimizer, barrier=barrier,shared_state=self.state)
             workers.append(worker)
             worker.start()
 
@@ -93,7 +93,7 @@ class Environment:
 
             self.memory_monitor.stop()
 
-    def sleep(self, time_len, ):
+    def sleep(self, time_len):
         # sleep for the minimumm time or the time that the actual simulation took
         sleeping_time = self.cycle_wait - time_len
         if sleeping_time < 0:
@@ -132,56 +132,61 @@ class Environment:
         safe_fails_list = [v["safe_fails"] for v in filtered_data.values()]
         kind_fails_list = [v["kind_fails"] for v in filtered_data.values()]
         queue_fails_list = [v["queue_fails"] for v in filtered_data.values()]
+        battery_fails_list = [v["battery_fails"] for v in filtered_data.values()]
         iot_usage = [v["iot_usuage"] for v in filtered_data.values()]
         mec_usuage = [v["mec_usuage"] for v in filtered_data.values()]
         cc_usuage = [v["cc_usuage"] for v in filtered_data.values()]
-
+        
         path_history = self.state.paths
-
+        
+        
+        
         fig, axs = plt.subplots(5, 2, figsize=(15, 30))
         axs[0, 0].plot(loss_list,
                        label='Loss', color="blue", marker='o')
         axs[0, 0].set_title('Loss')
         axs[0, 0].legend()
 
-        # Plot for reward
-        axs[0, 1].plot(reward_list,
-                       label='Reward', color="cyan", marker='o')
-        axs[0, 1].set_title('Reward')
-        axs[0, 1].legend()
+
 
         # Plot for time
-        axs[1, 0].plot(time_list,
+        axs[0,1].plot(time_list,
                        label='Time', color="red", marker='o')
-        axs[1, 0].set_title('Time')
-        axs[1, 0].legend()
+        axs[0,1].set_title('Time')
+        axs[0,1].legend()
 
         # Plot for energy
-        axs[1, 1].plot(energy_list,
+        axs[1, 0].plot(energy_list,
                        label='Energy', color="green", marker='o')
-        axs[1, 1].set_title('Energy')
+        axs[1, 0].set_title('Energy')
+        axs[1, 0].legend()
+
+        # Plot for all fail
+        axs[1, 1].plot(fails_list,
+                       label='ALL Fails', color="purple", marker='o')
+        axs[1, 1].set_title('Fail')
         axs[1, 1].legend()
 
-        # Plot for fail
-        axs[2, 0].plot(fails_list,
-                       label='ALL Fails', color="purple", marker='o')
+        axs[2, 0].plot(safe_fails_list,
+                       label='Safe task Fail', color="purple", marker='o')
         axs[2, 0].set_title('Fail')
         axs[2, 0].legend()
-
-        axs[2, 1].plot(safe_fails_list,
-                       label='Safe task Fail', color="purple", marker='o')
+        
+        # Plot for kind fail
+        axs[2, 1].plot(kind_fails_list,
+                       label='Task kind Fail', color="purple", marker='o')
         axs[2, 1].set_title('Fail')
         axs[2, 1].legend()
-
-        # Plot for fail
-        axs[3, 0].plot(kind_fails_list,
-                       label='Task kind Fail', color="purple", marker='o')
+        
+        # Plot for queue fail
+        axs[3, 0].plot(queue_fails_list,
+                       label='Queue full Fail', color="purple", marker='o')
         axs[3, 0].set_title('Fail')
         axs[3, 0].legend()
-
-        # Plot for fail
-        axs[3, 1].plot(queue_fails_list,
-                       label='Queue full Fail', color="purple", marker='o')
+        
+        # Plot for battery fail
+        axs[3, 1].plot(battery_fails_list,
+                       label='Battery punish', color="purple", marker='o')
         axs[3, 1].set_title('Fail')
         axs[3, 1].legend()
 
@@ -212,6 +217,7 @@ class Environment:
             axs[4, 1].set_title(f'Path History Heatmap ')
             axs[4, 1].set_xlabel('Output Classes')
             axs[4, 1].set_ylabel('Epochs')
+
 
         # Adjust layout to prevent overlap
         plt.tight_layout()

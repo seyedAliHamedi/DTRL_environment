@@ -6,6 +6,7 @@ import torch.multiprocessing as mp
 from environment.model.actor_critic import ActorCritic, CoreScheduler
 
 
+
 class Agent(mp.Process):
     def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state):
         super(Agent, self).__init__()
@@ -18,7 +19,7 @@ class Agent(mp.Process):
         self.global_actor_critic = global_actor_critic
         self.global_optimizer = global_optimizer
         # the local actor-critic and the core scheduler
-        self.local_actor_critic = ActorCritic(self.global_actor_critic.input_dims, self.global_actor_critic.n_actions)
+        self.local_actor_critic = ActorCritic(self.global_actor_critic.input_dims, self.global_actor_critic.n_actions,devices=self.devices)
         self.core = CoreScheduler(self.devices)
 
         # the current assigned job to the agent
@@ -85,16 +86,16 @@ class Agent(mp.Process):
             # retrive the necassary data
             job_state, pe_state = self.state.get()
             current_task = self.state.database.get_task(current_task_id)
-            current_job = self.state.get_job(self.assigned_job)
-            input_state = self.get_input(current_task, {})
+            input_state = self.get_input(current_task, pe_state)
         except:
             print("Retrying schedule on : ", self.name)
             self.schedule(current_task_id)
 
         # first-level schedule , select a device
-        option, path = self.local_actor_critic.choose_action(input_state)
-        selected_device_index = option
-        selected_device = self.devices[option]
+        option,path,devices = self.local_actor_critic.choose_action(input_state)
+        device_index = option
+        selected_device = devices[option]
+        selected_device_index = self.devices.index(selected_device)
 
         # cloud
         # if selected_device['type'] != "cloud":
@@ -139,29 +140,33 @@ class Agent(mp.Process):
         if fail_flag[1]:
             self.kind_fails_log += 1
         if fail_flag[2]:
+            self.queue_fails_log +=1        
+        if fail_flag[3]:
+            self.battery_fails_log +=1
+        self.fails_log+= sum(fail_flag)
+        if selected_device['type']=="iot":
+            self.iot_usuage+=1
+        if selected_device['type']=="mec":
+            self.mec_usuage+=1
+        if selected_device['type']=="cloud":
+            self.cc_usuage+=1
             self.queue_fails_log += 1
         self.fails_log += sum(fail_flag)
-        if selected_device['type'] == "iot":
-            self.iot_usuage += 1
-        if selected_device['type'] == "mec":
-            self.mec_usuage += 1
-        if selected_device['type'] == "cloud":
-            self.cc_usuage += 1
         self.path_history.append(path)
-
-    def save_agent_log(self, loss):
-        result = {
+    def save_agent_log(self,loss):
+        result={
             "loss": loss,
-            "reward": sum(self.reward_log) / len(self.reward_log),
-            "time": sum(self.time_log) / len(self.time_log),
-            "energy": sum(self.energy_log) / len(self.energy_log),
-            "safe_fails": self.safe_fails_log / len(self.energy_log),
-            "kind_fails": self.kind_fails_log / len(self.energy_log),
-            "queue_fails": self.queue_fails_log / len(self.energy_log),
-            "fails": self.fails_log / len(self.energy_log),
-            "iot_usuage": self.iot_usuage / len(self.energy_log),
-            "mec_usuage": self.mec_usuage / len(self.energy_log),
-            "cc_usuage": self.cc_usuage / len(self.energy_log),
+            "reward": sum(self.reward_log)/len(self.reward_log),
+            "time": sum(self.time_log)/len(self.time_log),
+            "energy": sum(self.energy_log)/len(self.energy_log),
+            "safe_fails": self.safe_fails_log/len(self.energy_log),
+            "kind_fails": self.kind_fails_log/len(self.energy_log),
+            "queue_fails": self.queue_fails_log/len(self.energy_log),
+            "battery_fails": self.battery_fails_log/len(self.energy_log),
+            "fails": self.fails_log/len(self.energy_log),
+            "iot_usuage": self.iot_usuage/len(self.energy_log),
+            "mec_usuage": self.mec_usuage/len(self.energy_log),
+            "cc_usuage": self.cc_usuage/len(self.energy_log),
         }
         self.state.save_agent_log(self.assigned_job, result, self.path_history)
 
@@ -177,8 +182,7 @@ class Agent(mp.Process):
         loss.backward()
 
         # set global params and load them again
-        for local_param, global_param in zip(self.local_actor_critic.parameters(),
-                                             self.global_actor_critic.parameters()):
+        for local_param,global_param in zip(self.local_actor_critic.parameters(),self.global_actor_critic.parameters()):
             global_param._grad = local_param.grad
         self.global_optimizer.step()
         self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())

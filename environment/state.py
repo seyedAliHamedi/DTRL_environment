@@ -41,7 +41,6 @@ class State:
 
     def set_task_window(self, task_window):
         self._task_window = task_window
-        # self.check_up_jobs()
 
     def get_task_window(self):
         return self._task_window
@@ -90,8 +89,7 @@ class State:
         placing_slot = (1, task_ID)
 
         queue_index, core_index = find_place(pe_dict, core_i)
-
-        fail_flag = [0, 0, 0]
+        fail_flag = [0, 0, 0, 0]
         if (task["is_safe"] and not pe['handleSafeTask']):
             # fail : assigned safe task to unsafe device
             fail_flag[0] = 1
@@ -100,14 +98,16 @@ class State:
             fail_flag[1] = 1
         elif queue_index == -1 and core_index == -1:
             # fail : assigned a task to a full queue core
-            fail_flag[2] = 1
-        # manage failed assingments
+            fail_flag[2] = 0
+
+            # manage failed assingments
         if sum(fail_flag) > 0:
             return sum(fail_flag) * reward_function(punish=True), fail_flag, 0, 0
 
         q = pe_dict["queue"][core_index]
         pe_dict["queue"][core_index] = q[:queue_index] + [placing_slot] + q[queue_index + 1:]
 
+        # updating the live status of the state after the schedule
         job_dict["runningTasks"].append(task_ID)
         job_dict["remainingTasks"].remove(task_ID)
 
@@ -124,6 +124,26 @@ class State:
             core_index] = capacitance * (volt * volt) * freq
         e = capacitance * (volt * volt) * freq * t
         return reward_function(e=e, t=t), fail_flag, e, t
+
+    def calc_battery_punish(self, pe_dict, pe, energy):
+        batteryFail = 0
+        punish = 0
+        if pe['type'] == 'iot':
+            battary_capacity = pe['battery_capacity']
+            battery_start = pe_dict['batteryLevel']
+            battery_end = ((battery_start * battary_capacity) - (energy * 1e5)) / battary_capacity
+            if battery_end < pe['ISL']:
+                batteryFail = 1
+            else:
+                punish = self.get_battery_finish(battery_start, battery_end)
+                pe_dict['batteryLevel'] = battery_end
+        return punish, batteryFail
+
+    def get_battery_finish(self, b_start, b_end, alpha=100, beta=0.3, gamma=0.1):
+        battery_drain = (b_start - b_end) ** gamma
+        low_battery_factor = ((100 - b_end) / 100) ** beta
+        penalty = -alpha * battery_drain * low_battery_factor
+        return -penalty
 
     def save_agent_log(self, assigned_job, dict, path_history):
         with self.lock:
@@ -286,7 +306,7 @@ class State:
         for core_index, core_queue in enumerate(pe["queue"]):
             first_task = core_queue[0]
 
-            if first_task[0] <= 0:
+            if first_task[0] == 0:
                 # Removing the finished task from queue
                 if first_task[1] != -1:
                     self.__task_finished(first_task[1])
@@ -297,8 +317,6 @@ class State:
                 # updating the queue for mec and iot (reducing the remaining time by 1 clock)
                 slot = (pe["queue"][core_index][0][0] - 1, pe["queue"][core_index][0][1])
                 pe["queue"][core_index] = [slot] + pe["queue"][core_index][1:]
-
-        # self.__remove_unused_cores_cloud(pe, deleting_queues_on_pe)
 
     def __remove_unused_cores_cloud(self, pe, core_list):
         for i, item in enumerate(core_list):
@@ -331,18 +349,6 @@ class State:
         job["finishedTasks"].append(task_ID)
         job["runningTasks"].remove(task_ID)
 
-    def check_up_jobs(self):
-        # TODO : cheap move
-        # Multiprocessing Robustness
-        try:
-            jobs = self.get_jobs()
-        except:
-            print("Retrying clean running tasks")
-            self.check_up_jobs()
-        for job in jobs:
-            for task_ID in jobs[job]['runningTasks']:
-                self.__task_finished(task_ID)
-
 
 ####### UTILITY #######
 def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
@@ -365,15 +371,10 @@ def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
         return -((alpha * e + beta * t) ** 2)
 
 
+
 def find_place(pe, core_i):
-    # if pe["type"] == "cloud":
-    #     pe["queue"].append([])
-    #     pe["queue"][-1].append((0, -1))
-    #     pe["energyConsumption"].append(0)
-    #     pe["occupiedCores"].append(1)
-    #     return 0, len(pe["queue"]) - 1
-    # else:
     for i, slot in enumerate(pe["queue"][core_i]):
         if slot[1] == -1:
             return i, core_i
     return -1, -1
+
