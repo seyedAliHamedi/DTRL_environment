@@ -13,6 +13,7 @@ class Preprocessing:
         self.queue = manager.list()
         
         self.max_jobs = config['multi_agent']
+    
 
     def run(self):
         self.update_active_jobs()

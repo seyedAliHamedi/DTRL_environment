@@ -96,9 +96,10 @@ class Agent(mp.Process):
             self.schedule(current_task_id)
 
         # first-level schedule , select a device
-        option,path = self.local_actor_critic.choose_action(input_state)
-        selected_device_index = option
-        selected_device = self.devices[option]
+        option,path,devices = self.local_actor_critic.choose_action(input_state)
+        device_index = option
+        selected_device = devices[option]
+        selected_device_index = self.devices.index(selected_device)
 
         if selected_device['type'] != "cloud":
             # second-level schedule for non cloud PEs , select a core and a Voltage Frequncy Pair

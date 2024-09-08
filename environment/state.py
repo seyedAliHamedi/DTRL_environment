@@ -297,10 +297,10 @@ class State:
 
             if first_task[0] == 0:
                 # Removing the finished task from queue
-                if first_task[1] != -1 and first_task[1] != 0:
+                if first_task[1] != -1 :
                     self.__task_finished(first_task[1])
                     # Shift queue and append (0,0)
-                    pe["queue"][core_index] = core_queue[1:] + [(0, 0)]
+                    pe["queue"][core_index] = core_queue[1:] + [(0, -1)]
                     
                 # TODO cloud shit
                 # if pe["type"] == "cloud":

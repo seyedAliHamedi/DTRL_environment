@@ -190,7 +190,6 @@ class Environment:
         
         
         
-        
         axs[4, 0].plot(iot_usage, label='IoT Usage', color='blue', marker='o')
         axs[4, 0].plot(mec_usuage, label='MEC Usage', color='orange', marker='x')
         axs[4, 0].plot(cc_usuage, label='Cloud Usage', color='green', marker='s')
