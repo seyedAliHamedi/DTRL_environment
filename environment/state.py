@@ -1,8 +1,8 @@
-import time
 import numpy as np
 import pandas as pd
 from data.db import Database
 from environment.pre_processing import Preprocessing
+from environment.util import reward_function, find_place, check_fail
 from environment.window_manager import WindowManager
 
 import torch.multiprocessing as mp
@@ -50,7 +50,7 @@ class State:
 
     ##### Intializations
     def _init_PEs(self, PEs, manager):
-        # initlizeing the PEs live variable from db
+        # initializing the PEs live variable from db
         for pe in PEs:
             self._PEs[pe["id"]] = {
                 "id": pe["id"],
@@ -83,26 +83,16 @@ class State:
         except:
             print("Retry apply action")
             return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
-        execution_time = t = np.ceil(task["computational_load"] / freq)
 
-        # TODO t much include time of task scheduled before this one in selected queue
+        execution_time = t = np.ceil(task["computational_load"] / freq)
+        # TODO t must include time of tasks scheduled before it ,in selected queue
         placing_slot = (1, task_ID)
 
         queue_index, core_index = find_place(pe_dict, core_i)
-        fail_flag = [0, 0, 0, 0]
-        if (task["is_safe"] and not pe['handleSafeTask']):
-            # fail : assigned safe task to unsafe device
-            fail_flag[0] = 1
-        elif task["task_kind"] not in pe["acceptableTasks"]:
-            # fail : assigned a kind of task to the inappropriate device
-            fail_flag[1] = 1
-        elif queue_index == -1 and core_index == -1:
-            # fail : assigned a task to a full queue core
-            fail_flag[2] = 0
+        fail_flags = check_fail(pe, queue_index, core_index, task)
 
-            # manage failed assingments
-        if sum(fail_flag) > 0:
-            return sum(fail_flag) * reward_function(punish=True), fail_flag, 0, 0
+        if sum(fail_flags) > 0:
+            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
         q = pe_dict["queue"][core_index]
         pe_dict["queue"][core_index] = q[:queue_index] + [placing_slot] + q[queue_index + 1:]
@@ -114,24 +104,19 @@ class State:
         # updating the pre processor queue
         self.preprocessor.queue.remove(task_ID)
 
-        # # calc and power consumption for different devices
-        # if pe_dict['type'] == 'cloud':
-        #     pe_dict["energyConsumption"][core_index] = volt
-        #     e = volt * t
-        # else:
         capacitance = pe["capacitance"][core_index]
         pe_dict["energyConsumption"][
             core_index] = capacitance * (volt * volt) * freq
         e = capacitance * (volt * volt) * freq * t
-        return reward_function(e=e, t=t), fail_flag, e, t
+        return reward_function(e=e, t=t), fail_flags, e, t
 
     def calc_battery_punish(self, pe_dict, pe, energy):
         batteryFail = 0
         punish = 0
         if pe['type'] == 'iot':
-            battary_capacity = pe['battery_capacity']
+            battery_capacity = pe['battery_capacity']
             battery_start = pe_dict['batteryLevel']
-            battery_end = ((battery_start * battary_capacity) - (energy * 1e5)) / battary_capacity
+            battery_end = ((battery_start * battery_capacity) - (energy * 1e5)) / battery_capacity
             if battery_end < pe['ISL']:
                 batteryFail = 1
             else:
@@ -157,7 +142,7 @@ class State:
     ####### ENVIRONMENT #######
     def update(self, manager):
         # the state main functionality
-        #   1 . getting task window from the window manager if avaliable
+        #   1 . getting task window from the window manager if available
         #   2. updating the jobs
         #   3. updating the PEs
         #   4. calling the preprocessor to update the agent queue based on the state
@@ -266,9 +251,6 @@ class State:
 
             # updating the PEs live status
             #  1. updating the quques
-            # TODO occupation ?? queue
-            #  2. updating the core occupations
-            #  3. updating the battery capcities
 
             self.__update_PEs_queue(pe)
             self.__update_occupied_cores(pe)
@@ -294,14 +276,12 @@ class State:
                 occupied_cores[core_index] = 1
 
     def __update_energy_consumption(self, pe, pe_ID):
-        # TODO:finish and robust via try catch
         for core_index, core_av in enumerate(pe["occupiedCores"]):
             if core_av == 0:
                 pe["energyConsumption"][core_index] = self.database.get_device(pe_ID)[
                     "powerIdle"][core_index]
 
     def __update_PEs_queue(self, pe):
-        deleting_queues_on_pe = []
 
         for core_index, core_queue in enumerate(pe["queue"]):
             first_task = core_queue[0]
@@ -345,36 +325,6 @@ class State:
                 if t in job['remainingTasks']:
                     self.preprocessor.queue.append(t)
 
-        # adding the task to the finisheds and removing it from the runnigs
+        # adding the task to the finished and removing it from the running tasks
         job["finishedTasks"].append(task_ID)
         job["runningTasks"].remove(task_ID)
-
-
-####### UTILITY #######
-def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
-    if punish:
-        return -10
-
-    if setup == 1:
-        return -1 * (alpha * e + beta * t)
-    elif setup == 2:
-        return 1 / (alpha * e + beta * t)
-    elif setup == 3:
-        return -np.exp(alpha * e) - np.exp(beta * t)
-    elif setup == 4:
-        return -np.exp(alpha * e + beta * t)
-    elif setup == 5:
-        return np.exp(-1 * (alpha * e + beta * t))
-    elif setup == 6:
-        return -np.log(alpha * e + beta * t)
-    elif setup == 7:
-        return -((alpha * e + beta * t) ** 2)
-
-
-
-def find_place(pe, core_i):
-    for i, slot in enumerate(pe["queue"][core_i]):
-        if slot[1] == -1:
-            return i, core_i
-    return -1, -1
-

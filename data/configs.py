@@ -41,7 +41,7 @@ devices_config = {
 
     },
     "cloud": {
-        "num_devices": 0,
+        "num_devices": 1,
         "num_cores": 128,
         # cloud , please correct these numbers TODO
         "voltage_frequencies": ((2.8e9, 13.85e-6), (3.9e9, 24.28e-6), (5e9, 36e-6)),

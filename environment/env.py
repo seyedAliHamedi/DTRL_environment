@@ -72,8 +72,8 @@ class Environment:
                 barrier.wait()
                 time_len = time.time() - starting_time
                 self.sleep(time_len)
-
                 iteration += 1
+
         except Exception as e:
             print("Caught an unexpected exception:", e)
             traceback.print_exc()
@@ -104,8 +104,14 @@ class Environment:
         time.sleep(sleeping_time)
 
     def save_time_log(self, path):
-        # saving time log gatherd in the simulation
+        # saving time log gathered in the simulation
         y_values = self.time_log
+        time_summary_log = {
+            'total_time': sum(y_values),
+            'average_time': sum(y_values) / len(y_values),
+            'max_time': max(y_values),
+            'epochs': len(y_values),
+        }
         plt.figure(figsize=(10, 5))
         plt.plot(y_values, marker='o', linestyle='-')
         plt.axhline(y=environment_config['environment']['cycle'],
@@ -118,7 +124,7 @@ class Environment:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         plt.savefig(path)
         with open(monitor_config['paths']['time']['summery'], 'w') as f:
-            json.dump(self.time_log, f, indent=4)
+            json.dump(time_summary_log, f, indent=2)
 
     def make_agents_plots(self, plot_path=monitor_config['paths']['agent']['plots']):
         # saving the agent logs gatherd from the state
