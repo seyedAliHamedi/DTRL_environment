@@ -6,6 +6,7 @@ from torch.distributions import Categorical
 
 import torch.optim as optim
 
+
 class ActorCritic(nn.Module):
     def __init__(self, input_dims, n_actions):
         super(ActorCritic, self).__init__()
@@ -31,22 +32,19 @@ class ActorCritic(nn.Module):
         self.states = []
 
     def forward(self, x):
-        p,path = self.actor(x)
+        p, path = self.actor(x)
         v = self.critic(x)
-        return p,path, v
+        return p, path, v
 
     def choose_action(self, ob):
         state = torch.tensor([ob], dtype=torch.float)
-        pi,path, _ = self.forward(state)
-
+        pi, path, _ = self.forward(state)
         # Ensure numerical stability for softmax
         pi = pi - pi.max()
         probs = F.softmax(pi, dim=-1)
-
         dist = Categorical(probs)
         action = dist.sample()
-
-        return action.item(),path
+        return action.item(), path
 
     def calculate_returns(self):
         G = 0
@@ -69,7 +67,7 @@ class ActorCritic(nn.Module):
         pis = []
         values = []
         for state in states:
-            pi, _,value = self.forward(state)
+            pi, _, value = self.forward(state)
             pis.append(pi)
             values.append(value)
         pis = torch.stack(pis, dim=0)
@@ -88,8 +86,6 @@ class ActorCritic(nn.Module):
         # total_loss = (actor_loss + critic_loss).mean()
         total_loss = actor_loss
         return total_loss
-
-
 
 
 class DDT(nn.Module):
@@ -111,12 +107,11 @@ class DDT(nn.Module):
             self.right = DDT(num_input, num_output, depth + 1,
                              max_depth)
 
-    def forward(self, x,path=""):
+    def forward(self, x, path=""):
         if self.depth == self.max_depth:
             return self.prob_dist, path
         val = torch.sigmoid(
             self.alpha * (torch.matmul(x, self.weights) + self.bias))
-
         if val >= 0.5:
             right_output, right_path = self.right(x, path + "R")
             return val * right_output, right_path
@@ -125,14 +120,15 @@ class DDT(nn.Module):
             return (1 - val) * left_output, left_path
 
 
-
 class CoreScheduler(nn.Module):
     def __init__(self, devices):
         super(CoreScheduler, self).__init__()
         self.devices = devices
         self.num_features = 9
-        self.forest = [self.createTree(device) for device in devices if device['type'] != 'cloud']
-        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005)for tree in self.forest]
+        # cloud
+        self.forest = [self.createTree(device) for device in devices]
+        self.optimizers = [optim.Adam(tree.parameters(), lr=0.005) for tree in self.forest]
 
     def createTree(self, device):
-        return DDT(num_input=self.num_features, num_output=device['num_cores']*3, depth=0, max_depth=np.log2(device['num_cores']))
+        return DDT(num_input=self.num_features, num_output=device['num_cores'] * 3, depth=0,
+                   max_depth=np.log2(device['num_cores']))

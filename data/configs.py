@@ -1,7 +1,7 @@
 devices_config = {
     "iot": {
         "num_devices": 30,
-        "num_cores": [4,8,16],
+        "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -21,7 +21,7 @@ devices_config = {
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 20,
+        "num_devices": 19,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -42,11 +42,12 @@ devices_config = {
     },
     "cloud": {
         "num_devices": 0,
-        "num_cores": -1,
-        "voltage_frequencies": ((2.8e9, 13.85), (3.9e9, 24.28)),
+        "num_cores": 128,
+        # cloud , please correct these numbers TODO
+        "voltage_frequencies": ((2.8e9, 13.85e-6), (3.9e9, 24.28e-6), (5e9, 36e-6)),
         "isl": -1,
-        "capacitance": -1,
-        "powerIdle": 0,
+        "capacitance": (3, 5),
+        "powerIdle": [0],
         "battery_capacity": -1,
         "error_rate": (0.10, 0.15),
         "safe": (1, 0),
@@ -72,7 +73,7 @@ jobs_config = {
 environment_config = {
     "multi_agent": 15,
     "window": {"size": 100, "max_jobs": 20, "clock": 10},
-    "environment": {"cycle": 0.01, "anomaly_th": 0.5},
+    "environment": {"cycle": 0.01, "anomaly_th": 5},
 }
 
 monitor_config = {
@@ -89,5 +90,3 @@ monitor_config = {
         'memory': './logs/simulation/memory.png',
     }
 }
-
-

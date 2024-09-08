@@ -35,7 +35,7 @@ class Environment:
         self.db = self.state.database
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
-        
+
         self.time_log = []
         self.display = display
 
@@ -51,7 +51,8 @@ class Environment:
         self.state.update(self.manager)
         for i in range(environment_config['multi_agent']):
             # oragnize and start the agents
-            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic, global_optimizer=global_optimizer, barrier=barrier,shared_state=self.state)
+            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic,
+                           global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state)
             workers.append(worker)
             worker.start()
 
@@ -60,14 +61,14 @@ class Environment:
             self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
                 if iteration % 10 == 0:
-                    print(f"iteration : {iteration}",len(self.state.get_jobs()))
+                    print(f"iteration : {iteration}", len(self.state.get_jobs()))
                 if iteration % 100 == 0:
                     self.save_time_log(monitor_config['paths']['time']['plot'])
                     self.make_agents_plots()
-                    
+
                 starting_time = time.time()
                 self.state.update(self.manager)
-        
+
                 barrier.wait()
                 time_len = time.time() - starting_time
                 self.sleep(time_len)
@@ -92,7 +93,7 @@ class Environment:
 
             self.memory_monitor.stop()
 
-    def sleep(self, time_len,):
+    def sleep(self, time_len, ):
         # sleep for the minimumm time or the time that the actual simulation took
         sleeping_time = self.cycle_wait - time_len
         if sleeping_time < 0:
@@ -101,7 +102,6 @@ class Environment:
         else:
             self.time_log.append(self.cycle_wait)
         time.sleep(sleeping_time)
-
 
     def save_time_log(self, path):
         # saving time log gatherd in the simulation
@@ -135,11 +135,9 @@ class Environment:
         iot_usage = [v["iot_usuage"] for v in filtered_data.values()]
         mec_usuage = [v["mec_usuage"] for v in filtered_data.values()]
         cc_usuage = [v["cc_usuage"] for v in filtered_data.values()]
-        
+
         path_history = self.state.paths
-        
-        
-        
+
         fig, axs = plt.subplots(5, 2, figsize=(15, 30))
         axs[0, 0].plot(loss_list,
                        label='Loss', color="blue", marker='o')
@@ -169,27 +167,24 @@ class Environment:
                        label='ALL Fails', color="purple", marker='o')
         axs[2, 0].set_title('Fail')
         axs[2, 0].legend()
-        
+
         axs[2, 1].plot(safe_fails_list,
                        label='Safe task Fail', color="purple", marker='o')
         axs[2, 1].set_title('Fail')
         axs[2, 1].legend()
-        
-              # Plot for fail
+
+        # Plot for fail
         axs[3, 0].plot(kind_fails_list,
                        label='Task kind Fail', color="purple", marker='o')
         axs[3, 0].set_title('Fail')
         axs[3, 0].legend()
-        
-              # Plot for fail
+
+        # Plot for fail
         axs[3, 1].plot(queue_fails_list,
                        label='Queue full Fail', color="purple", marker='o')
         axs[3, 1].set_title('Fail')
         axs[3, 1].legend()
-        
-        
-        
-        
+
         axs[4, 0].plot(iot_usage, label='IoT Usage', color='blue', marker='o')
         axs[4, 0].plot(mec_usuage, label='MEC Usage', color='orange', marker='x')
         axs[4, 0].plot(cc_usuage, label='Cloud Usage', color='green', marker='s')
@@ -198,10 +193,10 @@ class Environment:
         axs[4, 0].set_ylabel('Usage')
         axs[4, 0].legend()
         axs[4, 0].grid(True)
-        
+
         # Heatmap for path history
         # print(path_history)
-        if path_history and len(path_history) > 0: 
+        if path_history and len(path_history) > 0:
             output_classes = ["LLL", "LLR", "LRL", "LRR", "RLL", "RLR", "RRL", "RRR"]
             path_counts = np.zeros((len(path_history), len(output_classes)))
 
@@ -217,7 +212,6 @@ class Environment:
             axs[4, 1].set_title(f'Path History Heatmap ')
             axs[4, 1].set_xlabel('Output Classes')
             axs[4, 1].set_ylabel('Epochs')
-
 
         # Adjust layout to prevent overlap
         plt.tight_layout()
