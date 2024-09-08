@@ -143,7 +143,9 @@ class Agent(mp.Process):
         if fail_flag[1]:
             self.kind_fails_log +=1
         if fail_flag[2]:
-            self.queue_fails_log +=1
+            self.queue_fails_log +=1        
+        if fail_flag[3]:
+            self.battery_fails_log +=1
         self.fails_log+= sum(fail_flag)
         if selected_device['type']=="iot":
             self.iot_usuage+=1
@@ -161,6 +163,7 @@ class Agent(mp.Process):
             "safe_fails": self.safe_fails_log/len(self.energy_log),
             "kind_fails": self.kind_fails_log/len(self.energy_log),
             "queue_fails": self.queue_fails_log/len(self.energy_log),
+            "battery_fails": self.battery_fails_log/len(self.energy_log),
             "fails": self.fails_log/len(self.energy_log),
             "iot_usuage": self.iot_usuage/len(self.energy_log),
             "mec_usuage": self.mec_usuage/len(self.energy_log),

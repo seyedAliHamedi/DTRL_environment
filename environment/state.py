@@ -90,7 +90,7 @@ class State:
         
         #finding the empty slot in queue for the selected device & core
         queue_index, core_index = find_place(pe_dict, core_i)
-        fail_flag = [0,0,0]
+        fail_flag = [0,0,0,0]
         if (task["is_safe"] and not pe['handleSafeTask']):
             # fail : assigned safe task to unsafe device
             fail_flag[0]= 1
@@ -100,10 +100,6 @@ class State:
         elif queue_index == -1 and core_index == -1:
             # fail : assigned a task to a full queue core
             fail_flag[2]= 0
-        # manage failed assingments
-        if sum(fail_flag)>0:
-            return sum(fail_flag)*reward_function(punish=True), fail_flag, 0, 0
-        
         # updating the queue slots
         pe_dict["queue"][core_index] = [placing_slot]+  pe_dict["queue"][core_index][1:]
         
@@ -125,9 +121,36 @@ class State:
                 core_index] = capacitance * (volt * volt) * freq
             e = capacitance * (volt * volt) * freq * t
             
+        # battery_punish,batteryFail = self.calc_battery_punish(pe_dict,pe,e)
+        # if  batteryFail:
+        #     fail_flag[3]=0
+             
+        # manage failed assingments
+        if sum(fail_flag)>0:
+            return sum(fail_flag)*reward_function(punish=True), fail_flag, 0, 0
+        
         # returning the results
         return reward_function(e=e, t=t), fail_flag, e, t
 
+    def calc_battery_punish(self,pe_dict,pe,energy):
+        batteryFail=0
+        punish=0
+        if pe['type']=='iot':
+            battary_capacity = pe['battery_capacity']
+            battery_start = pe_dict['batteryLevel']
+            battery_end =((battery_start*battary_capacity)-(energy*1e5))/battary_capacity
+            if battery_end<pe['ISL']:
+                batteryFail=1
+            else:
+                punish = self.get_battery_finish(battery_start,battery_end)
+                pe_dict['batteryLevel']=battery_end
+        return punish,batteryFail
+    def get_battery_finish(self,b_start,b_end,alpha=100,beta=0.3,gamma=0.1):
+        battery_drain = (b_start-b_end)**gamma
+        low_battery_factor = ((100-b_end)/100)**beta
+        penalty = -alpha*battery_drain*low_battery_factor
+        return -penalty
+            
     def save_agent_log(self,assigned_job,dict,path_history):
         with self.lock:
             self.agent_log[assigned_job] = dict
@@ -255,7 +278,6 @@ class State:
             
             self.__update_PEs_queue(pe)
             # self.__update_occupied_cores(pe)
-            self.__update_batteries_capp(pe)
 
 
     def __update_occupied_cores(self, pe_dict):
@@ -277,10 +299,6 @@ class State:
                 energy_consumption[core_index] = power_idle[core_index]
             else:  # Core is occupied
                 occupied_cores[core_index] = 1
-
-    def __update_batteries_capp(self, pe):
-        if pe["type"] == "iot" :
-            pe["batteryLevel"] -= sum(pe["energyConsumption"])
 
     def __update_energy_consumption(self, pe, pe_ID):
         #TODO:finish and robust via try catch

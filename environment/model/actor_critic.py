@@ -162,14 +162,13 @@ class ClusterTree(nn.Module):
         # 5 weights for task and 4 for each device
         num_features = 5 + 4 * len(devices)
         
-        self.exploration_rate=0.5
-        self.explore_decay=0.99
+        self.exploration_rate=0.9
+        self.explore_decay=0.995
 
         if depth != max_depth:
             self.weights = nn.Parameter(torch.empty(
                 num_features).normal_(mean=0, std=0.1))
             self.bias = nn.Parameter(torch.zeros(1))
-            self.alpha = nn.Parameter(torch.zeros(1))
         if depth == max_depth:
             self.prob_dist = nn.Parameter(torch.zeros(len(devices)))
 
@@ -184,8 +183,7 @@ class ClusterTree(nn.Module):
         if self.depth == self.max_depth:
             return self.prob_dist,path,self.devices
 
-        val = torch.sigmoid(
-            self.alpha * (torch.matmul(x, self.weights.t()) + self.bias))
+        val = torch.sigmoid((torch.matmul(x, self.weights.t()) + self.bias))
         
         a = np.random.random()
         a = float("{:.6f}".format(a))

@@ -133,6 +133,7 @@ class Environment:
         safe_fails_list = [v["safe_fails"] for v in filtered_data.values()]
         kind_fails_list = [v["kind_fails"] for v in filtered_data.values()]
         queue_fails_list = [v["queue_fails"] for v in filtered_data.values()]
+        battery_fails_list = [v["battery_fails"] for v in filtered_data.values()]
         iot_usage = [v["iot_usuage"] for v in filtered_data.values()]
         mec_usuage = [v["mec_usuage"] for v in filtered_data.values()]
         cc_usuage = [v["cc_usuage"] for v in filtered_data.values()]
@@ -147,48 +148,48 @@ class Environment:
         axs[0, 0].set_title('Loss')
         axs[0, 0].legend()
 
-        # Plot for reward
-        axs[0, 1].plot(reward_list,
-                       label='Reward', color="cyan", marker='o')
-        axs[0, 1].set_title('Reward')
-        axs[0, 1].legend()
+
 
         # Plot for time
-        axs[1, 0].plot(time_list,
+        axs[0,1].plot(time_list,
                        label='Time', color="red", marker='o')
-        axs[1, 0].set_title('Time')
-        axs[1, 0].legend()
+        axs[0,1].set_title('Time')
+        axs[0,1].legend()
 
         # Plot for energy
-        axs[1, 1].plot(energy_list,
+        axs[1, 0].plot(energy_list,
                        label='Energy', color="green", marker='o')
-        axs[1, 1].set_title('Energy')
-        axs[1, 1].legend()
+        axs[1, 0].set_title('Energy')
+        axs[1, 0].legend()
 
-        # Plot for fail
-        axs[2, 0].plot(fails_list,
+        # Plot for all fail
+        axs[1, 1].plot(fails_list,
                        label='ALL Fails', color="purple", marker='o')
+        axs[1, 1].set_title('Fail')
+        axs[1, 1].legend()
+        
+        axs[2, 0].plot(safe_fails_list,
+                       label='Safe task Fail', color="purple", marker='o')
         axs[2, 0].set_title('Fail')
         axs[2, 0].legend()
         
-        axs[2, 1].plot(safe_fails_list,
-                       label='Safe task Fail', color="purple", marker='o')
+        # Plot for kind fail
+        axs[2, 1].plot(kind_fails_list,
+                       label='Task kind Fail', color="purple", marker='o')
         axs[2, 1].set_title('Fail')
         axs[2, 1].legend()
         
-              # Plot for fail
-        axs[3, 0].plot(kind_fails_list,
-                       label='Task kind Fail', color="purple", marker='o')
+        # Plot for queue fail
+        axs[3, 0].plot(queue_fails_list,
+                       label='Queue full Fail', color="purple", marker='o')
         axs[3, 0].set_title('Fail')
         axs[3, 0].legend()
         
-              # Plot for fail
-        axs[3, 1].plot(queue_fails_list,
-                       label='Queue full Fail', color="purple", marker='o')
+        # Plot for battery fail
+        axs[3, 1].plot(battery_fails_list,
+                       label='Battery punish', color="purple", marker='o')
         axs[3, 1].set_title('Fail')
         axs[3, 1].legend()
-        
-        
         
         axs[4, 0].plot(iot_usage, label='IoT Usage', color='blue', marker='o')
         axs[4, 0].plot(mec_usuage, label='MEC Usage', color='orange', marker='x')
