@@ -89,7 +89,7 @@ class Agent(mp.Process):
         try:
             # retrive the necassary data
             job_state, pe_state = self.state.get()
-            current_task = self.state.database.get_task(current_task_id)
+            current_task = self.state.database.get_task_norm(current_task_id)
             input_state = self.get_input(current_task, pe_state)
         except:
             print("Retyrin schedule on : ",self.name)
@@ -219,7 +219,7 @@ class Agent(mp.Process):
 
         error_rate = pe["error_rate"]
 
-        return [cores, devicePower, battery, error_rate]
+        return [ devicePower, battery]
 
     def get_input(self, task, pe_dict):
         task_features = self.get_task_data(task)

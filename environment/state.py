@@ -40,7 +40,7 @@ class State:
 
     def set_task_window(self, task_window):
         self._task_window = task_window
-        self.check_up_jobs()
+        # self.check_up_jobs()
 
     def get_task_window(self):
         return self._task_window
@@ -101,11 +101,14 @@ class State:
             # fail : assigned a task to a full queue core
             fail_flag[2]= 0
         # updating the queue slots
-        pe_dict["queue"][core_index] = [placing_slot]+  pe_dict["queue"][core_index][1:]
+        pe_dict["queue"][core_index] =  pe_dict["queue"][core_index][:queue_index]+[placing_slot]+  pe_dict["queue"][core_index][queue_index+1:]
         
         # updating the live status of the state after the schedule
         job_dict["runningTasks"].append(task_ID)
-        job_dict["remainingTasks"].remove(task_ID)
+        try:
+            job_dict["remainingTasks"].remove(task_ID)
+        except:
+            print("HEEEEEEEEEEEY ",job_dict["remainingTasks"],task_ID)
         
         # updating the pre processor queue
         self.preprocessor.queue.remove(task_ID)
@@ -380,7 +383,7 @@ class State:
 ####### UTILITY #######
 def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
     if punish:
-        return -10
+        return -100
 
     if setup == 1:
         return -1 * (alpha * e + beta * t)
