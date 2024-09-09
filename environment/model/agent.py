@@ -6,7 +6,6 @@ import torch.multiprocessing as mp
 from environment.model.actor_critic import ActorCritic, CoreScheduler
 
 
-
 class Agent(mp.Process):
     def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state):
         super(Agent, self).__init__()
@@ -19,7 +18,8 @@ class Agent(mp.Process):
         self.global_actor_critic = global_actor_critic
         self.global_optimizer = global_optimizer
         # the local actor-critic and the core scheduler
-        self.local_actor_critic = ActorCritic(self.global_actor_critic.input_dims, self.global_actor_critic.n_actions,devices=self.devices)
+        self.local_actor_critic = ActorCritic(self.global_actor_critic.input_dims, self.global_actor_critic.n_actions,
+                                              devices=self.devices)
         self.core = CoreScheduler(self.devices)
 
         # the current assigned job to the agent
@@ -63,16 +63,17 @@ class Agent(mp.Process):
                 self.init_logs()
 
             task_queue = self.state.preprocessor.get_agent_queue().get(self.assigned_job)
+
             if task_queue is None:
                 continue
-
             for task in task_queue:
                 self.schedule(task)
             try:
                 current_job = self.state.get_job(self.assigned_job)
             except:
                 pass
-            if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
+            if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job[
+                "task_count"]:
                 print("DONE")
                 self.update()
                 self.assigned_job = None
@@ -83,7 +84,7 @@ class Agent(mp.Process):
     def schedule(self, current_task_id):
         # Multiprocess Robustness
         try:
-            # retrive the necassary data
+            # retrieve the necessary data
             job_state, pe_state = self.state.get()
             current_task = self.state.database.get_task(current_task_id)
             input_state = self.get_input(current_task, pe_state)
@@ -92,14 +93,11 @@ class Agent(mp.Process):
             self.schedule(current_task_id)
 
         # first-level schedule , select a device
-        option,path,devices = self.local_actor_critic.choose_action(input_state)
-        device_index = option
+        option, path, devices = self.local_actor_critic.choose_action(input_state)
         selected_device = devices[option]
         selected_device_index = self.devices.index(selected_device)
 
-        # cloud
-        # if selected_device['type'] != "cloud":
-        # second-level schedule for non cloud PEs , select a core and a Voltage Frequncy Pair
+        # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
         sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]})
         sub_state = torch.tensor(sub_state, dtype=torch.float32)
         action_logits, sub_path = self.core.forest[selected_device_index](sub_state)
@@ -110,12 +108,7 @@ class Agent(mp.Process):
         selected_core = selected_device["voltages_frequencies"][selected_core_index]
         dvfs = selected_core[selected_core_dvfs_index % 3]
 
-        # if selected_device['type'] == "cloud":
-        #     selected_core_index = -1
-        #     i = np.random.randint(0, 1)
-        #     dvfs = [(50000, 13.85), (80000, 24.28)][i]
-
-        # applying action on the state and retriving the result
+        # applying action on the state and retrieving the result
         reward, fail_flag, energy, time = self.state.apply_action(
             selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
 
@@ -140,39 +133,39 @@ class Agent(mp.Process):
         if fail_flag[1]:
             self.kind_fails_log += 1
         if fail_flag[2]:
-            self.queue_fails_log +=1        
-        if fail_flag[3]:
-            self.battery_fails_log +=1
-        self.fails_log+= sum(fail_flag)
-        if selected_device['type']=="iot":
-            self.iot_usuage+=1
-        if selected_device['type']=="mec":
-            self.mec_usuage+=1
-        if selected_device['type']=="cloud":
-            self.cc_usuage+=1
             self.queue_fails_log += 1
+        if fail_flag[3]:
+            self.battery_fails_log += 1
+        self.fails_log += sum(fail_flag)
+        if selected_device['type'] == "iot":
+            self.iot_usuage += 1
+        if selected_device['type'] == "mec":
+            self.mec_usuage += 1
+        if selected_device['type'] == "cloud":
+            self.cc_usuage += 1
         self.fails_log += sum(fail_flag)
         self.path_history.append(path)
-    def save_agent_log(self,loss):
-        result={
+
+    def save_agent_log(self, loss):
+        result = {
             "loss": loss,
-            "reward": sum(self.reward_log)/len(self.reward_log),
-            "time": sum(self.time_log)/len(self.time_log),
-            "energy": sum(self.energy_log)/len(self.energy_log),
-            "safe_fails": self.safe_fails_log/len(self.energy_log),
-            "kind_fails": self.kind_fails_log/len(self.energy_log),
-            "queue_fails": self.queue_fails_log/len(self.energy_log),
-            "battery_fails": self.battery_fails_log/len(self.energy_log),
-            "fails": self.fails_log/len(self.energy_log),
-            "iot_usuage": self.iot_usuage/len(self.energy_log),
-            "mec_usuage": self.mec_usuage/len(self.energy_log),
-            "cc_usuage": self.cc_usuage/len(self.energy_log),
+            "reward": sum(self.reward_log) / len(self.reward_log),
+            "time": sum(self.time_log) / len(self.time_log),
+            "energy": sum(self.energy_log) / len(self.energy_log),
+            "safe_fails": self.safe_fails_log / len(self.energy_log),
+            "kind_fails": self.kind_fails_log / len(self.energy_log),
+            "queue_fails": self.queue_fails_log / len(self.energy_log),
+            "battery_fails": self.battery_fails_log / len(self.energy_log),
+            "fails": self.fails_log / len(self.energy_log),
+            "iot_usuage": self.iot_usuage / len(self.energy_log),
+            "mec_usuage": self.mec_usuage / len(self.energy_log),
+            "cc_usuage": self.cc_usuage / len(self.energy_log),
         }
         self.state.save_agent_log(self.assigned_job, result, self.path_history)
 
     def update(self):
         # updating the agent parameters
-        # calulating the loss
+        # calculating the loss
         loss = self.local_actor_critic.calc_loss()
 
         # sending back the result to the state
@@ -182,7 +175,8 @@ class Agent(mp.Process):
         loss.backward()
 
         # set global params and load them again
-        for local_param,global_param in zip(self.local_actor_critic.parameters(),self.global_actor_critic.parameters()):
+        for local_param, global_param in zip(self.local_actor_critic.parameters(),
+                                             self.global_actor_critic.parameters()):
             global_param._grad = local_param.grad
         self.global_optimizer.step()
         self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())
@@ -213,8 +207,7 @@ class Agent(mp.Process):
         devicePower = devicePower / num_cores
 
         error_rate = pe["error_rate"]
-
-        return [cores, devicePower, battery, error_rate]
+        return [cores, devicePower, battery]
 
     def get_input(self, task, pe_dict):
         task_features = self.get_task_data(task)

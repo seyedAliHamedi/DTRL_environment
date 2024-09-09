@@ -10,6 +10,7 @@ import traceback
 from environment.model.actor_critic import ActorCritic
 from environment.model.agent import Agent
 from environment.model.shared_adam import SharedAdam
+from environment.monitor import Monitor
 from environment.state import State
 from utilities.memory_monitor import MemoryMonitor
 from data.configs import environment_config, monitor_config
@@ -33,6 +34,7 @@ class Environment:
         self.manager = manager
         # the 3 global enteties of the shared state (preProcessor,windowManager,database)
         self.db = self.state.database
+        self.monitor = Monitor()
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
 
@@ -40,36 +42,41 @@ class Environment:
         self.display = display
 
     def run(self):
+        print("Loading devices...")
         devices = self.db.get_all_devices()
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(input_dims=5, n_actions=len(devices),devices=devices)
+        global_actor_critic = ActorCritic(input_dims=5, n_actions=len(devices), devices=devices)
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
         # setting up workers and their barriers
-        workers = []
+        self.workers = []
         barrier = mp.Barrier(environment_config['multi_agent'] + 1)
         # kick off the state
+        print("Simulation starting...")
         self.state.update(self.manager)
         for i in range(environment_config['multi_agent']):
             # oragnize and start the agents
-            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic, global_optimizer=global_optimizer, barrier=barrier,shared_state=self.state)
-            workers.append(worker)
+            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic,
+                           global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state)
+            self.workers.append(worker)
             worker.start()
 
         iteration = 0
         try:
             self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
-                if iteration % 10 == 0:
+                if iteration % 10 == 0 and iteration != 0:
                     print(f"iteration : {iteration}", len(self.state.get_jobs()))
-                if iteration % 100 == 0:
-                    self.save_time_log(monitor_config['paths']['time']['plot'])
-                    self.make_agents_plots()
+                    if iteration % 100 == 0:
+                        self.save_time_log(monitor_config['paths']['time']['plot'])
+                        self.make_agents_plots()
+                        self.monitor.plot()
 
                 starting_time = time.time()
                 self.state.update(self.manager)
-
+                self.monitor.log_PEs(self.state.get_PEs())
                 barrier.wait()
+
                 time_len = time.time() - starting_time
                 self.sleep(time_len)
                 iteration += 1
@@ -84,9 +91,9 @@ class Environment:
             self.make_agents_plots()
 
             # stopping and terminating the workers
-            for worker in workers:
+            for worker in self.workers:
                 worker.stop()
-            for worker in workers:
+            for worker in self.workers:
                 if worker.is_alive():
                     worker.terminate()
                     worker.join()
@@ -94,7 +101,7 @@ class Environment:
             self.memory_monitor.stop()
 
     def sleep(self, time_len):
-        # sleep for the minimumm time or the time that the actual simulation took
+        # sleep for the minimum time or the time that the actual simulation took
         sleeping_time = self.cycle_wait - time_len
         if sleeping_time < 0:
             sleeping_time = 0
@@ -104,6 +111,8 @@ class Environment:
         time.sleep(sleeping_time)
 
     def save_time_log(self, path):
+        if len(self.time_log) ==0:
+            return
         # saving time log gathered in the simulation
         y_values = self.time_log
         time_summary_log = {
@@ -142,11 +151,11 @@ class Environment:
         iot_usage = [v["iot_usuage"] for v in filtered_data.values()]
         mec_usuage = [v["mec_usuage"] for v in filtered_data.values()]
         cc_usuage = [v["cc_usuage"] for v in filtered_data.values()]
-        
+
         path_history = self.state.paths
-        
-        
-        
+
+
+
         fig, axs = plt.subplots(5, 2, figsize=(15, 30))
         axs[0, 0].plot(loss_list,
                        label='Loss', color="blue", marker='o')
@@ -177,19 +186,19 @@ class Environment:
                        label='Safe task Fail', color="purple", marker='o')
         axs[2, 0].set_title('Fail')
         axs[2, 0].legend()
-        
+
         # Plot for kind fail
         axs[2, 1].plot(kind_fails_list,
                        label='Task kind Fail', color="purple", marker='o')
         axs[2, 1].set_title('Fail')
         axs[2, 1].legend()
-        
+
         # Plot for queue fail
         axs[3, 0].plot(queue_fails_list,
                        label='Queue full Fail', color="purple", marker='o')
         axs[3, 0].set_title('Fail')
         axs[3, 0].legend()
-        
+
         # Plot for battery fail
         axs[3, 1].plot(battery_fails_list,
                        label='Battery punish', color="purple", marker='o')

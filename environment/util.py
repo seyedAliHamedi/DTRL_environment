@@ -32,11 +32,11 @@ def check_fail(pe, queue_index, core_index, task):
     fail_flag = [0, 0, 0, 0]
     if task["is_safe"] and not pe['handleSafeTask']:
         # fail : assigned safe task to unsafe device
-        fail_flag[0] = 1
+        fail_flag[0] = 0
     elif task["task_kind"] not in pe["acceptableTasks"]:
         # fail : assigned a kind of task to the inappropriate device
-        fail_flag[1] = 1
+        fail_flag[1] = 0
     elif queue_index == -1 and core_index == -1:
         # fail : assigned a task to a full queue core
-        fail_flag[2] = 0
+        fail_flag[2] = 1
     return fail_flag

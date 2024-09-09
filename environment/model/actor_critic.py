@@ -16,8 +16,7 @@ class ActorCritic(nn.Module):
         self.n_actions = n_actions
         self.actor = ClusterTree(devices=devices, depth=0, max_depth=3)
         self.critic = nn.Sequential(
-            nn.Linear(5 + 4 * len(devices), 128), nn.ReLU(), nn.Linear(128, 1))
-
+            nn.Linear(5 + 3 * len(devices), 128), nn.ReLU(), nn.Linear(128, 1))
         self.rewards = []
         self.actions = []
         self.states = []
@@ -108,8 +107,9 @@ class CoreScheduler(nn.Module):
     def __init__(self, devices):
         super(CoreScheduler, self).__init__()
         self.devices = devices
-        self.num_features = 9
-        self.forest = [self.createTree(device) for device in devices if device['type'] != 'cloud']
+        # 5 for tasks and 3 for pe features
+        self.num_features = 8
+        self.forest = [self.createTree(device) for device in devices]
         self.optimizers = [optim.Adam(tree.parameters(), lr=0.005) for tree in self.forest]
 
     def createTree(self, device):
@@ -155,13 +155,11 @@ class ClusterTree(nn.Module):
         super(ClusterTree, self).__init__()
         self.depth = depth
         self.max_depth = max_depth
-
         self.devices = devices
-        # 5 weights for task and 4 for each device
-        num_features = 5 + 4 * len(devices)
-
+        # 5 weights for task and 3 for each device
+        num_features = 5 + 3 * len(devices)
         self.exploration_rate = 0.9
-        self.explore_decay = 0.995
+        self.explore_decay = 0.999
 
         if depth != max_depth:
             self.weights = nn.Parameter(torch.empty(
@@ -186,25 +184,27 @@ class ClusterTree(nn.Module):
         a = np.random.random()
         a = float("{:.6f}".format(a))
         if a < self.exploration_rate:
-            val = 1 - val
+            # TODO test with actual random exploration, and does each node has to have its own exploration rate?
+            val = np.random.random()
+            # val = 1 - val
             self.exploration_rate *= self.explore_decay
 
         if val >= 0.5:
             indices = [self.devices.index(device)
                        for device in self.right.devices]
-            temp = x[5:].view(-1, 4)
+            temp = x[5:].view(-1, 3)
             indices_tensor = torch.tensor(indices)
             x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
             right_output, right_path, devices = self.right(x, path + "R")
-            return val * right_output, right_path, self.right.devices
+            return val * right_output, right_path,devices
         else:
             indices = [self.devices.index(device)
                        for device in self.left.devices]
-            temp = x[5:].view(-1, 4)
+            temp = x[5:].view(-1, 3)
             indices_tensor = torch.tensor(indices)
             x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
             left_output, left_path, devices = self.left(x, path + "L")
-            return val * left_output, left_path, self.left.devices
+            return val * left_output, left_path, devices
 
     def cluster(self, devices, k=2, random_state=42):
         torch.manual_seed(42)

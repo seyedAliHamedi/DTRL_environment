@@ -1,6 +1,6 @@
 devices_config = {
     "iot": {
-        "num_devices": 30,
+        "num_devices": 10,
         "num_cores": [4, 8, 16],
         "voltage_frequencies": [
             (10e6, 1.8),
@@ -18,10 +18,10 @@ devices_config = {
         "battery_capacity": (36, 41),
         "error_rate": (0.01, 0.06),
         "safe": (0.25, 0.75),
-        "maxQueue": 5
+        "maxQueue": 1
     },
     "mec": {
-        "num_devices": 19,
+        "num_devices": 5,
         "num_cores": [16, 32, 64],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -37,13 +37,13 @@ devices_config = {
         "battery_capacity": -1,
         "error_rate": (0.5, 0.11),
         "safe": (0.5, 0.5),
-        "maxQueue": 5
+        "maxQueue": 1
 
     },
     "cloud": {
         "num_devices": 1,
         "num_cores": 128,
-        # cloud , please correct these numbers TODO
+        # TODO cloud , please correct these numbers
         "voltage_frequencies": ((2.8e9, 13.85e-6), (3.9e9, 24.28e-6), (5e9, 36e-6)),
         "isl": -1,
         "capacitance": (3, 5),
@@ -71,8 +71,8 @@ jobs_config = {
 }
 
 environment_config = {
-    "multi_agent": 15,
-    "window": {"size": 100, "max_jobs": 20, "clock": 10},
+    "multi_agent": 5,
+    "window": {"size": 25, "max_jobs": 5, "clock": 8},
     "environment": {"cycle": 0.01, "anomaly_th": 5},
 }
 

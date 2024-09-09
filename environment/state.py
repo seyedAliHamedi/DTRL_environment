@@ -17,9 +17,9 @@ class State:
         self._jobs = manager.dict()
         # the task window manged by the window manager
         self._task_window = manager.list()
-        # intilizing PEs in Idle from database
+        # initializing PEs in Idle from database
         self._init_PEs(self.database.get_all_devices(), manager)
-        # intilizing the preprocessor and the window manager
+        # initializing the preprocessor and the window manager
         self.preprocessor = Preprocessing(state=self, manager=manager)
         self.window_manager = WindowManager(state=self, manager=manager)
 
@@ -86,7 +86,8 @@ class State:
 
         execution_time = t = np.ceil(task["computational_load"] / freq)
         # TODO t must include time of tasks scheduled before it ,in selected queue
-        placing_slot = (1, task_ID)
+        placing_slot = (5, task_ID)
+
 
         queue_index, core_index = find_place(pe_dict, core_i)
         fail_flags = check_fail(pe, queue_index, core_index, task)
