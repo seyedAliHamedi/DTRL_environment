@@ -1,7 +1,7 @@
 devices_config = {
     "iot": {
-        "num_devices": 4,
-        "num_cores": [2],
+        "num_devices": 20,
+        "num_cores": [2,4,8],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -18,11 +18,11 @@ devices_config = {
         "battery_capacity": (36, 41),
         "error_rate": (0.01, 0.06),
         "safe": (0.25, 0.75),
-        "maxQueue": 1
+        "maxQueue": 3
     },
     "mec": {
-        "num_devices": 3,
-        "num_cores": [4],
+        "num_devices": 11,
+        "num_cores": [8,16,32],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
             (750 * 1e6, 0.825),
@@ -37,12 +37,12 @@ devices_config = {
         "battery_capacity": -1,
         "error_rate": (0.5, 0.11),
         "safe": (0.5, 0.5),
-        "maxQueue": 1
+        "maxQueue": 3
 
     },
     "cloud": {
         "num_devices": 1,
-        "num_cores": 16,
+        "num_cores": 128,
         # TODO cloud , please correct these numbers
         "voltage_frequencies": ((2.8e9, 13.85e-6), (3.9e9, 24.28e-6), (5e9, 36e-6)),
         "isl": -1,

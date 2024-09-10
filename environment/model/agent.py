@@ -74,8 +74,11 @@ class Agent(mp.Process):
             if task_queue is None:
                 continue
             self.t_counter += 1
-            if self.t_counter >= self.time_out_counter and len(task_queue) > 0:
+            if self.t_counter >= self.time_out_counter :
                 print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} for too long!!!')
+                self.state.remove_job(self.assigned_job)
+                self.assigned_job=None
+                continue
 
             for task in task_queue:
                 self.schedule(task)
@@ -194,38 +197,13 @@ class Agent(mp.Process):
 
     ####### UTILITY #######
 
-    def get_pe_data(self, pe_dict):
-        pe = self.state.database.get_device(pe_dict["id"])
-        battery_capacity = pe["battery_capacity"]
-        battery_level = pe_dict["batteryLevel"]
-        battery_isl = pe["ISL"]
-        battery = (battery_level / battery_capacity -
-                   battery_isl) * battery_capacity
 
-        num_cores = pe["num_cores"]
-        cores_availability = pe_dict["occupiedCores"]
-        cores = 1 - (sum(cores_availability) / num_cores)
-
-        devicePower = 0
-        for index, core in enumerate(pe["voltages_frequencies"]):
-            if cores_availability[index] == 1:
-                continue
-            corePower = 0
-            for mod in core:
-                freq, vol = mod
-                corePower += freq / vol
-            devicePower += corePower
-        devicePower = devicePower / num_cores
-
-        error_rate = pe["error_rate"]
-
-        return [devicePower, battery]
 
     def get_input(self, task, pe_dict):
         task_features = self.get_task_data(task)
         pe_features = []
         for pe in pe_dict.values():
-            pe_features.extend(self.get_pe_data(pe))
+            pe_features.extend(self.state.database.get_device_norm(pe['id']))
         return task_features + pe_features
 
     def get_task_data(self, task):

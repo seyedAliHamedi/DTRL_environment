@@ -160,7 +160,7 @@ class ClusterTree(nn.Module):
         num_features = 5 + 2 * len(devices)
         
         self.exploration_rate=0.9
-        self.explore_decay=0.9999
+        self.explore_decay=0.999
 
         if depth != max_depth:
             self.weights = nn.Parameter(torch.empty(

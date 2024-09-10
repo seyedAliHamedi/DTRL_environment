@@ -48,7 +48,8 @@ class State:
 
     def get_job(self, job_id):
         return self.get_jobs().get(job_id)
-
+    def remove_job(self, job_id):
+        del self._jobs[job_id]
     ##### Intializations
     def _init_PEs(self, PEs, manager):
         # initializing the PEs live variable from db
@@ -90,19 +91,20 @@ class State:
         if execution_time > 5:
             execution_time = 5
         # TODO t must include time of tasks scheduled before it ,in selected queue
-        placing_slot = (execution_time, task_ID)
+        placing_slot = (1, task_ID)
 
         queue_index, core_index = find_place(pe_dict, core_i)
         fail_flags = [0, 0, 0, 0]
         if task["is_safe"] and not pe['handleSafeTask']:
             # fail : assigned safe task to unsafe device
-            fail_flags[0] = 0
+            fail_flags[0] = 1
         if task["task_kind"] not in pe["acceptableTasks"]:
             # fail : assigned a kind of task to the inappropriate device
-            fail_flags[1] = 0
+            fail_flags[1] = 1
         if queue_index == -1 and core_index == -1:
             # fail : assigned a task to a full queue core
-            fail_flags[2] = 1
+            fail_flags[2] = 0
+            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
         if sum(fail_flags) > 0:
             return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
