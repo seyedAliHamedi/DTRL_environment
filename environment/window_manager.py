@@ -1,6 +1,7 @@
 import random
 from data.configs import environment_config
 
+
 class WindowManager:
 
     def __init__(self, state, manager, config=environment_config):
@@ -16,19 +17,18 @@ class WindowManager:
         # head index to keep track of jobs read from db
         self.__head_index = 1
 
-
     def run(self):
         # pass the windows to state every defined cycle
         if self.current_cycle != self.__cycle:
             self.current_cycle += 1
             self.state.set_task_window([])
         else:
-            # TODO fix this
-            if len(self.state.get_jobs())>20:
-                self.current_cycle -=1
-            else:
-                self.current_cycle = 0
-                self.state.set_task_window(self.get_window())
+            if len(self.state.get_jobs()) > self.__max_jobs:
+                self.current_cycle -= 1
+                self.state.set_task_window([])
+                return
+            self.current_cycle = 0
+            self.state.set_task_window(self.get_window())
 
     def get_window(self):
         # return the entire pool or a protion of it(window size)

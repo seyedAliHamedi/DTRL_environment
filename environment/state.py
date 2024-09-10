@@ -75,41 +75,51 @@ class State:
 
     ##### Functionality
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        try:
-            pe_dict = self.get_PEs()[pe_ID]
-            pe = self.database.get_device(pe_ID)
-            task = self.database.get_task(task_ID)
-            job_dict = self.get_job(task["job_id"])
-        except:
-            print("Retry apply action")
-            return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
+        with self.lock:
+            try:
+                pe_dict = self.get_PEs()[pe_ID]
+                pe = self.database.get_device(pe_ID)
+                task = self.database.get_task(task_ID)
+                job_dict = self.get_job(task["job_id"])
+            except:
+                print("Retry apply action")
+                return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
 
-        execution_time = t = np.ceil(task["computational_load"] / freq)
-        # TODO t must include time of tasks scheduled before it ,in selected queue
-        placing_slot = (5, task_ID)
+            execution_time = t = np.ceil(task["computational_load"] / freq)
+            # TODO t must include time of tasks scheduled before it ,in selected queue
+            placing_slot = (1, task_ID)
 
 
-        queue_index, core_index = find_place(pe_dict, core_i)
-        fail_flags = check_fail(pe, queue_index, core_index, task)
+            queue_index, core_index = find_place(pe_dict, core_i)
+            fail_flags = [0, 0, 0, 0]
+            if task["is_safe"] and not pe['handleSafeTask']:
+                # fail : assigned safe task to unsafe device
+                fail_flags[0] = 0
+            elif task["task_kind"] not in pe["acceptableTasks"]:
+                # fail : assigned a kind of task to the inappropriate device
+                fail_flags[1] = 0
+            elif queue_index == -1 and core_index == -1:
+                # fail : assigned a task to a full queue core
+                fail_flags[2] = 1
 
-        if sum(fail_flags) > 0:
-            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
+            if sum(fail_flags) > 0:
+                return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
-        q = pe_dict["queue"][core_index]
-        pe_dict["queue"][core_index] = q[:queue_index] + [placing_slot] + q[queue_index + 1:]
 
-        # updating the live status of the state after the schedule
-        job_dict["runningTasks"].append(task_ID)
-        job_dict["remainingTasks"].remove(task_ID)
+            pe_dict["queue"][core_index] = pe_dict["queue"][core_index][:queue_index] + [placing_slot] + pe_dict["queue"][core_index][queue_index + 1:]
 
-        # updating the pre processor queue
-        self.preprocessor.queue.remove(task_ID)
+            # updating the live status of the state after the schedule
+            job_dict["runningTasks"].append(task_ID)
+            job_dict["remainingTasks"].remove(task_ID)
 
-        capacitance = pe["capacitance"][core_index]
-        pe_dict["energyConsumption"][
-            core_index] = capacitance * (volt * volt) * freq
-        e = capacitance * (volt * volt) * freq * t
-        return reward_function(e=e, t=t), fail_flags, e, t
+            # updating the pre processor queue
+            self.preprocessor.queue.remove(task_ID)
+
+            capacitance = pe["capacitance"][core_index]
+            pe_dict["energyConsumption"][
+                core_index] = capacitance * (volt * volt) * freq
+            e = capacitance * (volt * volt) * freq * t
+            return reward_function(e=e, t=t), fail_flags, e, t
 
     def calc_battery_punish(self, pe_dict, pe, energy):
         batteryFail = 0
