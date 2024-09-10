@@ -75,10 +75,9 @@ class Agent(mp.Process):
                 continue
             self.t_counter += 1
             if self.t_counter >= self.time_out_counter :
-                print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} for too long!!!')
-                self.state.remove_job(self.assigned_job)
-                self.assigned_job=None
-                continue
+                job = self.state.get_job(self.assigned_job)
+                print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} ')
+                self.assigned_job = None
 
             for task in task_queue:
                 self.schedule(task)

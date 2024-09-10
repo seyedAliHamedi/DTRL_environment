@@ -1,3 +1,4 @@
+import random
 from typing import Counter
 import numpy as np
 import pandas as pd
@@ -14,7 +15,9 @@ class ActorCritic(nn.Module):
         super(ActorCritic, self).__init__()
         self.input_dims = input_dims
         self.n_actions = n_actions
-        self.actor = ClusterTree(devices=devices, depth=0, max_depth=3)
+        self.exploration_rate=0.9
+        self.explore_decay=0.9995
+        self.actor = ClusterTree(devices=devices, depth=0, max_depth=3,exploration_rate=self.exploration_rate,explore_decay=self.explore_decay)
         self.critic = nn.Sequential(
             nn.Linear (5 + 2 * len(devices), 128), nn.ReLU(), nn.Linear(128, 1))
 
@@ -45,10 +48,15 @@ class ActorCritic(nn.Module):
         pi = pi - pi.max()
         probs = F.softmax(pi, dim=-1)
 
-        dist = Categorical(probs)
-        action = dist.sample()
+        if random.random() < self.exploration_rate:
+            # Exploration: randomly choose an action
+            action = torch.randint(0, probs.shape[-1], (1,)).item()
+        else:
+            # Exploitation: use the policy to sample an action
+            dist = Categorical(probs)
+            action = dist.sample().item()
 
-        return action.item(), path, devices
+        return action, path, devices
 
     def calculate_returns(self):
         G = 0
@@ -151,7 +159,7 @@ class DDT(nn.Module):
 
 
 class ClusterTree(nn.Module):
-    def __init__(self, devices, depth, max_depth):
+    def __init__(self, devices, depth, max_depth,exploration_rate,explore_decay):
         super(ClusterTree, self).__init__()
         self.depth = depth
         self.max_depth = max_depth
@@ -159,8 +167,8 @@ class ClusterTree(nn.Module):
         # 5 weights for task and 4 for each device
         num_features = 5 + 2 * len(devices)
         
-        self.exploration_rate=0.9
-        self.explore_decay=0.999
+        self.exploration_rate=exploration_rate
+        self.explore_decay=explore_decay
 
         if depth != max_depth:
             self.weights = nn.Parameter(torch.empty(
@@ -173,8 +181,8 @@ class ClusterTree(nn.Module):
             clusters = self.cluster(self.devices)
             left_cluster = clusters[0]
             right_cluster = clusters[1]
-            self.left = ClusterTree(left_cluster, depth + 1, max_depth)
-            self.right = ClusterTree(right_cluster, depth + 1, max_depth)
+            self.left = ClusterTree(left_cluster, depth + 1, max_depth,exploration_rate=self.exploration_rate,explore_decay=self.explore_decay)
+            self.right = ClusterTree(right_cluster, depth + 1, max_depth,exploration_rate=self.exploration_rate,explore_decay=self.explore_decay)
 
     def forward(self, x, path=""):
         if self.depth == self.max_depth:
