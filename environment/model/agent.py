@@ -71,14 +71,12 @@ class Agent(mp.Process):
                 self.init_logs()
 
             task_queue = self.state.preprocessor.get_agent_queue().get(self.assigned_job)
-            self.t_counter += 1
-            if self.t_counter >= self.time_out_counter and len(task_queue) > 0 :
-                print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} for too long!!!')
-
-
-
             if task_queue is None:
                 continue
+            self.t_counter += 1
+            if self.t_counter >= self.time_out_counter and len(task_queue) > 0:
+                print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} for too long!!!')
+
             for task in task_queue:
                 self.schedule(task)
             try:
@@ -221,7 +219,7 @@ class Agent(mp.Process):
 
         error_rate = pe["error_rate"]
 
-        return [ devicePower, battery]
+        return [devicePower, battery]
 
     def get_input(self, task, pe_dict):
         task_features = self.get_task_data(task)

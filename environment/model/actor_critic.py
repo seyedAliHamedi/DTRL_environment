@@ -109,7 +109,7 @@ class CoreScheduler(nn.Module):
         super(CoreScheduler, self).__init__()
         self.devices = devices
         self.num_features = 7
-        self.forest = [self.createTree(device) for device in devices if device['type'] != 'cloud']
+        self.forest = [self.createTree(device) for device in devices]
         self.optimizers = [optim.Adam(tree.parameters(), lr=0.005)for tree in self.forest]
 
     def createTree(self, device):

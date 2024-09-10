@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from data.db import Database
 from environment.pre_processing import Preprocessing
-from environment.util import reward_function, find_place, check_fail
+from environment.util import reward_function, find_place
 from environment.window_manager import WindowManager
 
 import torch.multiprocessing as mp
@@ -76,51 +76,53 @@ class State:
 
     ##### Functionality
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        with self.lock:
-            try:
-                pe_dict = self.get_PEs()[pe_ID]
-                pe = self.database.get_device(pe_ID)
-                task = self.database.get_task(task_ID)
-                job_dict = self.get_job(task["job_id"])
-            except:
-                print("Retry apply action")
-                return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
+        try:
+            pe_dict = self.get_PEs()[pe_ID]
+            pe = self.database.get_device(pe_ID)
+            task = self.database.get_task(task_ID)
+            job_dict = self.get_job(task["job_id"])
+        except:
+            print("Retry apply action")
+            return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
 
-            execution_time = t = np.ceil(task["computational_load"] / freq)
-            # TODO t must include time of tasks scheduled before it ,in selected queue
-            placing_slot = (1, task_ID)
+        execution_time = t = np.ceil(task["computational_load"] / freq)
 
+        if execution_time > 5:
+            execution_time = 5
+        # TODO t must include time of tasks scheduled before it ,in selected queue
+        placing_slot = (execution_time, task_ID)
 
-            queue_index, core_index = find_place(pe_dict, core_i)
-            fail_flags = [0, 0, 0, 0]
-            if task["is_safe"] and not pe['handleSafeTask']:
-                # fail : assigned safe task to unsafe device
-                fail_flags[0] = 0
-            elif task["task_kind"] not in pe["acceptableTasks"]:
-                # fail : assigned a kind of task to the inappropriate device
-                fail_flags[1] = 0
-            elif queue_index == -1 and core_index == -1:
-                # fail : assigned a task to a full queue core
-                fail_flags[2] = 1
+        queue_index, core_index = find_place(pe_dict, core_i)
+        fail_flags = [0, 0, 0, 0]
+        if task["is_safe"] and not pe['handleSafeTask']:
+            # fail : assigned safe task to unsafe device
+            fail_flags[0] = 0
+        if task["task_kind"] not in pe["acceptableTasks"]:
+            # fail : assigned a kind of task to the inappropriate device
+            fail_flags[1] = 0
+        if queue_index == -1 and core_index == -1:
+            # fail : assigned a task to a full queue core
+            fail_flags[2] = 1
 
-            if sum(fail_flags) > 0:
-                return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
+        if sum(fail_flags) > 0:
+            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
+        # print(f'task{task_ID},   device{pe_ID},   core{core_index},    queue{queue_index}')
+        pe_dict["queue"][core_index] = pe_dict["queue"][core_index][:queue_index] + [placing_slot] + \
+                                       pe_dict["queue"][core_index][queue_index + 1:]
 
-            pe_dict["queue"][core_index] = pe_dict["queue"][core_index][:queue_index] + [placing_slot] + pe_dict["queue"][core_index][queue_index + 1:]
+        # updating the live status of the state after the schedule
+        job_dict["runningTasks"].append(task_ID)
+        job_dict["remainingTasks"].remove(task_ID)
 
-            # updating the live status of the state after the schedule
-            job_dict["runningTasks"].append(task_ID)
-            job_dict["remainingTasks"].remove(task_ID)
+        # updating the pre processor queue
+        self.preprocessor.queue.remove(task_ID)
 
-            # updating the pre processor queue
-            self.preprocessor.queue.remove(task_ID)
-
-            capacitance = pe["capacitance"][core_index]
-            pe_dict["energyConsumption"][
-                core_index] = capacitance * (volt * volt) * freq
-            e = capacitance * (volt * volt) * freq * t
-            return reward_function(e=e, t=t), fail_flags, e, t
+        capacitance = pe["capacitance"][core_index]
+        pe_dict["energyConsumption"][
+            core_index] = capacitance * (volt * volt) * freq
+        e = capacitance * (volt * volt) * freq * t
+        return reward_function(e=e, t=t), fail_flags, e, t
 
     def calc_battery_punish(self, pe_dict, pe, energy):
         batteryFail = 0
@@ -176,7 +178,7 @@ class State:
                     "energyConsumption": list(pe["energyConsumption"]),
                     "queue": [list(core_queue) for core_queue in pe["queue"]]
                 }
-            print(pd.DataFrame(pe_data), '\n')
+            print('\033[94m', pd.DataFrame(pe_data), '\033[0m', '\n')
 
             print("Jobs::")
             job_data = {}
@@ -188,7 +190,7 @@ class State:
                     "remainingTasks": list(job["remainingTasks"]),
                     "remainingDeadline": job["remainingDeadline"]
                 }
-            print(pd.DataFrame(job_data), "\n")
+            print('\033[92m', pd.DataFrame(job_data), '\033[0m', "\n")
 
             print(
                 "|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
@@ -340,9 +342,9 @@ class State:
         # adding the task to the finished and removing it from the running tasks
         job["finishedTasks"].append(task_ID)
         job["runningTasks"].remove(task_ID)
-    
+
     def check_up_jobs(self):
-        #TODO : cheap move
+        # TODO : cheap move
         # Multiprocessing Robustness
         try:
             jobs = self.get_jobs()
@@ -352,37 +354,3 @@ class State:
         for job in jobs:
             for task_ID in jobs[job]['runningTasks']:
                 self.__task_finished(task_ID)
-                    
-                
-####### UTILITY #######
-def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
-    if punish:
-        return -100
-
-    if setup == 1:
-        return -1 * (alpha * e + beta * t)
-    elif setup == 2:
-        return 1 / (alpha * e + beta * t)
-    elif setup == 3:
-        return -np.exp(alpha * e) - np.exp(beta * t)
-    elif setup == 4:
-        return -np.exp(alpha * e + beta * t)
-    elif setup == 5:
-        return np.exp(-1 * (alpha * e + beta * t))
-    elif setup == 6:
-        return -np.log(alpha * e + beta * t)
-    elif setup == 7:
-        return -((alpha * e + beta * t) ** 2)
-
-def find_place(pe, core_i):
-    if pe["type"] == "cloud":
-        pe["queue"].append([])
-        pe["queue"][-1].append((0, -1))
-        pe["energyConsumption"].append(0)
-        pe["occupiedCores"].append(1)
-        return 0, len(pe["queue"]) - 1
-    else:
-        for i, slot in enumerate(pe["queue"][core_i]):
-            if slot == (0, -1):
-                return i, core_i
-    return -1, -1

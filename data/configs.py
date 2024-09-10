@@ -71,9 +71,9 @@ jobs_config = {
 }
 
 environment_config = {
-    "multi_agent": 5,
-    "time_out_counter": 30,
-    "window": {"size": 25, "max_jobs": 8, "clock": 8},
+    "multi_agent": 15,
+    "time_out_counter": 100,
+    "window": {"size": 100, "max_jobs": 20, "clock": 10},
     "environment": {"cycle": 0.01, "anomaly_th": 5},
 }
 
