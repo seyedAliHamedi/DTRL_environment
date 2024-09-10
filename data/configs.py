@@ -1,7 +1,7 @@
 devices_config = {
     "iot": {
-        "num_devices": 25,
-        "num_cores": [4,8,16],
+        "num_devices": 4,
+        "num_cores": [2],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -21,8 +21,8 @@ devices_config = {
         "maxQueue": 1
     },
     "mec": {
-        "num_devices": 15,
-        "num_cores": [16, 32, 64],
+        "num_devices": 3,
+        "num_cores": [4],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
             (750 * 1e6, 0.825),
@@ -42,7 +42,7 @@ devices_config = {
     },
     "cloud": {
         "num_devices": 1,
-        "num_cores": 128,
+        "num_cores": 16,
         # TODO cloud , please correct these numbers
         "voltage_frequencies": ((2.8e9, 13.85e-6), (3.9e9, 24.28e-6), (5e9, 36e-6)),
         "isl": -1,
@@ -65,14 +65,15 @@ jobs_config = {
         "input_size": [1, 1001],
         "output_size": [1, 1001],
         "computational_load": [1, 1001],
-        "safe_measurement": [0.5, 0.5],
+        "safe_measurement": [0.8, 0.2],
         "task_kinds": [1, 2, 3, 4],
     },
 }
 
 environment_config = {
     "multi_agent": 5,
-    "window": {"size": 25, "max_jobs": 5, "clock": 8},
+    "time_out_counter": 30,
+    "window": {"size": 25, "max_jobs": 8, "clock": 8},
     "environment": {"cycle": 0.01, "anomaly_th": 5},
 }
 

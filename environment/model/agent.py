@@ -7,7 +7,7 @@ from environment.model.actor_critic import ActorCritic, CoreScheduler
 
 
 class Agent(mp.Process):
-    def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state):
+    def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state, time_out_counter):
         super(Agent, self).__init__()
         # the worker/agent name
         self.name = name
@@ -31,6 +31,9 @@ class Agent(mp.Process):
 
         # the shared state
         self.state = shared_state
+
+        self.time_out_counter = time_out_counter
+        self.t_counter = 0
 
     def init_logs(self):
         # intilizing the agent_log
@@ -58,11 +61,21 @@ class Agent(mp.Process):
             if self.assigned_job is None:
                 self.assigned_job = self.state.assign_job_to_agent()
                 if self.assigned_job is None:
+                    self.t_counter += 1
+                    if self.t_counter >= self.time_out_counter:
+                        print(f'Agent {self.name}  TIMEOUT ( no job to be assigned) !!!')
                     continue
+                else:
+                    self.t_counter = 0
                 self.local_actor_critic.clear_memory()
                 self.init_logs()
 
             task_queue = self.state.preprocessor.get_agent_queue().get(self.assigned_job)
+            self.t_counter += 1
+            if self.t_counter >= self.time_out_counter and len(task_queue) > 0 :
+                print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} for too long!!!')
+
+
 
             if task_queue is None:
                 continue

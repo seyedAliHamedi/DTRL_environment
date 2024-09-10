@@ -7,6 +7,7 @@ import threading
 import time
 import traceback
 
+import data.configs
 from environment.model.actor_critic import ActorCritic
 from environment.model.agent import Agent
 from environment.model.shared_adam import SharedAdam
@@ -55,9 +56,10 @@ class Environment:
         print("Simulation starting...")
         self.state.update(self.manager)
         for i in range(environment_config['multi_agent']):
-            # oragnize and start the agents
+            # organize and start the agents
             worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic,
-                           global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state)
+                           global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state,
+                           time_out_counter=data.configs.environment_config["time_out_counter"])
             self.workers.append(worker)
             worker.start()
 
@@ -111,7 +113,7 @@ class Environment:
         time.sleep(sleeping_time)
 
     def save_time_log(self, path):
-        if len(self.time_log) ==0:
+        if len(self.time_log) == 0:
             return
         # saving time log gathered in the simulation
         y_values = self.time_log
@@ -154,21 +156,17 @@ class Environment:
 
         path_history = self.state.paths
 
-
-
         fig, axs = plt.subplots(5, 2, figsize=(15, 30))
         axs[0, 0].plot(loss_list,
                        label='Loss', color="blue", marker='o')
         axs[0, 0].set_title('Loss')
         axs[0, 0].legend()
 
-
-
         # Plot for time
-        axs[0,1].plot(time_list,
+        axs[0, 1].plot(time_list,
                        label='Time', color="red", marker='o')
-        axs[0,1].set_title('Time')
-        axs[0,1].legend()
+        axs[0, 1].set_title('Time')
+        axs[0, 1].legend()
 
         # Plot for energy
         axs[1, 0].plot(energy_list,
@@ -232,7 +230,6 @@ class Environment:
             axs[4, 1].set_title(f'Path History Heatmap ')
             axs[4, 1].set_xlabel('Output Classes')
             axs[4, 1].set_ylabel('Epochs')
-
 
         # Adjust layout to prevent overlap
         plt.tight_layout()
