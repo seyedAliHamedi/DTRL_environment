@@ -1,11 +1,12 @@
-import time
 import numpy as np
 import pandas as pd
 from data.db import Database
 from environment.pre_processing import Preprocessing
+from environment.util import reward_function, find_place, check_fail
 from environment.window_manager import WindowManager
 
 import torch.multiprocessing as mp
+
 
 class State:
 
@@ -16,15 +17,15 @@ class State:
         self._jobs = manager.dict()
         # the task window manged by the window manager
         self._task_window = manager.list()
-        # intilizing PEs in Idle from database
+        # initializing PEs in Idle from database
         self._init_PEs(self.database.get_all_devices(), manager)
-        # intilizing the preprocessor and the window manager
+        # initializing the preprocessor and the window manager
         self.preprocessor = Preprocessing(state=self, manager=manager)
         self.window_manager = WindowManager(state=self, manager=manager)
-        
+
         # TODO : rest
         self.agent_log = manager.dict({})
-        self.paths=manager.list([])
+        self.paths = manager.list([])
         self.display = display
         self.lock = mp.Lock()
 
@@ -50,7 +51,7 @@ class State:
 
     ##### Intializations
     def _init_PEs(self, PEs, manager):
-        # initlizeing the PEs live variable from db
+        # initializing the PEs live variable from db
         for pe in PEs:
             self._PEs[pe["id"]] = {
                 "id": pe["id"],
@@ -58,7 +59,8 @@ class State:
                 "batteryLevel": pe["battery_capacity"],
                 "occupiedCores": manager.list([0 for _ in range(pe["num_cores"])]),
                 "energyConsumption": manager.list(pe["powerIdle"]),
-                "queue": manager.list([manager.list([(0, -1) for _ in range(pe["maxQueue"])]) for _ in range(pe["num_cores"])]),
+                "queue": manager.list(
+                    [manager.list([(0, -1) for _ in range(pe["maxQueue"])]) for _ in range(pe["num_cores"])]),
             }
 
     def _set_jobs(self, jobs, manager):
@@ -71,7 +73,7 @@ class State:
                 "remainingTasks": manager.list([]),
                 "remainingDeadline": job["deadline"],
             }
-    
+
     ##### Functionality
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
         try:
@@ -82,13 +84,12 @@ class State:
         except:
             print("Retry apply action")
             return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
-        # calculating the execution time
+
         execution_time = t = np.ceil(task["computational_load"] / freq)
-        
-        # placing_slot = (execution_time, task_ID)
-        placing_slot = (1, task_ID)
-        
-        #finding the empty slot in queue for the selected device & core
+        # TODO t must include time of tasks scheduled before it ,in selected queue
+        placing_slot = (5, task_ID)
+
+
         queue_index, core_index = find_place(pe_dict, core_i)
         fail_flag = [0,0,0,0]
         if (task["is_safe"] and not pe['handleSafeTask']):
@@ -112,60 +113,46 @@ class State:
         
         # updating the pre processor queue
         self.preprocessor.queue.remove(task_ID)
-            
-        
-        # calc and power consumption for different devices
-        if pe_dict['type'] == 'cloud':
-            pe_dict["energyConsumption"][core_index] = volt
-            e = volt * t
-        else:
-            capacitance = pe["capacitance"][core_index]
-            pe_dict["energyConsumption"][
-                core_index] = capacitance * (volt * volt) * freq
-            e = capacitance * (volt * volt) * freq * t
-            
-        # battery_punish,batteryFail = self.calc_battery_punish(pe_dict,pe,e)
-        # if  batteryFail:
-        #     fail_flag[3]=0
-             
-        # manage failed assingments
-        if sum(fail_flag)>0:
-            return sum(fail_flag)*reward_function(punish=True), fail_flag, 0, 0
-        
-        # returning the results
-        return reward_function(e=e, t=t), fail_flag, e, t
 
-    def calc_battery_punish(self,pe_dict,pe,energy):
-        batteryFail=0
-        punish=0
-        if pe['type']=='iot':
-            battary_capacity = pe['battery_capacity']
+        capacitance = pe["capacitance"][core_index]
+        pe_dict["energyConsumption"][
+            core_index] = capacitance * (volt * volt) * freq
+        e = capacitance * (volt * volt) * freq * t
+        return reward_function(e=e, t=t), fail_flags, e, t
+
+    def calc_battery_punish(self, pe_dict, pe, energy):
+        batteryFail = 0
+        punish = 0
+        if pe['type'] == 'iot':
+            battery_capacity = pe['battery_capacity']
             battery_start = pe_dict['batteryLevel']
-            battery_end =((battery_start*battary_capacity)-(energy*1e5))/battary_capacity
-            if battery_end<pe['ISL']:
-                batteryFail=1
+            battery_end = ((battery_start * battery_capacity) - (energy * 1e5)) / battery_capacity
+            if battery_end < pe['ISL']:
+                batteryFail = 1
             else:
-                punish = self.get_battery_finish(battery_start,battery_end)
-                pe_dict['batteryLevel']=battery_end
-        return punish,batteryFail
-    def get_battery_finish(self,b_start,b_end,alpha=100,beta=0.3,gamma=0.1):
-        battery_drain = (b_start-b_end)**gamma
-        low_battery_factor = ((100-b_end)/100)**beta
-        penalty = -alpha*battery_drain*low_battery_factor
+                punish = self.get_battery_finish(battery_start, battery_end)
+                pe_dict['batteryLevel'] = battery_end
+        return punish, batteryFail
+
+    def get_battery_finish(self, b_start, b_end, alpha=100, beta=0.3, gamma=0.1):
+        battery_drain = (b_start - b_end) ** gamma
+        low_battery_factor = ((100 - b_end) / 100) ** beta
+        penalty = -alpha * battery_drain * low_battery_factor
         return -penalty
-            
-    def save_agent_log(self,assigned_job,dict,path_history):
+
+    def save_agent_log(self, assigned_job, dict, path_history):
         with self.lock:
             self.agent_log[assigned_job] = dict
             self.paths.append(path_history)
-    
+
     def assign_job_to_agent(self):
         with self.lock:
             return self.preprocessor.assign_job()
+
     ####### ENVIRONMENT #######
     def update(self, manager):
         # the state main functionality
-        #   1 . getting task window from the window manager if avaliable
+        #   1 . getting task window from the window manager if available
         #   2. updating the jobs
         #   3. updating the PEs
         #   4. calling the preprocessor to update the agent queue based on the state
@@ -174,7 +161,7 @@ class State:
         self.__update_PEs()
         self.preprocessor.run()
 
-        # displaying the live status of the state 
+        # displaying the live status of the state
         if self.display:
             print("PEs::")
             pe_data = {}
@@ -187,7 +174,7 @@ class State:
                     "energyConsumption": list(pe["energyConsumption"]),
                     "queue": [list(core_queue) for core_queue in pe["queue"]]
                 }
-            print(pd.DataFrame(pe_data).T, '\n')
+            print(pd.DataFrame(pe_data), '\n')
 
             print("Jobs::")
             job_data = {}
@@ -210,12 +197,11 @@ class State:
         # updating the jobs live status
         # Multiprocess Robustness
         try:
-            jobs_list=self.get_jobs()
+            jobs_list = self.get_jobs()
         except:
             print("Retrying update jobs ")
             self.__update_jobs(self, manager)
-        
-        
+
         # adding new jobs from the window manager to state if there is any
         self.__add_new_active_jobs(self._task_window, manager)
 
@@ -239,17 +225,17 @@ class State:
         for task_id in new_tasks:
             # Multiprocess Robustness
             try:
-                task=self.database.get_task(task_id)
-                job =self.database.get_job(task['job_id'])
+                task = self.database.get_task(task_id)
+                job = self.database.get_job(task['job_id'])
             except:
                 print("Retrying add new active jobs ")
                 self.__add_new_active_jobs(self, new_tasks, manager)
-            
+
             # initaling job if not; and if appending the new tasks that arrived
             if not self.__is_active_job(task['job_id']):
                 self._set_jobs([job], manager)
             self.get_job(task['job_id'])["remainingTasks"].append(task_id)
-        
+
     def __is_active_job(self, job_ID):
         # Multiprocess Robustness
         try:
@@ -268,20 +254,16 @@ class State:
         for pe_ID in self.get_PEs().keys():
             # Multiprocess Robustness
             try:
-                 pe = self.get_PEs()[pe_ID]
+                pe = self.get_PEs()[pe_ID]
             except:
                 print("Retrying update PEs")
                 self.__update_PEs()
-           
+
             # updating the PEs live status
             #  1. updating the quques
-            # TODO occupation ?? queue
-            #  2. updating the core occupations
-            #  3. updating the battery capcities
-            
-            self.__update_PEs_queue(pe)
-            # self.__update_occupied_cores(pe)
 
+            self.__update_PEs_queue(pe)
+            self.__update_occupied_cores(pe)
 
     def __update_occupied_cores(self, pe_dict):
         # Multiprocess Robustness
@@ -290,7 +272,7 @@ class State:
         except:
             print("Retrying update occupied cores")
             self.__update_occupied_cores(pe_dict)
-            
+
         occupied_cores = pe_dict["occupiedCores"]
         energy_consumption = pe_dict["energyConsumption"]
         queue_list = pe_dict["queue"]
@@ -304,36 +286,27 @@ class State:
                 occupied_cores[core_index] = 1
 
     def __update_energy_consumption(self, pe, pe_ID):
-        #TODO:finish and robust via try catch
         for core_index, core_av in enumerate(pe["occupiedCores"]):
             if core_av == 0:
                 pe["energyConsumption"][core_index] = self.database.get_device(pe_ID)[
                     "powerIdle"][core_index]
 
     def __update_PEs_queue(self, pe):
-        deleting_queues_on_pe = []
 
         for core_index, core_queue in enumerate(pe["queue"]):
             first_task = core_queue[0]
 
             if first_task[0] == 0:
                 # Removing the finished task from queue
-                if first_task[1] != -1 :
+                if first_task[1] != -1:
                     self.__task_finished(first_task[1])
-                    # Shift queue and append (0,0)
+                    # Shift queue and append (0,-1)
                     pe["queue"][core_index] = core_queue[1:] + [(0, -1)]
-                    
-                # TODO cloud shit
-                # if pe["type"] == "cloud":
-                #     deleting_queues_on_pe.append(core_index)
-                #     continue
+
             else:
                 # updating the queue for mec and iot (reducing the remaining time by 1 clock)
-                slot = (pe["queue"][core_index][0][0] -1, pe["queue"][core_index][0][1])
-                pe["queue"][core_index] = [
-                    slot] + pe["queue"][core_index][1:]
-
-        self.__remove_unused_cores_cloud(pe, deleting_queues_on_pe)
+                slot = (pe["queue"][core_index][0][0] - 1, pe["queue"][core_index][0][1])
+                pe["queue"][core_index] = [slot] + pe["queue"][core_index][1:]
 
     def __remove_unused_cores_cloud(self, pe, core_list):
         for i, item in enumerate(core_list):
@@ -349,11 +322,10 @@ class State:
             job = self.get_job(job_ID)
             task_suc = task['successors']
             if job is None or task_ID not in job["runningTasks"]:
-                return 
+                return
         except:
             print("Retrying task finished")
             return self.__task_finished(task_ID)
-        
 
         # updating the predecessors count for the successors tasks of the finished task(ready state)
         for t in task_suc:
@@ -362,8 +334,8 @@ class State:
                 # if the task is in the state and the dependencies meet; added it to the queue
                 if t in job['remainingTasks']:
                     self.preprocessor.queue.append(t)
-                    
-        # adding the task to the finisheds and removing it from the runnigs
+
+        # adding the task to the finished and removing it from the running tasks
         job["finishedTasks"].append(task_ID)
         job["runningTasks"].remove(task_ID)
     

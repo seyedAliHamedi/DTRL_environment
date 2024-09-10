@@ -8,12 +8,13 @@ from torch.distributions import Categorical
 from sklearn.cluster import KMeans
 import torch.optim as optim
 
+
 class ActorCritic(nn.Module):
-    def __init__(self, input_dims, n_actions,devices):
+    def __init__(self, input_dims, n_actions, devices):
         super(ActorCritic, self).__init__()
         self.input_dims = input_dims
         self.n_actions = n_actions
-        self.actor = ClusterTree(devices=devices,depth=0,max_depth=3)
+        self.actor = ClusterTree(devices=devices, depth=0, max_depth=3)
         self.critic = nn.Sequential(
             nn.Linear (5 + 2 * len(devices), 128), nn.ReLU(), nn.Linear(128, 1))
 
@@ -32,13 +33,13 @@ class ActorCritic(nn.Module):
         self.states = []
 
     def forward(self, x):
-        p,path,devices = self.actor(x)
+        p, path, devices = self.actor(x)
         v = self.critic(x)
-        return p,path,devices, v
+        return p, path, devices, v
 
     def choose_action(self, ob):
         state = torch.tensor(ob, dtype=torch.float)
-        pi,path,devices, _ = self.forward(state)
+        pi, path, devices, _ = self.forward(state)
 
         # Ensure numerical stability for softmax
         pi = pi - pi.max()
@@ -47,7 +48,7 @@ class ActorCritic(nn.Module):
         dist = Categorical(probs)
         action = dist.sample()
 
-        return action.item(),path,devices
+        return action.item(), path, devices
 
     def calculate_returns(self):
         G = 0
@@ -70,20 +71,20 @@ class ActorCritic(nn.Module):
         pis = []
         values = []
         for state in states:
-            pi, _,_,value = self.forward(state)
+            pi, _, _, value = self.forward(state)
             pis.append(pi)
             values.append(value)
-        
-        max_len = max([pi.size(0) for pi in pis])  
-        padded_pis = [torch.nn.functional.pad(pi, (0, max_len - pi.size(0))) for pi in pis]  
+
+        max_len = max([pi.size(0) for pi in pis])
+        padded_pis = [torch.nn.functional.pad(pi, (0, max_len - pi.size(0))) for pi in pis]
         pis = torch.stack(padded_pis, dim=0)
-        
+
         values = torch.stack(values, dim=0).squeeze()
 
         # Ensure numerical stability for softmax
         pis = pis - pis.max(dim=-1, keepdim=True)[0]
         probs = F.softmax(pis, dim=-1)
-        
+
         # Adjust actions that are out of bounds
         action_mask = (actions < max_len).long()
         actions = torch.clamp(actions, 0, max_len - 1)
@@ -112,11 +113,8 @@ class CoreScheduler(nn.Module):
         self.optimizers = [optim.Adam(tree.parameters(), lr=0.005)for tree in self.forest]
 
     def createTree(self, device):
-        return DDT(num_input=self.num_features, num_output=device['num_cores']*3, depth=0, max_depth=np.log2(device['num_cores']))
-    
-    
-
-
+        return DDT(num_input=self.num_features, num_output=device['num_cores'] * 3, depth=0,
+                   max_depth=np.log2(device['num_cores']))
 
 
 class DDT(nn.Module):
@@ -138,7 +136,7 @@ class DDT(nn.Module):
             self.right = DDT(num_input, num_output, depth + 1,
                              max_depth)
 
-    def forward(self, x,path=""):
+    def forward(self, x, path=""):
         if self.depth == self.max_depth:
             return self.prob_dist, path
         val = torch.sigmoid(
@@ -157,7 +155,6 @@ class ClusterTree(nn.Module):
         super(ClusterTree, self).__init__()
         self.depth = depth
         self.max_depth = max_depth
-        
         self.devices = devices
         # 5 weights for task and 4 for each device
         num_features = 5 + 2 * len(devices)
@@ -176,15 +173,15 @@ class ClusterTree(nn.Module):
             clusters = self.cluster(self.devices)
             left_cluster = clusters[0]
             right_cluster = clusters[1]
-            self.left = ClusterTree(left_cluster, depth+1, max_depth)
-            self.right = ClusterTree(right_cluster, depth+1, max_depth)
+            self.left = ClusterTree(left_cluster, depth + 1, max_depth)
+            self.right = ClusterTree(right_cluster, depth + 1, max_depth)
 
-    def forward(self, x,path=""):
+    def forward(self, x, path=""):
         if self.depth == self.max_depth:
-            return self.prob_dist,path,self.devices
+            return self.prob_dist, path, self.devices
 
         val = torch.sigmoid((torch.matmul(x, self.weights.t()) + self.bias))
-        
+
         a = np.random.random()
         a = float("{:.6f}".format(a))
         if a < self.exploration_rate:
@@ -218,12 +215,12 @@ class ClusterTree(nn.Module):
         X = np.array(data)
         kmeans = KMeans(n_clusters=k, init="random", random_state=random_state)
         kmeans.fit(X)
-        
+
         cluster_labels = kmeans.labels_
         clusters = [[] for _ in range(k)]
 
         balanced_labels = self.balance_clusters(cluster_labels, k, len(devices))
-        
+
         for device, label in zip(devices, balanced_labels):
             clusters[label].append(device)
         return clusters
@@ -234,16 +231,16 @@ class ClusterTree(nn.Module):
         """
         target_cluster_size = n_samples // k
         max_imbalance = n_samples % k  # Allowable imbalance due to indivisible n_samples
-        
+
         cluster_sizes = Counter(labels)
-        
+
         # List to store the indices of samples in each cluster
         cluster_indices = {i: [] for i in range(k)}
-        
+
         # Populate the cluster_indices dictionary
         for idx, label in enumerate(labels):
             cluster_indices[label].append(idx)
-            
+
         # Reassign samples to achieve balanced clusters
         for cluster in range(k):
             while len(cluster_indices[cluster]) > target_cluster_size:
@@ -259,14 +256,14 @@ class ClusterTree(nn.Module):
                         break
 
         return labels
-    
+
     def _clusters_balanced(self, cluster_indices, target_size, max_imbalance):
         """
         Check if clusters are balanced within an allowable imbalance.
         """
         imbalance_count = sum(abs(len(indices) - target_size) for indices in cluster_indices.values())
         return imbalance_count <= max_imbalance
-    
+
     def get_pe_data(self, pe):
         battery_capacity = pe['battery_capacity']
         battery_isl = pe['ISL']

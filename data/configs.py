@@ -18,7 +18,7 @@ devices_config = {
         "battery_capacity": (36, 41),
         "error_rate": (0.01, 0.06),
         "safe": (0.25, 0.75),
-        "maxQueue": 5
+        "maxQueue": 1
     },
     "mec": {
         "num_devices": 15,
@@ -37,16 +37,17 @@ devices_config = {
         "battery_capacity": -1,
         "error_rate": (0.5, 0.11),
         "safe": (0.5, 0.5),
-        "maxQueue": 5
+        "maxQueue": 1
 
     },
     "cloud": {
-        "num_devices": 0,
-        "num_cores": -1,
-        "voltage_frequencies": ((2.8e9, 13.85), (3.9e9, 24.28)),
+        "num_devices": 1,
+        "num_cores": 128,
+        # TODO cloud , please correct these numbers
+        "voltage_frequencies": ((2.8e9, 13.85e-6), (3.9e9, 24.28e-6), (5e9, 36e-6)),
         "isl": -1,
-        "capacitance": -1,
-        "powerIdle": 0,
+        "capacitance": (3, 5),
+        "powerIdle": [0],
         "battery_capacity": -1,
         "error_rate": (0.10, 0.15),
         "safe": (1, 0),
@@ -70,9 +71,9 @@ jobs_config = {
 }
 
 environment_config = {
-    "multi_agent": 15,
-    "window": {"size": 100, "max_jobs": 20, "clock": 10},
-    "environment": {"cycle": 0.01, "anomaly_th": 0.5},
+    "multi_agent": 5,
+    "window": {"size": 25, "max_jobs": 5, "clock": 8},
+    "environment": {"cycle": 0.01, "anomaly_th": 5},
 }
 
 monitor_config = {
@@ -89,5 +90,3 @@ monitor_config = {
         'memory': './logs/simulation/memory.png',
     }
 }
-
-

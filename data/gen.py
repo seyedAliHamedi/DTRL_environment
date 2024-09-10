@@ -49,9 +49,9 @@ class Generator:
 
             for _ in range(config["num_devices"]):
                 cpu_cores = (
-                    -1
-                    if config["num_cores"]
-                    == -1 else int(np.random.choice(config["num_cores"]))
+                    config['num_cores']
+                    if type == 'cloud'
+                    else int(np.random.choice(config["num_cores"]))
                 )
                 device_info = {
                     "id": Generator._device_id_counter,
@@ -60,7 +60,7 @@ class Generator:
                     "voltages_frequencies": [
                         [
                             config["voltage_frequencies"][i]
-                            for i in np.random.choice(5 if type == "iot" else 4, size=3, replace=False)
+                            for i in np.random.choice(len(config['voltage_frequencies']), size=3, replace=False)
                         ]
                         for _ in range(cpu_cores)
                     ],
