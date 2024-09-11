@@ -9,7 +9,6 @@ from torch.distributions import Categorical
 from sklearn.cluster import KMeans
 import torch.optim as optim
 
-from environment.util import Exploration
 
 
 class ActorCritic(nn.Module):
@@ -19,9 +18,9 @@ class ActorCritic(nn.Module):
         self.n_actions = n_actions
         self.exploration_rate=0.9
         self.explore_decay=0.9995
-        self.actor = ClusTree(devices=devices, depth=0, max_depth=3,exploration_rate=self.exploration_rate,explore_decay=self.explore_decay)
+        self.actor = ClusterTree(devices=devices, depth=0, max_depth=3)
         self.critic = nn.Sequential(
-            nn.Linear (8 , 128), nn.ReLU(), nn.Linear(128, 1))
+            nn.Linear (8 + 2*len(devices) , 128), nn.ReLU(), nn.Linear(128, 1))
 
         self.rewards = []
         self.actions = []
@@ -103,7 +102,7 @@ class CoreScheduler(nn.Module):
     def __init__(self, devices):
         super(CoreScheduler, self).__init__()
         self.devices = devices
-        self.num_features = 8
+        self.num_features = 10
         self.forest = [self.createTree(device) for device in devices]
         self.optimizers = [optim.Adam(tree.parameters(), lr=0.005) for tree in self.forest]
 
@@ -144,7 +143,7 @@ class DDT(nn.Module):
 
 class ClusterTree(nn.Module):
     class ExplorationParams:
-        def __init__(self, exploration_rate=0.9, explore_decay=0.995):
+        def __init__(self, exploration_rate=0.99, explore_decay=0.005):
             self.exploration_rate = exploration_rate
             self.explore_decay = explore_decay
             
@@ -153,24 +152,24 @@ class ClusterTree(nn.Module):
         self.depth = depth
         self.max_depth = max_depth
         self.devices=devices
-        self.exploration_params = exploration_params if exploration_params else DDT.ExplorationParams()
+        self.exploration_params = exploration_params if exploration_params else ClusterTree.ExplorationParams()
         
-        # 5 weights for task and 2 for each device
-        num_features = 5 + 2 * len(devices)
+        # 8 weights for task and 2 for each device
+        num_features = 8 + 2 * len(devices)
 
         if depth != max_depth:
             self.weights = nn.Parameter(torch.empty(
                 num_features).normal_(mean=0, std=0.1))
             self.bias = nn.Parameter(torch.zeros(1))
         if depth == max_depth:
-            self.prob_dist = torch.nn.Parameter(torch.ones(10))
+            self.prob_dist = torch.nn.Parameter(torch.ones(len(self.devices)))
 
         if depth < max_depth:
             clusters = self.cluster(self.devices)
             left_cluster = clusters[0]
             right_cluster = clusters[1]
-            self.left = ClusterTree(left_cluster, depth + 1, max_depth)
-            self.right = ClusterTree(right_cluster, depth + 1, max_depth)
+            self.left = ClusterTree(left_cluster, depth + 1, max_depth,exploration_params)
+            self.right = ClusterTree(right_cluster, depth + 1, max_depth,exploration_params)
 
     def forward(self, x, path=""):
         if self.depth == self.max_depth:
@@ -187,17 +186,17 @@ class ClusterTree(nn.Module):
         if val >= 0.5:
             indices = [self.devices.index(device)
                        for device in self.right.devices]
-            temp = x[5:].view(-1, 2)
+            temp = x[8:].view(-1, 2)
             indices_tensor = torch.tensor(indices)
-            x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
+            x = torch.cat((x[0:8], temp[indices_tensor].view(-1)), dim=0)
             right_output, right_path, devices = self.right(x, path + "R")
             return val * right_output, right_path, devices
         else:
             indices = [self.devices.index(device)
                        for device in self.left.devices]
-            temp = x[5:].view(-1, 2)
+            temp = x[8:].view(-1, 2)
             indices_tensor = torch.tensor(indices)
-            x = torch.cat((x[0:5], temp[indices_tensor].view(-1)), dim=0)
+            x = torch.cat((x[0:8], temp[indices_tensor].view(-1)), dim=0)
             left_output, left_path, devices = self.left(x, path + "L")
             return val * left_output, left_path, devices
 
