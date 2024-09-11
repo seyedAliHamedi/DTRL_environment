@@ -349,6 +349,8 @@ class State:
                 
     def find_place(self,pe, core_i):
         with self.lock:
+            if pe['type']=='cloud' and pe["queue"][core_i][0][1]!=-1 and core_i<127:
+                return self.find_place(pe["queue"][core_i+1])
             for i, slot in enumerate(pe["queue"][core_i]):
                 if slot[1] == -1:
                     return i, core_i
