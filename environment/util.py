@@ -21,8 +21,3 @@ def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
         return -((alpha * e + beta * t) ** 2)
 
 
-def find_place(pe, core_i):
-    for i, slot in enumerate(pe["queue"][core_i]):
-        if slot[1] == -1:
-            return i, core_i
-    return -1, -1

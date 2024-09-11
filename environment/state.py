@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from data.db import Database
 from environment.pre_processing import Preprocessing
-from environment.util import reward_function, find_place
+from environment.util import reward_function
 from environment.window_manager import WindowManager
 
 import torch.multiprocessing as mp
@@ -93,7 +93,7 @@ class State:
         # TODO t must include time of tasks scheduled before it ,in selected queue
         placing_slot = (1, task_ID)
 
-        queue_index, core_index = find_place(pe_dict, core_i)
+        queue_index, core_index = self.find_place(pe_dict, core_i)
         fail_flags = [0, 0, 0, 0]
         if task["is_safe"] and not pe['handleSafeTask']:
             # fail : assigned safe task to unsafe device
@@ -124,7 +124,7 @@ class State:
         pe_dict["energyConsumption"][
             core_index] = capacitance * (volt * volt) * freq
         e = capacitance * (volt * volt) * freq * t
-        return reward_function(e=e, t=t), fail_flags, e, t
+        return 0, fail_flags, e, t
 
     def calc_battery_punish(self, pe_dict, pe, energy):
         batteryFail = 0
@@ -345,14 +345,10 @@ class State:
         job["finishedTasks"].append(task_ID)
         job["runningTasks"].remove(task_ID)
 
-    def check_up_jobs(self):
-        # TODO : cheap move
-        # Multiprocessing Robustness
-        try:
-            jobs = self.get_jobs()
-        except:
-            print("Retrying clean running tasks")
-            self.check_up_jobs()
-        for job in jobs:
-            for task_ID in jobs[job]['runningTasks']:
-                self.__task_finished(task_ID)
+                
+    def find_place(self,pe, core_i):
+        with self.lock:
+            for i, slot in enumerate(pe["queue"][core_i]):
+                if slot[1] == -1:
+                    return i, core_i
+            return -1, -1

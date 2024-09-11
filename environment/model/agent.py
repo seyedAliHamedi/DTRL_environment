@@ -75,7 +75,7 @@ class Agent(mp.Process):
                 continue
             self.t_counter += 1
             if self.t_counter >= self.time_out_counter :
-                job = self.state.get_job(self.assigned_job)
+                # job = self.state.get_job(self.assigned_job)
                 print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} ')
                 self.assigned_job = None
 
@@ -100,7 +100,7 @@ class Agent(mp.Process):
             # retrieve the necessary data
             job_state, pe_state = self.state.get()
             current_task = self.state.database.get_task_norm(current_task_id)
-            input_state = self.get_input(current_task, pe_state)
+            input_state = self.get_input(current_task, {})
         except:
             print("Retrying schedule on : ", self.name)
             self.schedule(current_task_id)
@@ -111,7 +111,8 @@ class Agent(mp.Process):
         selected_device_index = self.devices.index(selected_device)
 
         # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
-        sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]})
+        # sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]})
+        sub_state = self.get_input(current_task, {})
         sub_state = torch.tensor(sub_state, dtype=torch.float32)
         action_logits, sub_path = self.core.forest[selected_device_index](sub_state)
         action_dist = torch.distributions.Categorical(F.softmax(action_logits, dim=-1))
@@ -210,6 +211,9 @@ class Agent(mp.Process):
             task["computational_load"],
             task["input_size"],
             task["output_size"],
-            task["task_kind"],
+            task["kind1"],
+            task["kind2"],
+            task["kind3"],
+            task["kind4"],
             task["is_safe"],
         ]

@@ -53,8 +53,12 @@ class Database:
     # -------- normalize -------
     def normalize_tasks(self,tasks_normalize):
         for column in tasks_normalize.columns.values:
-            if column in ("computational_load","input_size","output_size","is_safe","task_kind"):
+            if column in ("computational_load","input_size","output_size","is_safe"):
                 tasks_normalize[column] = (tasks_normalize[column] - tasks_normalize[column].min()) / (tasks_normalize[column].max() - tasks_normalize[column].min())
+        kinds=[1,2,3,4]
+        for kind in kinds:
+            tasks_normalize[f'kind{kind}'] = tasks_normalize['task_kind'].isin([kind]).astype(int)
+        tasks_normalize.drop(['task_kind'],axis=1)
         return tasks_normalize
         
     def get_pe_data(self, id):
