@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
-
 from environment.model.actor_critic import ActorCritic, CoreScheduler
 
 
@@ -55,6 +54,9 @@ class Agent(mp.Process):
 
         self.path_history = []
 
+    def exp_value(self):
+        return self.local_actor_critic.exp.value
+
     def run(self):
         while self.runner_flag:
             self.barrier.wait()
@@ -74,7 +76,7 @@ class Agent(mp.Process):
             if task_queue is None:
                 continue
             self.t_counter += 1
-            if self.t_counter >= self.time_out_counter :
+            if self.t_counter >= self.time_out_counter:
                 job = self.state.get_job(self.assigned_job)
                 print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} ')
                 self.assigned_job = None
@@ -124,6 +126,10 @@ class Agent(mp.Process):
         # applying action on the state and retrieving the result
         reward, fail_flag, energy, time = self.state.apply_action(
             selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
+
+        # print(f'reward for e:{energy},t:{time} -> {reward}|'
+        #       f'task_cl:{self.state.database.get_task(current_task_id)["computational_load"]} '
+        #       f'with dev{self.state.database.get_device(selected_device_index)["type"]}')
 
         if action:
             sub_tree_loss = (-action_dist.log_prob(action) * reward)
@@ -195,8 +201,6 @@ class Agent(mp.Process):
         self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())
 
     ####### UTILITY #######
-
-
 
     def get_input(self, task, pe_dict):
         task_features = self.get_task_data(task)

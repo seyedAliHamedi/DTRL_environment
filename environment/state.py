@@ -48,8 +48,10 @@ class State:
 
     def get_job(self, job_id):
         return self.get_jobs().get(job_id)
+
     def remove_job(self, job_id):
         del self._jobs[job_id]
+
     ##### Intializations
     def _init_PEs(self, PEs, manager):
         # initializing the PEs live variable from db
@@ -91,7 +93,7 @@ class State:
         if execution_time > 5:
             execution_time = 5
         # TODO t must include time of tasks scheduled before it ,in selected queue
-        placing_slot = (1, task_ID)
+        placing_slot = (execution_time, task_ID)
 
         queue_index, core_index = find_place(pe_dict, core_i)
         fail_flags = [0, 0, 0, 0]
@@ -104,7 +106,7 @@ class State:
         if queue_index == -1 and core_index == -1:
             # fail : assigned a task to a full queue core
             fail_flags[2] = 0
-            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
+            return reward_function(punish=True) * sum(fail_flags), fail_flags, 0, 0
 
         if sum(fail_flags) > 0:
             return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
@@ -124,7 +126,7 @@ class State:
         pe_dict["energyConsumption"][
             core_index] = capacitance * (volt * volt) * freq
         e = capacitance * (volt * volt) * freq * t
-        return reward_function(e=e, t=t), fail_flags, e, t
+        return reward_function(t=t, e=e), fail_flags, e, t
 
     def calc_battery_punish(self, pe_dict, pe, energy):
         batteryFail = 0

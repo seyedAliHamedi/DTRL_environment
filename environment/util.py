@@ -26,3 +26,14 @@ def find_place(pe, core_i):
         if slot[1] == -1:
             return i, core_i
     return -1, -1
+
+
+class Exploration:
+    def __init__(self, starting_exp, decay, min_exp):
+        self.value = starting_exp
+        self._decay = decay
+        self._min_exp = min_exp
+
+    def decay(self):
+        if self.value >= self._min_exp:
+            self.value -= self._decay
