@@ -1,7 +1,7 @@
 devices_config = {
     "iot": {
-        "num_devices": 20,
-        "num_cores": [2,4,8],
+        "num_devices": 7,
+        "num_cores": [2],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -18,10 +18,10 @@ devices_config = {
         "battery_capacity": (36, 41),
         "error_rate": (0.01, 0.06),
         "safe": (0.25, 0.75),
-        "maxQueue": 3
+        "maxQueue": 1
     },
     "mec": {
-        "num_devices": 11,
+        "num_devices": 0,
         "num_cores": [8,16,32],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -50,7 +50,7 @@ devices_config = {
         "powerIdle": [0],
         "battery_capacity": -1,
         "error_rate": (0.10, 0.15),
-        "safe": (1, 0),
+        "safe": (0,1),
         "maxQueue": 1
     },
 }
@@ -72,7 +72,7 @@ jobs_config = {
 
 environment_config = {
     "multi_agent": 10,
-    "time_out_counter": 100,
+    "time_out_counter": 250,
     "window": {"size": 50, "max_jobs": 10, "clock": 10},
     "environment": {"cycle": 0.01, "anomaly_th": 5},
 }

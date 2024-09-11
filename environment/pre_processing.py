@@ -25,6 +25,8 @@ class Preprocessing:
             if job not in self.assigned_jobs:
                 self.assigned_jobs.append(job)
                 return job
+    def drop_job(self,job_id):
+        self.assigned_jobs.remove(job_id)
 
     def update_active_jobs(self):
         state_jobs = self.state.get_jobs()

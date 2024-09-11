@@ -79,6 +79,7 @@ class Agent(mp.Process):
             if self.t_counter >= self.time_out_counter:
                 # job = self.state.get_job(self.assigned_job)
                 print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} ')
+                # self.state.preprocessor.drop_job(self.assigned_job)
                 self.assigned_job = None
 
             for task in task_queue:
@@ -206,9 +207,25 @@ class Agent(mp.Process):
         task_features = self.get_task_data(task)
         pe_features = []
         for pe in pe_dict.values():
-            pe_features.extend(self.state.database.get_device_norm(pe['id']))
+            pe_features.extend(self.get_pe_data(pe,pe['id']))
         return task_features + pe_features
 
+    def get_pe_data(self,pe_dict,pe_id):
+        pe = self.state.database.get_device(pe_id)
+        devicePower = pe['devicePower']
+        
+        batteryLevel = pe_dict['batteryLevel']
+        battery_capacity = pe['battery_capacity']
+        battery_isl = pe['ISL']
+        battery = ((1 - battery_isl) * battery_capacity - batteryLevel)/battery_capacity
+        
+        num_cores = pe['num_cores']
+        cores = 1 - (sum(pe_dict['occupiedCores'])/num_cores)
+        
+        return [cores,devicePower,battery]
+    
+    
+    
     def get_task_data(self, task):
         return [
             task["computational_load"],

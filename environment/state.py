@@ -99,14 +99,13 @@ class State:
         fail_flags = [0, 0, 0, 0]
         if task["is_safe"] and not pe['handleSafeTask']:
             # fail : assigned safe task to unsafe device
-            fail_flags[0] = 1
+            fail_flags[0] = 0
         if task["task_kind"] not in pe["acceptableTasks"]:
             # fail : assigned a kind of task to the inappropriate device
-            fail_flags[1] = 1
+            fail_flags[1] = 0
         if queue_index == -1 and core_index == -1:
             # fail : assigned a task to a full queue core
-            fail_flags[2] = 0
-            return reward_function(punish=True) * sum(fail_flags), fail_flags, 0, 0
+            fail_flags[2] = 1
 
         if sum(fail_flags) > 0:
             return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0

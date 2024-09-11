@@ -10,8 +10,7 @@ class Database:
         self._task_norm = self._tasks.copy()
         self._task_norm=self.normalize_tasks(self._task_norm)
         
-        self._devices_norm = self._devices.copy()
-        self._devices_norm = self.normalize_devices(self._devices_norm )
+        self._devices = self.normalize_devices(self._devices)
         
     # ------------ all ----------
 
@@ -39,8 +38,6 @@ class Database:
     def get_task_norm(self, id):
         return self._task_norm.iloc[id].to_dict()
     
-    def get_device_norm(self,id):
-        return self._devices_norm.iloc[id].values
     
     def task_pred_dec(self, id):
         self._tasks.at[id, "pred_count"] -= 1
@@ -61,11 +58,8 @@ class Database:
         tasks_normalize.drop(['task_kind'],axis=1)
         return tasks_normalize
         
-    def get_pe_data(self, id):
-        pe = self.get_device(id)
-        battery_capacity = pe['battery_capacity']
-        battery_isl = pe['ISL']
-        battery = (1 - battery_isl) * battery_capacity
+    def get_pe_data(self, pe):
+ 
 
         num_cores = pe['num_cores']
 
@@ -78,30 +72,12 @@ class Database:
             devicePower += corePower
         devicePower = devicePower / num_cores
 
-        error_rate = pe['error_rate']
 
-        return [ devicePower, battery]
+        return devicePower
 
-    def normalize_devices(self, devices_normalize):
-        # Create empty lists to store the devicePower and battery values for all devices
-        devicePower_list = []
-        battery_list = []
+    def normalize_devices(self, df):
+        df['devicePower'] = df.apply(self.get_pe_data, axis=1)
 
-        # Iterate through each device and calculate devicePower and battery
-        for idx, device in devices_normalize.iterrows():
-            devicePower, battery = self.get_pe_data(idx)
-            devicePower_list.append(devicePower)
-            battery_list.append(battery)
+        df['devicePower'] = (df['devicePower'] - df['devicePower'].min()) / (df['devicePower'].max() - df['devicePower'].min())
 
-        # Convert the lists into a DataFrame to easily apply normalization
-        df_normalize = pd.DataFrame({
-            'devicePower': devicePower_list,
-            'battery': battery_list
-        })
-
-        # Normalize the 'devicePower' and 'battery' columns using MinMaxScaler
-        scaler = MinMaxScaler()
-        df_normalize[['devicePower', 'battery']] = scaler.fit_transform(df_normalize[['devicePower', 'battery']])
-
-
-        return df_normalize
+        return df
