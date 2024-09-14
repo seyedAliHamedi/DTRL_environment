@@ -215,7 +215,7 @@ class Environment:
         # Heatmap for path history
         # print(path_history)
         if path_history and len(path_history) > 0:
-            output_classes = ["LLL", "LLR", "LRL", "LRR", "RLL", "RLR", "RRL", "RRR"]
+            output_classes = ["LL", "LR", "RL", "RR"]
             path_counts = np.zeros((len(path_history), len(output_classes)))
 
             for epoch in range(len(path_history)):

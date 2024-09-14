@@ -4,7 +4,6 @@ from data.db import Database
 from environment.pre_processing import Preprocessing
 from environment.util import reward_function
 from environment.window_manager import WindowManager
-
 import torch.multiprocessing as mp
 
 
@@ -87,45 +86,49 @@ class State:
         except:
             print("Retry apply action")
             return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
+        with self.lock:
+            execution_time = np.ceil(task["computational_load"] / freq)
 
-        execution_time = t = np.ceil(task["computational_load"] / freq)
+            if execution_time > 5:
+                execution_time = 5
+            # TODO t must include time of tasks scheduled before it ,in selected queue
+            placing_slot = (execution_time, task_ID)
 
-        if execution_time > 5:
-            execution_time = 5
-        # TODO t must include time of tasks scheduled before it ,in selected queue
-        placing_slot = (execution_time, task_ID)
+            queue_index, core_index, lag_time = self.find_place(pe_dict, core_i)
 
-        queue_index, core_index = self.find_place(pe_dict, core_i)
-        fail_flags = [0, 0, 0, 0]
-        if task["is_safe"] and not pe['handleSafeTask']:
-            # fail : assigned safe task to unsafe device
-            fail_flags[0] = 0
-        if task["task_kind"] not in pe["acceptableTasks"]:
-            # fail : assigned a kind of task to the inappropriate device
-            fail_flags[1] = 0
-        if queue_index == -1 and core_index == -1:
-            # fail : assigned a task to a full queue core
-            fail_flags[2] = 1
+            fail_flags = [0, 0, 0, 0]
+            if task["is_safe"] and not pe['handleSafeTask']:
+                # fail : assigned safe task to unsafe device
+                fail_flags[0] = 1
+            if task["task_kind"] not in pe["acceptableTasks"]:
+                # fail : assigned a kind of task to the inappropriate device
+                fail_flags[1] = 1
+            if queue_index == -1 and core_index == -1:
+                # fail : assigned a task to a full queue core
+                fail_flags[2] = 1
 
-        if sum(fail_flags) > 0:
-            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
+            if sum(fail_flags) > 0:
+                return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
-        # print(f'task{task_ID},   device{pe_ID},   core{core_index},    queue{queue_index}')
-        pe_dict["queue"][core_index] = pe_dict["queue"][core_index][:queue_index] + [placing_slot] + \
-                                       pe_dict["queue"][core_index][queue_index + 1:]
+            # print(f'task{task_ID},   device{pe_ID},   core{core_index},    queue{queue_index}')
+            pe_dict["queue"][core_index] = pe_dict["queue"][core_index][:queue_index] + [placing_slot] + \
+                                           pe_dict["queue"][core_index][queue_index + 1:]
 
-        # updating the live status of the state after the schedule
-        job_dict["runningTasks"].append(task_ID)
-        job_dict["remainingTasks"].remove(task_ID)
+            # updating the live status of the state after the schedule
+            # TODO robust
+            job_dict["runningTasks"].append(task_ID)
+            try:
+                job_dict["remainingTasks"].remove(task_ID)
+            except:
+                print('bug')
 
-        # updating the pre processor queue
-        self.preprocessor.queue.remove(task_ID)
+            # updating the pre processor queue
+            self.preprocessor.queue.remove(task_ID)
 
         capacitance = pe["capacitance"][core_index]
-        pe_dict["energyConsumption"][
-            core_index] = capacitance * (volt * volt) * freq
-        e = capacitance * (volt * volt) * freq * t
-        return reward_function(t=t, e=e), fail_flags, e, t
+        pe_dict["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
+        e = capacitance * (volt * volt) * freq * execution_time
+        return reward_function(t=execution_time + lag_time, e=e), fail_flags, e, execution_time + lag_time
 
     def calc_battery_punish(self, pe_dict, pe, energy):
         batteryFail = 0
@@ -216,6 +219,9 @@ class State:
         for job_ID in jobs_list.keys():
             # decreasing the deadline of the jobs by 1 cycle
             job = jobs_list.get(job_ID)
+            # TODO robust
+            if job is None:
+                continue
             job["remainingDeadline"] -= 1
 
             # removing the finished jobs from the state
@@ -346,12 +352,16 @@ class State:
         job["finishedTasks"].append(task_ID)
         job["runningTasks"].remove(task_ID)
 
-                
-    def find_place(self,pe, core_i):
-        with self.lock:
-            if pe['type']=='cloud' and pe["queue"][core_i][0][1]!=-1 and core_i<127:
-                return self.find_place(pe["queue"][core_i+1])
-            for i, slot in enumerate(pe["queue"][core_i]):
-                if slot[1] == -1:
-                    return i, core_i
-            return -1, -1
+    def find_place(self, pe, core_i):
+        lag_time = 0
+        if pe['type'] == 'cloud':
+            for core_index, queue in enumerate(pe["queue"]):
+                if queue[0][1] == -1:
+                    return 0, core_index, 0
+        # if pe['type'] == 'cloud' and pe["queue"][core_i][0][1] != -1 and core_i < 127:
+        #     return self.find_place(pe, core_i + 1)
+        for i, slot in enumerate(pe["queue"][core_i]):
+            if slot[1] == -1:
+                lag_time = sum([time for time, taskIndex in pe["queue"][core_i][0:i]])
+                return i, core_i, lag_time
+        return -1, -1, -1

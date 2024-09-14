@@ -9,6 +9,7 @@ from torch.distributions import Categorical
 from sklearn.cluster import KMeans
 import torch.optim as optim
 
+from environment.util import Exploration
 
 
 class ActorCritic(nn.Module):
@@ -16,7 +17,8 @@ class ActorCritic(nn.Module):
         super(ActorCritic, self).__init__()
         self.input_dims = input_dims
         self.n_actions = n_actions
-        self.actor = ClusterTree(devices=devices, depth=0, max_depth=3)
+        self.exp = Exploration(1, 0.002, 0.01)
+        self.actor = ClusterTree(devices=devices, depth=0, max_depth=2, exp=self.exp)
         self.critic = nn.Sequential(
             nn.Linear (8 + 3*len(devices) , 128), nn.ReLU(), nn.Linear(128, 1))
 
@@ -140,18 +142,12 @@ class DDT(nn.Module):
 
 
 class ClusterTree(nn.Module):
-    class ExplorationParams:
-        def __init__(self, exploration_rate=0.99, explore_decay=0.01):
-            self.exploration_rate = exploration_rate
-            self.explore_decay = explore_decay
-            
-    def __init__(self, devices, depth, max_depth,exploration_params=None):
+    def __init__(self, devices, depth, max_depth, exp):
         super(ClusterTree, self).__init__()
         self.depth = depth
         self.max_depth = max_depth
-        self.devices=devices
-        self.exploration_params = exploration_params if exploration_params else ClusterTree.ExplorationParams()
-        
+        self.devices = devices
+        self.exp = exp
         # 8 weights for task and 3 for each device
         num_features = 8 + 3 * len(devices)
 
@@ -160,14 +156,14 @@ class ClusterTree(nn.Module):
                 num_features).normal_(mean=0, std=0.1))
             self.bias = nn.Parameter(torch.zeros(1))
         if depth == max_depth:
-            self.prob_dist = torch.nn.Parameter(torch.ones(len(self.devices)))
+            self.prob_dist = nn.Parameter(torch.full((len(devices),), torch.rand(1).item()))
 
         if depth < max_depth:
             clusters = self.cluster(self.devices)
             left_cluster = clusters[0]
             right_cluster = clusters[1]
-            self.left = ClusterTree(left_cluster, depth + 1, max_depth,exploration_params)
-            self.right = ClusterTree(right_cluster, depth + 1, max_depth,exploration_params)
+            self.left = ClusterTree(left_cluster, depth + 1, max_depth, exp)
+            self.right = ClusterTree(right_cluster, depth + 1, max_depth, exp)
 
     def forward(self, x, path=""):
         if self.depth == self.max_depth:
@@ -177,9 +173,9 @@ class ClusterTree(nn.Module):
 
         a = np.random.random()
         a = float("{:.6f}".format(a))
-        if random.random() < self.exploration_params.exploration_rate:
+        if a < self.exp.value:
             val = np.random.random()
-            self.exploration_params.exploration_rate -= self.exploration_params.explore_decay 
+            self.exp.decay()
 
         if val >= 0.5:
             indices = [self.devices.index(device)
@@ -218,7 +214,7 @@ class ClusterTree(nn.Module):
 
     def balance_clusters(self, labels, k, n_samples):
         target_cluster_size = n_samples // k
-        max_imbalance = n_samples % k  
+        max_imbalance = n_samples % k
 
         cluster_sizes = Counter(labels)
         cluster_indices = {i: [] for i in range(k)}

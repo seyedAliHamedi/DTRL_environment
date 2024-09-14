@@ -23,6 +23,8 @@ class WindowManager:
             self.current_cycle += 1
             self.state.set_task_window([])
         else:
+            if len(self.state.get_jobs()) > 50:
+                return
             self.current_cycle = 0
             self.state.set_task_window(self.get_window())
 

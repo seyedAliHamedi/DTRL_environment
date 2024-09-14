@@ -103,6 +103,8 @@ class Generator:
                     "maxQueue": config["maxQueue"],
 
                 }
+                if type == 'cloud':
+                    device_info['acceptableTasks'] = [1, 2, 3, 4]
                 Generator._device_id_counter += 1
                 devices_data.append(device_info)
 

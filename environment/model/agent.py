@@ -79,9 +79,9 @@ class Agent(mp.Process):
             if self.t_counter >= self.time_out_counter:
                 # job = self.state.get_job(self.assigned_job)
                 print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} ')
-                # self.state.preprocessor.drop_job(self.assigned_job)
+                self.state.remove_job(self.assigned_job)
+                # TODO drop job if bugged, need to bugfix
                 self.assigned_job = None
-
             for task in task_queue:
                 self.schedule(task)
             try:
@@ -112,7 +112,6 @@ class Agent(mp.Process):
         option, path, devices = self.local_actor_critic.choose_action(input_state)
         selected_device = devices[option]
         selected_device_index = self.devices.index(selected_device)
-
         # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
         sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]})
         sub_state = torch.tensor(sub_state, dtype=torch.float32)
@@ -207,25 +206,23 @@ class Agent(mp.Process):
         task_features = self.get_task_data(task)
         pe_features = []
         for pe in pe_dict.values():
-            pe_features.extend(self.get_pe_data(pe,pe['id']))
+            pe_features.extend(self.get_pe_data(pe, pe['id']))
         return task_features + pe_features
 
-    def get_pe_data(self,pe_dict,pe_id):
+    def get_pe_data(self, pe_dict, pe_id):
         pe = self.state.database.get_device(pe_id)
         devicePower = pe['devicePower']
-        
+
         batteryLevel = pe_dict['batteryLevel']
         battery_capacity = pe['battery_capacity']
         battery_isl = pe['ISL']
-        battery = ((1 - battery_isl) * battery_capacity - batteryLevel)/battery_capacity
-        
+        battery = ((1 - battery_isl) * battery_capacity - batteryLevel) / battery_capacity
+
         num_cores = pe['num_cores']
-        cores = 1 - (sum(pe_dict['occupiedCores'])/num_cores)
-        
-        return [cores,devicePower,battery]
-    
-    
-    
+        cores = 1 - (sum(pe_dict['occupiedCores']) / num_cores)
+
+        return [cores, devicePower, battery]
+
     def get_task_data(self, task):
         return [
             task["computational_load"],

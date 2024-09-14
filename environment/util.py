@@ -21,3 +21,12 @@ def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
         return -((alpha * e + beta * t) ** 2)
 
 
+class Exploration:
+    def __init__(self, starting_exp, decay, min_exp):
+        self.value = starting_exp
+        self._decay = decay
+        self._min_exp = min_exp
+
+    def decay(self):
+        if self.value >= self._min_exp:
+            self.value -= self._decay
