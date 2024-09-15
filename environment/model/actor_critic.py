@@ -17,7 +17,7 @@ class ActorCritic(nn.Module):
         super(ActorCritic, self).__init__()
         self.input_dims = input_dims
         self.n_actions = n_actions
-        self.exp = Exploration(1, 0.002, 0.01)
+        self.exp = Exploration(1, 0.005, 0.01)
         self.actor = ClusterTree(devices=devices, depth=0, max_depth=2, exp=self.exp)
         self.critic = nn.Sequential(
             nn.Linear (8 + 3*len(devices) , 128), nn.ReLU(), nn.Linear(128, 1))
@@ -102,43 +102,49 @@ class CoreScheduler(nn.Module):
     def __init__(self, devices):
         super(CoreScheduler, self).__init__()
         self.devices = devices
-        self.num_features = 11
+        
         self.forest = [self.createTree(device) for device in devices]
         self.optimizers = [optim.Adam(tree.parameters(), lr=0.005) for tree in self.forest]
 
     def createTree(self, device):
-        max_depth=np.log2(device['num_cores'])
-        num_input=self.num_features
+        max_depth=3
+        num_input=10+device['num_cores']
         num_output=device['num_cores'] * 3
         return DDT(num_input,num_output,0,max_depth)
 
 
 class DDT(nn.Module):
-    def __init__(self, num_input, num_output, depth, max_depth, ):
+    def __init__(self, num_input, num_output, depth, max_depth,exp=Exploration(1,0.01,0.01) ):
         super(DDT, self).__init__()
         self.depth = depth
         self.max_depth = max_depth
-
+        self.exp = exp
         if depth != max_depth:
             self.weights = nn.Parameter(torch.empty(num_input).normal_(mean=0, std=0.1))
             self.bias = nn.Parameter(torch.zeros(1))
-            self.alpha = nn.Parameter(torch.zeros(1))
         if depth == max_depth:
-            self.prob_dist = nn.Parameter(torch.zeros(num_output))
+            self.prob_dist = nn.Parameter(torch.ones(num_output))
         if depth < max_depth:
-            self.left = DDT(num_input, num_output, depth + 1,max_depth)
-            self.right = DDT(num_input, num_output, depth + 1,max_depth)
+            self.left = DDT(num_input, num_output, depth + 1,max_depth,self.exp)
+            self.right = DDT(num_input, num_output, depth + 1,max_depth,self.exp)
+        
+
 
     def forward(self, x):
         if self.depth == self.max_depth:
             return self.prob_dist
-        val = torch.sigmoid(
-            self.alpha * (torch.matmul(x, self.weights) + self.bias))
+        val = torch.tanh(torch.matmul(x, self.weights.t()) + self.bias)
+    
+        if random.random() < self.exp.value:
+            val =2* np.random.random()-1
+            self.exp.decay()
 
-        if val >= 0.5:
-            return val *  self.right(x)
+        val_softmax = torch.softmax(torch.tensor([val, -val]), dim=0)  
+            
+        if val >= 0:
+            return val_softmax[0] *  self.right(x)
         else:
-            return (1 - val) * self.left(x)
+            return val_softmax[1] * self.left(x)
 
 
 class ClusterTree(nn.Module):
@@ -169,22 +175,26 @@ class ClusterTree(nn.Module):
         if self.depth == self.max_depth:
             return self.prob_dist, path, self.devices
 
-        val = torch.sigmoid((torch.matmul(x, self.weights.t()) + self.bias))
-
-        a = np.random.random()
-        a = float("{:.6f}".format(a))
-        if a < self.exp.value:
-            val = np.random.random()
+        
+        val = torch.tanh(torch.matmul(x, self.weights.t()) + self.bias)
+    
+        
+        if random.random() < self.exp.value:
+            val =2* np.random.random()-1
             self.exp.decay()
 
-        if val >= 0.5:
+        val_softmax = torch.softmax(torch.tensor([val, -val]), dim=0)  
+
+
+
+        if val >= 0:
             indices = [self.devices.index(device)
                        for device in self.right.devices]
             temp = x[8:].view(-1, 3)
             indices_tensor = torch.tensor(indices)
             x = torch.cat((x[0:8], temp[indices_tensor].view(-1)), dim=0)
             right_output, right_path, devices = self.right(x, path + "R")
-            return val * right_output, right_path, devices
+            return val_softmax[0] * right_output, right_path, devices
         else:
             indices = [self.devices.index(device)
                        for device in self.left.devices]
@@ -192,7 +202,7 @@ class ClusterTree(nn.Module):
             indices_tensor = torch.tensor(indices)
             x = torch.cat((x[0:8], temp[indices_tensor].view(-1)), dim=0)
             left_output, left_path, devices = self.left(x, path + "L")
-            return val * left_output, left_path, devices
+            return val_softmax[1] * left_output, left_path, devices
 
     def cluster(self, devices, k=2, random_state=42):
         torch.manual_seed(42)

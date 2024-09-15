@@ -19,7 +19,7 @@ class Agent(mp.Process):
         # the local actor-critic and the core scheduler
         self.local_actor_critic = ActorCritic(self.global_actor_critic.input_dims, self.global_actor_critic.n_actions,
                                               devices=self.devices)
-        self.core = CoreScheduler(self.devices)
+       
 
         # the current assigned job to the agent
         self.assigned_job = None
@@ -113,9 +113,9 @@ class Agent(mp.Process):
         selected_device = devices[option]
         selected_device_index = self.devices.index(selected_device)
         # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
-        sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]})
+        sub_state = self.get_input_subtree(current_task, {0: pe_state[selected_device['id']]})
         sub_state = torch.tensor(sub_state, dtype=torch.float32)
-        action_logits = self.core.forest[selected_device_index](sub_state)
+        action_logits = self.state.core.forest[selected_device_index](sub_state)
         action_dist = torch.distributions.Categorical(F.softmax(action_logits, dim=-1))
         action = action_dist.sample()
         selected_core_dvfs_index = action.item()
@@ -131,11 +131,10 @@ class Agent(mp.Process):
         #       f'task_cl:{self.state.database.get_task(current_task_id)["computational_load"]} '
         #       f'with dev{self.state.database.get_device(selected_device_index)["type"]}')
 
-        if action:
-            sub_tree_loss = (-action_dist.log_prob(action) * reward)
-            self.core.optimizers[selected_device_index].zero_grad()
-            sub_tree_loss.backward()
-            self.core.optimizers[selected_device_index].step()
+        sub_tree_loss = (-action_dist.log_prob(action) * reward)
+        self.state.core.optimizers[selected_device_index].zero_grad()
+        sub_tree_loss.backward()
+        self.state.core.optimizers[selected_device_index].step()
 
         # archive the result to the agent 
         self.local_actor_critic.archive(input_state, option, reward)
@@ -208,6 +207,12 @@ class Agent(mp.Process):
         for pe in pe_dict.values():
             pe_features.extend(self.get_pe_data(pe, pe['id']))
         return task_features + pe_features
+    def get_input_subtree(self, task, pe_dict):
+        task_features = self.get_task_data(task)
+        pe_features = []
+        for pe in pe_dict.values():
+            pe_features.extend(self.get_pe_data_subtree(pe, pe['id']))
+        return task_features + pe_features
 
     def get_pe_data(self, pe_dict, pe_id):
         pe = self.state.database.get_device(pe_id)
@@ -222,6 +227,19 @@ class Agent(mp.Process):
         cores = 1 - (sum(pe_dict['occupiedCores']) / num_cores)
 
         return [cores, devicePower, battery]
+
+    def get_pe_data_subtree(self, pe_dict, pe_id):
+        pe = self.state.database.get_device(pe_id)
+        devicePower = pe['devicePower']
+
+        batteryLevel = pe_dict['batteryLevel']
+        battery_capacity = pe['battery_capacity']
+        battery_isl = pe['ISL']
+        battery = ((1 - battery_isl) * battery_capacity - batteryLevel) / battery_capacity
+
+        num_cores = pe['num_cores']
+
+        return pe_dict['occupiedCores'] + [ devicePower, battery]
 
     def get_task_data(self, task):
         return [

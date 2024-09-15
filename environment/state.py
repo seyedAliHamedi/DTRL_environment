@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from data.db import Database
+from environment.model.actor_critic import CoreScheduler
 from environment.pre_processing import Preprocessing
 from environment.util import reward_function
 from environment.window_manager import WindowManager
@@ -17,7 +18,8 @@ class State:
         # the task window manged by the window manager
         self._task_window = manager.list()
         # initializing PEs in Idle from database
-        self._init_PEs(self.database.get_all_devices(), manager)
+        self.devices = self.database.get_all_devices()
+        self._init_PEs(self.devices, manager)
         # initializing the preprocessor and the window manager
         self.preprocessor = Preprocessing(state=self, manager=manager)
         self.window_manager = WindowManager(state=self, manager=manager)
@@ -27,6 +29,7 @@ class State:
         self.paths = manager.list([])
         self.display = display
         self.lock = mp.Lock()
+        self.core = CoreScheduler(self.devices)
 
     ###### getters & setters ######
     def get(self):
