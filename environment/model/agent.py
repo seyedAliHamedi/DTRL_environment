@@ -95,7 +95,7 @@ class Agent(mp.Process):
                 self.assigned_job = None
 
     def skip_job(self):
-        print(f'Agent {self.name}  skipped  job{self.assigned_job}')
+        print(f'NDONE')
         self.state.remove_job(self.assigned_job)
         # TODO drop job if bugged, need to bugfix
         self.update()

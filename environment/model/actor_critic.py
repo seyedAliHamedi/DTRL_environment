@@ -83,7 +83,6 @@ class ActorCritic(nn.Module):
         # Ensure actions are long type for indexing
         actions = torch.tensor(self.actions, dtype=torch.long)
         returns = self.calculate_returns()
-        pis = self.pis
         values = []
         for state in states:
             _, _, _, value = self.forward(state)
@@ -104,7 +103,7 @@ class ActorCritic(nn.Module):
 
         # actor_loss = -log_probs * (returns - values)
         actor_loss = -torch.sum(log_probs * returns)
-        critic_loss = F.mse_loss(values, returns, reduction='none')
+        # critic_loss = F.mse_loss(values, returns, reduction='none')
 
         # total_loss = (actor_loss + critic_loss).mean()
         total_loss = actor_loss

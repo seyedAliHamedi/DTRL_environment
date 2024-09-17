@@ -1,3 +1,5 @@
+from collections import deque
+
 import numpy as np
 import pandas as pd
 from data.db import Database
@@ -14,7 +16,7 @@ class State:
         # the state live values PEs & Jobs
         self._PEs = manager.dict()
         self._jobs = manager.dict()
-        self.removed_jobs = []
+        self.removed_jobs = deque(maxlen=50)
         # the task window manged by the window manager
         self._task_window = manager.list()
         # initializing PEs in Idle from database
