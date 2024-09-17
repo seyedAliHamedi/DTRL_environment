@@ -148,10 +148,6 @@ class Monitor:
                   agent=monitor_config['settings']['agent']):
         if time:
             self._save_time_log()
-        if main:
-            self._save_main_log()
-        if summery:
-            self._save_summery_log()
         if agent:
             self._save_agent_log()
 
@@ -163,8 +159,6 @@ class Monitor:
         self.agent_log['summary']['avg-fail'] = np.sum(
             self.agent_log['live-log']['fail'])
         summary_path = self._config['paths']['agent']['summary']
-        os.makedirs(os.path.dirname(summary_path), exist_ok=True)
-        self.__make_agents_plots(self._config['paths']['agent']['plots'])
         with open(summary_path, 'w') as f:
             f.write('Agent-config\n')
             json.dump(agent_config, f, indent=4)

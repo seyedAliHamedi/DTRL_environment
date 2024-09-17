@@ -60,4 +60,3 @@ class Database:
     @classmethod
     def get_task_successors(cls, task_ID):
         return Database.get_task(task_ID)['successors']
-

@@ -2,7 +2,7 @@ import time
 import traceback
 
 from data.db import Database
-from environment.agent import Agent
+from environment.AgentWrapper import AgentWrapper
 from environment.state import State
 from utilities.monitor import Monitor
 from environment.window_manager import Preprocessing, WindowManager
@@ -22,6 +22,7 @@ class Environment:
         self.__runner_flag = True
 
     def run(self):
+        agent = AgentWrapper(len(Database.get_all_devices()), 3, 5)
         iteration = 0
         try:
             while iteration <= self.n_iterations:
@@ -31,16 +32,11 @@ class Environment:
                 starting_time = time.time()
 
                 WindowManager().run()
-                State().update(iteration)
+                State().update()
                 Preprocessing().run()
-                Agent().run(self.display)
+                agent.run(self.display)
 
                 time_len = time.time() - starting_time
-
-                # Monitor logging
-                self.monitor_log(iteration)
-
-                # Calculating time passed in iteration and saving log
 
                 # Calculate sleeping time
                 self.sleep(time_len, iteration)

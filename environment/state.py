@@ -1,5 +1,5 @@
 import math
-from data.configs import summary_log_string,monitor_config
+from data.configs import summary_log_string, monitor_config
 import pandas as pd
 import numpy as np
 from data.db import Database
@@ -37,27 +37,31 @@ class State:
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
         pe = self._PEs[pe_ID]
         pe_database = Database.get_device(pe_ID)
-        acceptable_tasks = pe_database["acceptableTasks"]
         task = Database.get_task(task_ID)
 
-        fail_flag = 0
-        if (task["task_kind"] not in acceptable_tasks) and (task["is_safe"] and not pe_database['handleSafeTask']):
-            fail_flag = 2
-            return self.reward_function(punish=True), fail_flag, 0, 0
-        elif Database.get_task(task_ID)["is_safe"] and not pe_database['handleSafeTask']:
-            fail_flag = 1
-            return self.reward_function(punish=True), fail_flag, 0, 0
-        elif task["task_kind"] not in acceptable_tasks:
-            fail_flag = 1
-            return self.reward_function(punish=True), fail_flag, 0, 0
+        execution_time = np.ceil(task["computational_load"] / freq)
 
-        execution_time = t = math.ceil(Database.get_task(task_ID)[
-                                           "computational_load"] / freq)
+        if execution_time > 5:
+            execution_time = 5
+        # TODO t must include time of tasks scheduled before it ,in selected queue
         placing_slot = (execution_time, task_ID)
-        queue_index, core_index = find_place(pe, core_i)
 
-        # if queue_index == -1:
-        #     return self.reward_function(punish=-100)
+        queue_index, core_index, lag_time = find_place(pe, core_i)
+
+        fail_flags = [0, 0, 0, 0]
+        if task["is_safe"] and not pe_database['handleSafeTask']:
+            # fail : assigned safe task to unsafe device
+            fail_flags[0] = 1
+        if task["task_kind"] not in pe_database["acceptableTasks"]:
+            # fail : assigned a kind of task to the inappropriate device
+            fail_flags[1] = 1
+        if queue_index == -1 and core_index == -1:
+            # fail : assigned a task to a full queue core
+            fail_flags[2] = 0
+            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
+
+        if sum(fail_flags) > 0:
+            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
         # apply on queue
         pe["queue"][core_index][queue_index] = placing_slot
@@ -70,22 +74,10 @@ class State:
         job["runningTasks"].append(task_ID)
 
         # apply energyConsumption
-        if pe['type'] == 'cloud':
-            pe["energyConsumption"][core_index] = volt
-            e = volt * t
-        else:
-            capacitance = Database.get_device(pe_ID)["capacitance"][core_index]
-            pe["energyConsumption"][core_index] = capacitance * \
-                                                  (volt * volt) * freq
-            e = capacitance * (volt * volt) * freq * t
-
-        return self.reward_function(e=e, alpha=1, t=t, beta=1), fail_flag, e, t
-
-    def reward_function(self, e=0, alpha=0, t=0, beta=0, punish=0):
-        if punish == 0:
-            return np.exp(-1 * (e + t))
-        else:
-            return -100
+        capacitance = pe_database["capacitance"][core_index]
+        pe["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
+        e = capacitance * (volt * volt) * freq * execution_time
+        return reward_function(t=execution_time, e=e), fail_flags, e, execution_time
 
     def _init_PEs(self, PEs):
         for pe in PEs:
@@ -113,9 +105,9 @@ class State:
                 "remainingDeadline": job["deadline"],
             }
 
-    ####### ENVIRONMENT #######
-    def update(self, iteration):
+        ####### ENVIRONMENT #######
 
+    def update(self):
         # process 1
         self.__update_jobs()
         # process 2
@@ -130,16 +122,9 @@ class State:
             print(pd.DataFrame(self._jobs), "\n")
             print("|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||")
 
-        if monitor_config['settings']['main']:
-            Monitor().add_log('PEs::', start='\n\n', end='')
-            Monitor().add_log(f'{pd.DataFrame(self._PEs).to_string()}')
-            Monitor().add_log("Jobs::", start='\n', end='')
-            Monitor().add_log(f'{pd.DataFrame(self._jobs).to_string()}')
-            Monitor().add_log(summary_log_string, start='\n')
+        ########  UPDATE JOBS #######
 
-    ########  UPDATE JOBS #######
     def __update_jobs(self):
-
         self.__add_new_active_jobs(self._task_window)
 
         removing_items = []
@@ -181,7 +166,8 @@ class State:
         for job in self._jobs.values():
             job["assignedTask"] = None
 
-    ####### UPDATE PEs #######
+        ####### UPDATE PEs #######
+
     def __update_PEs(self):
         for pe_ID in self._PEs.keys():
             pe = self._PEs[pe_ID]
@@ -209,20 +195,9 @@ class State:
                 if current_queue[0][1] != -1:
                     finished_task_ID = current_queue[0][1]
                     self.__task_finished(finished_task_ID)
-                if pe["type"] == "cloud":
-                    deleting_queues_on_pe.append(core_index)
-                    continue
                 queue_shift_left(current_queue)
             else:
-                current_queue[0] = (
-                    current_queue[0][0] - 1, current_queue[0][1])
-        self.__remove_unused_cores_cloud(pe, deleting_queues_on_pe)
-
-    def __remove_unused_cores_cloud(self, pe, core_list):
-        for i, item in enumerate(core_list):
-            del pe["queue"][item - i]
-            del pe["occupiedCores"][item - i]
-            del pe["energyConsumption"][item - i]
+                current_queue[0] = (current_queue[0][0] - 1, current_queue[0][1])
 
     def __task_finished(self, task_ID):
         job_ID = Database.get_task(task_ID)["job_id"]
@@ -238,26 +213,16 @@ class State:
             if is_core_free(pe["queue"][core_index]):
                 pe["occupiedCores"][core_index] = 0
                 # set default energy cons for idle cores
-                pe["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
-                    core_index]
+                if pe['type'] == 'cloud':
+                    pe["energyConsumption"][core_index] = 0
+                else:
+                    pe["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
+                        core_index]
             else:
                 pe["occupiedCores"][core_index] = 1
 
 
 ####### UTILITY #######
-def find_place(pe, core_i):
-    if pe["type"] == "cloud":
-        pe["queue"].append([])
-        pe["queue"][-1].append((0, -1))
-        pe["energyConsumption"].append(0)
-        pe["occupiedCores"].append(1)
-        return 0, len(pe["queue"]) - 1
-    else:
-        for i, slot in enumerate(pe["queue"][core_i]):
-            if slot == (0, -1):
-                return i, core_i
-    return -1, -1
-
 
 def is_core_free(queue):
     if queue[0] == (0, -1):
@@ -277,3 +242,22 @@ def is_already_added_to_job(task, job_task_list):
             return True
         else:
             return False
+
+
+def find_place(pe, core_i):
+    if pe['type'] == 'cloud' or True:
+        for core_index, queue in enumerate(pe["queue"]):
+            if queue[0][1] == -1:
+                return 0, core_index, 0
+    # for i, slot in enumerate(pe["queue"][core_i]):
+    #     if slot[1] == -1:
+    #         lag_time = sum([time for time, taskIndex in pe["queue"][core_i][0:i]])
+    #         return i, core_i, lag_time
+    return -1, -1, -1
+
+
+def reward_function(e=0, alpha=1, t=0, beta=1, punish=False):
+    if punish is True:
+        return -10
+    else:
+        return np.exp(-1 * (e * alpha + t * beta))
