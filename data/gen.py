@@ -92,7 +92,7 @@ class Generator:
                     ),
                     "acceptableTasks": list(np.random.choice(
                         jobs_config["task"]["task_kinds"],
-                        size=np.random.randint(3, 5),
+                        size=np.random.randint(2, 3),
                         replace=False,
                     )),
                     "handleSafeTask": int(

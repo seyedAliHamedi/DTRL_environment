@@ -11,9 +11,8 @@ class Preprocessing:
         self.assigned_jobs = manager.list()
         # the ready 
         self.queue = manager.list()
-        
+
         self.max_jobs = config['multi_agent']
-    
 
     def run(self):
         self.update_active_jobs()
@@ -25,11 +24,17 @@ class Preprocessing:
             if job not in self.assigned_jobs:
                 self.assigned_jobs.append(job)
                 return job
-    def drop_job(self,job_id):
+
+    def drop_job(self, job_id):
         self.assigned_jobs.remove(job_id)
 
     def update_active_jobs(self):
         state_jobs = self.state.get_jobs()
+
+        # remove skipped jobs
+        for removed_job in self.state.removed_jobs:
+            self.active_jobs.pop(removed_job)
+
         # Add or update jobs in active_jobs
         for job_ID in state_jobs.keys():
             self.active_jobs[job_ID] = state_jobs[job_ID]
@@ -43,7 +48,6 @@ class Preprocessing:
 
         for job_ID in deleting_list:
             self.active_jobs.pop(job_ID)
-
 
     def process(self):
         # add window tasks to the queues
@@ -76,4 +80,3 @@ class Preprocessing:
                 if task['job_id'] == job_ID:
                     agent_queue[job_ID].append(task_ID)
         return agent_queue
-

@@ -6,7 +6,7 @@ from environment.model.actor_critic import ActorCritic, CoreScheduler
 
 
 class Agent(mp.Process):
-    def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state, time_out_counter):
+    def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state, time_out_counter, max_fail):
         super(Agent, self).__init__()
         # the worker/agent name
         self.name = name
@@ -23,6 +23,8 @@ class Agent(mp.Process):
 
         # the current assigned job to the agent
         self.assigned_job = None
+        self.current_fail_counter = 0
+        self.max_fail = max_fail
 
         # the runner flag and the barrier for the workers process
         self.runner_flag = mp.Value('b', True)
@@ -67,8 +69,6 @@ class Agent(mp.Process):
                     if self.t_counter >= self.time_out_counter:
                         print(f'Agent {self.name}  TIMEOUT ( no job to be assigned) !!!')
                     continue
-                else:
-                    self.t_counter = 0
                 self.local_actor_critic.clear_memory()
                 self.init_logs()
 
@@ -76,23 +76,32 @@ class Agent(mp.Process):
             if task_queue is None:
                 continue
             self.t_counter += 1
-            if self.t_counter >= self.time_out_counter:
-                # job = self.state.get_job(self.assigned_job)
-                print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} ')
-                self.state.remove_job(self.assigned_job)
-                # TODO drop job if bugged, need to bugfix
-                self.assigned_job = None
+
             for task in task_queue:
-                self.schedule(task)
+                fails = self.schedule(task)
+                self.current_fail_counter += fails
+            if self.current_fail_counter >= self.max_fail or self.t_counter >= self.time_out_counter:
+                self.skip_job()
             try:
                 current_job = self.state.get_job(self.assigned_job)
             except:
                 pass
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job[
                 "task_count"]:
+                self.t_counter = 0
+                self.current_fail_counter = 0
                 print("DONE")
                 self.update()
                 self.assigned_job = None
+
+    def skip_job(self):
+        print(f'Agent {self.name}  skipped  job{self.assigned_job}')
+        self.state.remove_job(self.assigned_job)
+        # TODO drop job if bugged, need to bugfix
+        self.update()
+        self.assigned_job = None
+        self.t_counter = 0
+        self.current_fail_counter = 0
 
     def stop(self):
         self.runner_flag = False
@@ -110,7 +119,7 @@ class Agent(mp.Process):
             self.schedule(current_task_id)
 
         # first-level schedule , select a device
-        option, path, devices = self.local_actor_critic.choose_action(input_state)
+        option, path, devices, pis = self.local_actor_critic.choose_action(input_state)
         selected_device = devices[option]
         selected_device_index = self.devices.index(selected_device)
         # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
@@ -139,10 +148,12 @@ class Agent(mp.Process):
             self.core.optimizers[selected_device_index].step()
 
         # archive the result to the agent 
-        self.local_actor_critic.archive(input_state, option, reward)
+        self.local_actor_critic.archive(input_state, option, reward, pis)
 
         # saving agent logs 
         self.update_agent_logs(reward, time, energy, fail_flag, selected_device, path)
+
+        return sum(fail_flag)
 
     def update_agent_logs(self, reward, time, energy, fail_flag, selected_device, path):
         self.reward_log.append(reward)

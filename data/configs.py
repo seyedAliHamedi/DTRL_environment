@@ -50,7 +50,7 @@ devices_config = {
         "powerIdle": [0],
         "battery_capacity": -1,
         "error_rate": (0.10, 0.15),
-        "safe": (1,0),
+        "safe": (1, 0),
         "maxQueue": 1
     },
 }
@@ -71,9 +71,10 @@ jobs_config = {
 }
 
 environment_config = {
-    "multi_agent": 5,
-    "time_out_counter": 150,
-    "window": {"size": 50, "max_jobs": 6, "clock": 10},
+    "multi_agent": 3,
+    "max_fail": 30,
+    "time_out_counter": 50,
+    "window": {"size": 10, "max_jobs": 3, "clock": 10},
     "environment": {"cycle": 0.01, "anomaly_th": 5},
 }
 

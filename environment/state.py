@@ -14,6 +14,7 @@ class State:
         # the state live values PEs & Jobs
         self._PEs = manager.dict()
         self._jobs = manager.dict()
+        self.removed_jobs = []
         # the task window manged by the window manager
         self._task_window = manager.list()
         # initializing PEs in Idle from database
@@ -50,6 +51,7 @@ class State:
 
     def remove_job(self, job_id):
         del self._jobs[job_id]
+        self.removed_jobs.append(job_id)
 
     ##### Intializations
     def _init_PEs(self, PEs, manager):
@@ -240,6 +242,9 @@ class State:
             try:
                 task = self.database.get_task(task_id)
                 job = self.database.get_job(task['job_id'])
+                if job in self.removed_jobs:
+                    print("trying to add removed job to jobs but prevented")
+                    continue
             except:
                 print("Retrying add new active jobs ")
                 self.__add_new_active_jobs(self, new_tasks, manager)
@@ -332,6 +337,9 @@ class State:
         try:
             task = self.database.get_task(task_ID)
             job_ID = task["job_id"]
+            if job_ID in self.removed_jobs:
+                print("Tried to finish a task which its owner job was removed before but prevented")
+                return
             job = self.get_job(job_ID)
             task_suc = task['successors']
             if job is None or task_ID not in job["runningTasks"]:
@@ -359,8 +367,8 @@ class State:
                 if queue[0][1] == -1:
                     return 0, core_index, 0
         # Code for selecting first free stout of first available core
-        for i, slot in enumerate(pe["queue"][core_i]):
-            if slot[1] == -1:
-                lag_time = sum([time for time, taskIndex in pe["queue"][core_i][0:i]])
-                return i, core_i, lag_time
+        # for i, slot in enumerate(pe["queue"][core_i]):
+        #     if slot[1] == -1:
+        #         lag_time = sum([time for time, taskIndex in pe["queue"][core_i][0:i]])
+        #         return i, core_i, lag_time
         return -1, -1, -1

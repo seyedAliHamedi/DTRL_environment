@@ -59,7 +59,8 @@ class Environment:
             # organize and start the agents
             worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic,
                            global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state,
-                           time_out_counter=data.configs.environment_config["time_out_counter"])
+                           time_out_counter=data.configs.environment_config["time_out_counter"],
+                           max_fail=data.configs.environment_config['max_fail'])
             self.workers.append(worker)
             worker.start()
 
@@ -215,7 +216,7 @@ class Environment:
         # Heatmap for path history
         # print(path_history)
         if path_history and len(path_history) > 0:
-            output_classes = ["LLL", "LLR", "LRL", "LRR","RLL", "RLR", "RRL", "RRR"]
+            output_classes = ["LLL", "LLR", "LRL", "LRR", "RLL", "RLR", "RRL", "RRR"]
             path_counts = np.zeros((len(path_history), len(output_classes)))
 
             for epoch in range(len(path_history)):
