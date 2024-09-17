@@ -25,7 +25,7 @@ class Environment:
         iteration = 0
         try:
             while iteration <= self.n_iterations:
-                if iteration % 500 == 0:
+                if iteration % 100 == 0:
                     print(f"iteration : {iteration}")
 
                 starting_time = time.time()
