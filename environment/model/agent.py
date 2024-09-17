@@ -103,7 +103,8 @@ class Agent(mp.Process):
             # retrieve the necessary data
             job_state, pe_state = self.state.get()
             current_task = self.state.database.get_task_norm(current_task_id)
-            input_state = self.get_input(current_task, pe_state)
+            # TODO for feeding tree features give pe_dict correctly
+            input_state = self.get_input(current_task, {})
         except:
             print("Retrying schedule on : ", self.name)
             self.schedule(current_task_id)

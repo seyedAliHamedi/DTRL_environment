@@ -18,9 +18,10 @@ class ActorCritic(nn.Module):
         self.input_dims = input_dims
         self.n_actions = n_actions
         self.exp = Exploration(1, 0.002, 0.01)
-        self.actor = ClusterTree(devices=devices, depth=0, max_depth=2, exp=self.exp)
+        self.actor = ClusterTree(devices=devices, depth=0, max_depth=3, exp=self.exp)
         self.critic = nn.Sequential(
-            nn.Linear (8 + 3*len(devices) , 128), nn.ReLU(), nn.Linear(128, 1))
+            # Features
+            nn.Linear (8 + 0 *len(devices) , 128), nn.ReLU(), nn.Linear(128, 1))
 
         self.rewards = []
         self.actions = []
@@ -148,8 +149,8 @@ class ClusterTree(nn.Module):
         self.max_depth = max_depth
         self.devices = devices
         self.exp = exp
-        # 8 weights for task and 3 for each device
-        num_features = 8 + 3 * len(devices)
+        # 8 weights for task and 3 for each device, Features
+        num_features = 8 + 0 * len(devices)
 
         if depth != max_depth:
             self.weights = nn.Parameter(torch.empty(
@@ -180,7 +181,8 @@ class ClusterTree(nn.Module):
         if val >= 0.5:
             indices = [self.devices.index(device)
                        for device in self.right.devices]
-            temp = x[8:].view(-1, 3)
+            # temp = x[8:].view(-1, 3)
+            temp = x[8:]
             indices_tensor = torch.tensor(indices)
             x = torch.cat((x[0:8], temp[indices_tensor].view(-1)), dim=0)
             right_output, right_path, devices = self.right(x, path + "R")
@@ -188,7 +190,8 @@ class ClusterTree(nn.Module):
         else:
             indices = [self.devices.index(device)
                        for device in self.left.devices]
-            temp = x[8:].view(-1, 3)
+            # temp = x[8:].view(-1, 3),
+            temp = x[8:]
             indices_tensor = torch.tensor(indices)
             x = torch.cat((x[0:8], temp[indices_tensor].view(-1)), dim=0)
             left_output, left_path, devices = self.left(x, path + "L")

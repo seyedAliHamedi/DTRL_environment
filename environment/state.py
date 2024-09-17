@@ -128,7 +128,7 @@ class State:
         capacitance = pe["capacitance"][core_index]
         pe_dict["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
         e = capacitance * (volt * volt) * freq * execution_time
-        return reward_function(t=execution_time + lag_time, e=e), fail_flags, e, execution_time + lag_time
+        return reward_function(t=execution_time, e=e), fail_flags, e, execution_time
 
     def calc_battery_punish(self, pe_dict, pe, energy):
         batteryFail = 0
@@ -353,13 +353,12 @@ class State:
         job["runningTasks"].remove(task_ID)
 
     def find_place(self, pe, core_i):
-        lag_time = 0
-        if pe['type'] == 'cloud':
+        # Code for selecting first free core
+        if pe['type'] == 'cloud' or True:
             for core_index, queue in enumerate(pe["queue"]):
                 if queue[0][1] == -1:
                     return 0, core_index, 0
-        # if pe['type'] == 'cloud' and pe["queue"][core_i][0][1] != -1 and core_i < 127:
-        #     return self.find_place(pe, core_i + 1)
+        # Code for selecting first free stout of first available core
         for i, slot in enumerate(pe["queue"][core_i]):
             if slot[1] == -1:
                 lag_time = sum([time for time, taskIndex in pe["queue"][core_i][0:i]])
