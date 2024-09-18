@@ -1,6 +1,6 @@
 devices_config = {
     "iot": {
-        "num_devices": 7,
+        "num_devices": 20,
         "num_cores": [2, 4, 8],
         "voltage_frequencies": [
             (10e6, 1.8),
@@ -21,7 +21,7 @@ devices_config = {
         "maxQueue": 5
     },
     "mec": {
-        "num_devices": 0,
+        "num_devices": 11,
         "num_cores": [8, 16, 32],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
@@ -56,7 +56,7 @@ devices_config = {
 }
 
 jobs_config = {
-    "num_jobs": 10000,
+    "num_jobs": 100000,
     "max_deadline": 2000,
     "max_task_per_depth": 2,
     "max_depth": 2,
@@ -65,7 +65,7 @@ jobs_config = {
         "input_size": [1, 1001],
         "output_size": [1, 1001],
         "computational_load": [1, 1001],
-        "safe_measurement": [0.8, 0.2],
+        "safe_measurement": [0.5, 0.5],
         "task_kinds": [1, 2, 3, 4],
     },
 }

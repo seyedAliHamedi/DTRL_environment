@@ -17,8 +17,7 @@ class Agent(mp.Process):
         self.global_actor_critic = global_actor_critic
         self.global_optimizer = global_optimizer
         # the local actor-critic and the core scheduler
-        self.local_actor_critic = ActorCritic(self.global_actor_critic.input_dims, self.global_actor_critic.n_actions,
-                                              devices=self.devices)
+        self.local_actor_critic = ActorCritic(global_actor_critic.input_dim,global_actor_critic.output_dim,global_actor_critic.tree_max_depth,global_actor_critic.cirtic_input_dim,global_actor_critic.cirtic_hidden_layer_dim,global_actor_critic.devices,global_actor_critic.discount_factor)
        
 
         # the current assigned job to the agent
@@ -33,6 +32,7 @@ class Agent(mp.Process):
 
         self.time_out_counter = time_out_counter
         self.t_counter = 0
+        self.state.core = CoreScheduler(subtree_input_dims=10,subtree_max_depth=3,devices=self.devices,subtree_lr=0.005)
 
     def init_logs(self):
         # intilizing the agent_log
@@ -103,15 +103,16 @@ class Agent(mp.Process):
             # retrieve the necessary data
             job_state, pe_state = self.state.get()
             current_task = self.state.database.get_task_norm(current_task_id)
-            input_state = self.get_input(current_task, pe_state)
+            input_state = self.get_input(current_task, {})
         except:
             print("Retrying schedule on : ", self.name)
             self.schedule(current_task_id)
 
         # first-level schedule , select a device
-        option, path, devices = self.local_actor_critic.choose_action(input_state)
-        selected_device = devices[option]
-        selected_device_index = self.devices.index(selected_device)
+        option, path = self.local_actor_critic.choose_action(input_state)
+        selected_device = self.devices[option]
+        selected_device_index = option
+        
         # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
         sub_state = self.get_input_subtree(current_task, {0: pe_state[selected_device['id']]})
         sub_state = torch.tensor(sub_state, dtype=torch.float32)
@@ -131,10 +132,10 @@ class Agent(mp.Process):
         #       f'task_cl:{self.state.database.get_task(current_task_id)["computational_load"]} '
         #       f'with dev{self.state.database.get_device(selected_device_index)["type"]}')
 
-        sub_tree_loss = (-action_dist.log_prob(action) * reward)
-        self.state.core.optimizers[selected_device_index].zero_grad()
-        sub_tree_loss.backward()
-        self.state.core.optimizers[selected_device_index].step()
+        # sub_tree_loss = (-action_dist.log_prob(action) * reward)
+        # self.state.core.optimizers[selected_device_index].zero_grad()
+        # sub_tree_loss.backward()
+        # self.state.core.optimizers[selected_device_index].step()
 
         # archive the result to the agent 
         self.local_actor_critic.archive(input_state, option, reward)
@@ -190,6 +191,7 @@ class Agent(mp.Process):
         self.save_agent_log(loss.item())
 
         # update params 
+        self.global_optimizer.zero_grad()
         loss.backward()
 
         # set global params and load them again

@@ -29,7 +29,7 @@ class State:
         self.paths = manager.list([])
         self.display = display
         self.lock = mp.Lock()
-        self.core = CoreScheduler(self.devices)
+        
 
     ###### getters & setters ######
     def get(self):
@@ -108,7 +108,8 @@ class State:
                 fail_flags[1] = 1
             if queue_index == -1 and core_index == -1:
                 # fail : assigned a task to a full queue core
-                fail_flags[2] = 1
+                fail_flags[2] = 0
+                return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
             if sum(fail_flags) > 0:
                 return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
@@ -357,12 +358,13 @@ class State:
 
     def find_place(self, pe, core_i):
         lag_time = 0
-        if pe['type'] == 'cloud':
+        if pe['type'] == 'cloud' or True:
             for core_index, queue in enumerate(pe["queue"]):
                 if queue[0][1] == -1:
                     return 0, core_index, 0
         # if pe['type'] == 'cloud' and pe["queue"][core_i][0][1] != -1 and core_i < 127:
         #     return self.find_place(pe, core_i + 1)
+        return -1, -1, -1
         for i, slot in enumerate(pe["queue"][core_i]):
             if slot[1] == -1:
                 lag_time = sum([time for time, taskIndex in pe["queue"][core_i][0:i]])

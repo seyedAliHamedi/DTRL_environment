@@ -3,7 +3,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import os
 import json
-import threading
 import time
 import traceback
 
@@ -13,7 +12,6 @@ from environment.model.agent import Agent
 from environment.model.shared_adam import SharedAdam
 from environment.monitor import Monitor
 from environment.state import State
-from utilities.memory_monitor import MemoryMonitor
 from data.configs import environment_config, monitor_config
 
 import torch.multiprocessing as mp
@@ -24,9 +22,6 @@ class Environment:
     def __init__(self, n_iterations, display):
         # numver of iterations for the environment/simulation
         self.n_iterations = n_iterations
-        # the memory monitor and it's thread
-        self.memory_monitor = MemoryMonitor()
-        self.mem_monitor_thread = threading.Thread(target=self.memory_monitor.run)
         # the minimumm wait between iterations
         self.cycle_wait = environment_config["environment"]["cycle"]
         # the shared state and the manager for shared memory variables/dictionaries/lists
@@ -44,9 +39,9 @@ class Environment:
 
     def run(self):
         print("Loading devices...")
-        devices = self.db.get_all_devices()
+        self.devices = self.db.get_all_devices()
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(input_dims=5, n_actions=len(devices), devices=devices)
+        global_actor_critic = ActorCritic(input_dim=8,output_dim=len(self.devices),tree_max_depth=2,cirtic_input_dim=8,cirtic_hidden_layer_dim=128,devices=self.devices,discount_factor=0)
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
         # setting up workers and their barriers
@@ -65,7 +60,6 @@ class Environment:
 
         iteration = 0
         try:
-            self.mem_monitor_thread.start()
             while iteration <= self.n_iterations:
                 if iteration % 10 == 0 and iteration != 0:
                     print(f"iteration : {iteration}", len(self.state.get_jobs()))
