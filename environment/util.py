@@ -3,7 +3,7 @@ import numpy as np
 
 def reward_function(setup=5, e=0, alpha=1, t=0, beta=1, punish=0):
     if punish:
-        return -10
+        return -1
     if setup == 1:
         return -1 * (alpha * e + beta * t)
     elif setup == 2:

@@ -119,8 +119,8 @@ class Agent(mp.Process):
             self.schedule(current_task_id)
 
         # first-level schedule , select a device
-        option, path, devices, pis = self.local_actor_critic.choose_action(input_state)
-        selected_device = devices[option]
+        option, _ = self.local_actor_critic.choose_action(input_state)
+        selected_device = self.devices[option]
         selected_device_index = self.devices.index(selected_device)
         # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
         sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]})
@@ -148,9 +148,10 @@ class Agent(mp.Process):
             self.core.optimizers[selected_device_index].step()
 
         # archive the result to the agent 
-        self.local_actor_critic.archive(input_state, option, reward, pis)
+        self.local_actor_critic.archive(input_state, option, reward)
 
-        # saving agent logs 
+        # saving agent logs
+        path = 'RRR'
         self.update_agent_logs(reward, time, energy, fail_flag, selected_device, path)
 
         return sum(fail_flag)

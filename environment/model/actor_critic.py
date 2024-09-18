@@ -9,6 +9,7 @@ from torch.distributions import Categorical
 from sklearn.cluster import KMeans
 import torch.optim as optim
 
+from environment.model.nn_agent import Agent
 from environment.util import Exploration
 
 
@@ -18,7 +19,7 @@ class ActorCritic(nn.Module):
         self.input_dims = input_dims
         self.n_actions = n_actions
         self.exp = Exploration(1, 0.002, 0.01, )
-        self.actor = ClusterTree(devices=devices, depth=0, max_depth=3, exp=self.exp)
+        self.actor = Agent(8, len(devices))
         self.critic = nn.Sequential(
             # Features
             nn.Linear(8 + 0 * len(devices), 128), nn.ReLU(), nn.Linear(128, 1))
@@ -26,44 +27,26 @@ class ActorCritic(nn.Module):
         self.rewards = []
         self.actions = []
         self.states = []
-        self.pis = []
 
-    def archive(self, state, action, reward, p):
+    def archive(self, state, action, reward):
         self.states.append(state)
         self.actions.append(action)
         self.rewards.append(reward)
-        self.pis.append(p)
 
     def clear_memory(self):
         self.rewards = []
         self.actions = []
         self.states = []
-        self.pis = []
 
     def forward(self, x):
-        a = np.random.random()
-        a = float("{:.6f}".format(a))
-        if a < self.actor.exp.value:
-            explore = True
-            self.actor.exp.decay()
-        else:
-            explore = False
-        p, path, devices = self.actor(x, explore=explore)
-        v = self.critic(x)
-        return p, path, devices, v
+        probs = self.actor.act(x)
+        return probs
 
     def choose_action(self, ob):
-        state = torch.tensor(ob, dtype=torch.float)
-        pi, path, devices, _ = self.forward(state)
-
-        # Ensure numerical stability for softmax
-        pi = pi - pi.max()
-        probs = F.softmax(pi, dim=-1)
-
-        dist = Categorical(probs)
-        action = dist.sample()
-
-        return action.item(), path, devices, pi
+        state = torch.tensor(ob, dtype=torch.float).unsqueeze(0)
+        probs = self.forward(state)
+        action = np.random.choice(self.actor.action_size, p=probs.data.numpy().squeeze())
+        return action, probs
 
     def calculate_returns(self):
         G = 0
@@ -79,33 +62,16 @@ class ActorCritic(nn.Module):
 
     def calc_loss(self):
         states = torch.tensor(self.states, dtype=torch.float)
-
-        # Ensure actions are long type for indexing
         actions = torch.tensor(self.actions, dtype=torch.long)
         returns = self.calculate_returns()
-        values = []
-        for state in states:
-            _, _, _, value = self.forward(state)
-            # pis.append(pi)
-            values.append(value)
 
-        # pis = torch.stack(pis, dim=0)
+        pred_batch = self.actor.act(states)
 
-        values = torch.stack(values, dim=0).squeeze()
+        prob_batch = pred_batch.gather(dim=1, index=actions.long().view(-1, 1)).squeeze()
 
-        # Ensure numerical stability for softmax
-        # pis = pis - pis.max(dim=-1, keepdim=True)[0]
-        pis = torch.stack(self.pis)
-        probs = F.softmax(pis, dim=-1)
-
-        dist = Categorical(probs)
-        log_probs = dist.log_prob(actions)
-
-        # actor_loss = -log_probs * (returns - values)
+        log_probs = torch.log(prob_batch)
         actor_loss = -torch.sum(log_probs * returns)
-        # critic_loss = F.mse_loss(values, returns, reduction='none')
 
-        # total_loss = (actor_loss + critic_loss).mean()
         total_loss = actor_loss
         return total_loss
 
