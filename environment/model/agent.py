@@ -2,95 +2,78 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
-from environment.model.actor_critic import ActorCritic, CoreScheduler
+from environment.model.actor_critic import ActorCritic
+from environment.model.utilities import CoreScheduler
 
 
 class Agent(mp.Process):
     def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state, time_out_counter):
         super(Agent, self).__init__()
-        # the worker/agent name
-        self.name = name
-        # the database devices
-        self.devices = shared_state.database.get_all_devices()
-
-        # the global Actor-Critic and the gloval optimzer(Shared Adam)
-        self.global_actor_critic = global_actor_critic
-        self.global_optimizer = global_optimizer
+        
+        self.name = name  # worker/agent name
+        self.devices = shared_state.database.get_all_devices()  # devices from database
+        self.global_actor_critic = global_actor_critic  # global shared actor-critic model
+        self.global_optimizer = global_optimizer  # shared Adam optimizer
+        
         # the local actor-critic and the core scheduler
-        self.local_actor_critic = ActorCritic(global_actor_critic.input_dim,global_actor_critic.output_dim,global_actor_critic.tree_max_depth,global_actor_critic.cirtic_input_dim,global_actor_critic.cirtic_hidden_layer_dim,global_actor_critic.devices,global_actor_critic.discount_factor)
+        self.local_actor_critic = ActorCritic(
+            global_actor_critic.input_dim,
+            global_actor_critic.output_dim,
+            global_actor_critic.tree_max_depth,
+            global_actor_critic.critic_input_dim,
+            global_actor_critic.critic_hidden_layer_dim,
+            global_actor_critic.discount_factor
+        ) # local actor-critic model
        
 
-        # the current assigned job to the agent
-        self.assigned_job = None
+        self.assigned_job = None  # current job assigned to the agent
+        self.runner_flag = mp.Value('b', True)  # flag to control agent's execution loop
+        self.barrier = barrier  # barrier for synchronization across processes
+        self.state = shared_state  # shared state between agents
+        self.time_out_counter = time_out_counter  # counter for timeout detection
+        self.t_counter = 0  # tracks agent's wait time
+        self.state.core = CoreScheduler(subtree_input_dims=10, subtree_max_depth=3, devices=self.devices, subtree_lr=0.005)
 
-        # the runner flag and the barrier for the workers process
-        self.runner_flag = mp.Value('b', True)
-        self.barrier = barrier
-
-        # the shared state
-        self.state = shared_state
-
-        self.time_out_counter = time_out_counter
-        self.t_counter = 0
-        self.state.core = CoreScheduler(subtree_input_dims=10,subtree_max_depth=3,devices=self.devices,subtree_lr=0.005)
 
     def init_logs(self):
-        # intilizing the agent_log
+        """Initialize logs for the agent."""
         self.state.agent_log[self.assigned_job] = {}
-        self.reward_log = []
-        # reward based objectives
-        self.time_log = []
-        self.energy_log = []
-        # punish based objectives
-        self.kind_fails_log = 0
-        self.safe_fails_log = 0
-        self.queue_fails_log = 0
-        self.battery_fails_log = 0
-        self.fails_log = 0
-        # usuage and explore
-        self.iot_usuage = 0
-        self.mec_usuage = 0
-        self.cc_usuage = 0
-
+        self.reward_log, self.time_log, self.energy_log = [], [], []
+        self.kind_fails_log = self.safe_fails_log = self.queue_fails_log = self.battery_fails_log = self.fails_log = 0
+        self.iot_usuage = self.mec_usuage = self.cc_usuage = 0
         self.path_history = []
 
-    def exp_value(self):
-        return self.local_actor_critic.exp.value
 
     def run(self):
+        """Main loop where the agent keeps running, processing jobs."""
         while self.runner_flag:
-            self.barrier.wait()
+            self.barrier.wait()  # wait for all agents to be synchronized
             if self.assigned_job is None:
                 self.assigned_job = self.state.assign_job_to_agent()
                 if self.assigned_job is None:
-                    self.t_counter += 1
-                    if self.t_counter >= self.time_out_counter:
-                        print(f'Agent {self.name}  TIMEOUT ( no job to be assigned) !!!')
                     continue
-                else:
-                    self.t_counter = 0
-                self.local_actor_critic.clear_memory()
+                
+                # reset the status of the agent    
+                self.t_counter = 0
+                self.local_actor_critic.reset_memory()
                 self.init_logs()
 
+            # retrive the agent task_queue
             task_queue = self.state.preprocessor.get_agent_queue().get(self.assigned_job)
             if task_queue is None:
                 continue
+            
             self.t_counter += 1
             if self.t_counter >= self.time_out_counter:
-                # job = self.state.get_job(self.assigned_job)
-                print(f'Agent {self.name}  TIMEOUT stuck on job{self.assigned_job} ')
-                self.state.remove_job(self.assigned_job)
-                # TODO drop job if bugged, need to bugfix
-                self.assigned_job = None
+                self._timeout_on_job()
+                continue
             for task in task_queue:
                 self.schedule(task)
-            try:
-                current_job = self.state.get_job(self.assigned_job)
-            except:
-                pass
-            if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job[
-                "task_count"]:
-                print("DONE")
+                
+            # Check if the current job is complete
+            current_job = self.state.get_job(self.assigned_job)
+            if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
+                print(f"Job {self.assigned_job} DONE")
                 self.update()
                 self.assigned_job = None
 
@@ -103,120 +86,131 @@ class Agent(mp.Process):
             # retrieve the necessary data
             job_state, pe_state = self.state.get()
             current_task = self.state.database.get_task_norm(current_task_id)
-            input_state = self.get_input(current_task, {})
+            input_state = self.get_input(current_task)
         except:
             print("Retrying schedule on : ", self.name)
             self.schedule(current_task_id)
 
-        # first-level schedule , select a device
-        option, path = self.local_actor_critic.choose_action(input_state)
-        selected_device = self.devices[option]
-        selected_device_index = option
+        # First-level scheduling: device selection
+        selected_device_index, path = self.local_actor_critic.choose_action(input_state)
+        selected_device = self.devices[selected_device_index]
         
         # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
-        sub_state = self.get_input_subtree(current_task, {0: pe_state[selected_device['id']]})
-        sub_state = torch.tensor(sub_state, dtype=torch.float32)
+        sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]},subtree=True)
+        sub_state = torch.tensor(sub_state, dtype=torch.float)
         action_logits = self.state.core.forest[selected_device_index](sub_state)
         action_dist = torch.distributions.Categorical(F.softmax(action_logits, dim=-1))
         action = action_dist.sample()
         selected_core_dvfs_index = action.item()
-        selected_core_index = int(selected_core_dvfs_index / 3)
-        selected_core = selected_device["voltages_frequencies"][selected_core_index]
-        dvfs = selected_core[selected_core_dvfs_index % 3]
+        selected_core_index, dvfs = self._select_core_dvfs(selected_device,selected_core_dvfs_index)
 
         # applying action on the state and retrieving the result
         reward, fail_flag, energy, time = self.state.apply_action(
             selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
 
-        # print(f'reward for e:{energy},t:{time} -> {reward}|'
-        #       f'task_cl:{self.state.database.get_task(current_task_id)["computational_load"]} '
-        #       f'with dev{self.state.database.get_device(selected_device_index)["type"]}')
-
-        # sub_tree_loss = (-action_dist.log_prob(action) * reward)
-        # self.state.core.optimizers[selected_device_index].zero_grad()
-        # sub_tree_loss.backward()
-        # self.state.core.optimizers[selected_device_index].step()
+        # update the core schudler forest
+        self.update_core_scheduler(selected_device_index,action_dist,action,reward)
 
         # archive the result to the agent 
-        self.local_actor_critic.archive(input_state, option, reward)
+        self.local_actor_critic.archive(input_state, selected_device_index, reward)
 
         # saving agent logs 
         self.update_agent_logs(reward, time, energy, fail_flag, selected_device, path)
 
+    def update_core_scheduler(self,selected_device_index,action_dist,action,reward):
+        sub_tree_loss = (-action_dist.log_prob(action) * reward)
+        self.state.core.optimizers[selected_device_index].zero_grad()
+        sub_tree_loss.backward()
+        self.state.core.optimizers[selected_device_index].step()
     def update_agent_logs(self, reward, time, energy, fail_flag, selected_device, path):
+        """Update the logs for the agent based on task performance."""
         self.reward_log.append(reward)
         self.time_log.append(time)
         self.energy_log.append(energy)
-        if fail_flag[0]:
-            self.safe_fails_log += 1
-        if fail_flag[1]:
-            self.kind_fails_log += 1
-        if fail_flag[2]:
-            self.queue_fails_log += 1
-        if fail_flag[3]:
-            self.battery_fails_log += 1
         self.fails_log += sum(fail_flag)
+
         if selected_device['type'] == "iot":
             self.iot_usuage += 1
-        if selected_device['type'] == "mec":
+        elif selected_device['type'] == "mec":
             self.mec_usuage += 1
-        if selected_device['type'] == "cloud":
+        elif selected_device['type'] == "cloud":
             self.cc_usuage += 1
-        self.fails_log += sum(fail_flag)
+
+        if fail_flag[0]: self.safe_fails_log += 1
+        if fail_flag[1]: self.kind_fails_log += 1
+        if fail_flag[2]: self.queue_fails_log += 1
+        if fail_flag[3]: self.battery_fails_log += 1
+
         self.path_history.append(path)
 
     def save_agent_log(self, loss):
+        """Save the logs of the agent after processing a job."""
+        job_length = len(self.energy_log)
         result = {
             "loss": loss,
-            "reward": sum(self.reward_log) / len(self.reward_log),
-            "time": sum(self.time_log) / len(self.time_log),
-            "energy": sum(self.energy_log) / len(self.energy_log),
-            "safe_fails": self.safe_fails_log / len(self.energy_log),
-            "kind_fails": self.kind_fails_log / len(self.energy_log),
-            "queue_fails": self.queue_fails_log / len(self.energy_log),
-            "battery_fails": self.battery_fails_log / len(self.energy_log),
-            "fails": self.fails_log / len(self.energy_log),
-            "iot_usuage": self.iot_usuage / len(self.energy_log),
-            "mec_usuage": self.mec_usuage / len(self.energy_log),
-            "cc_usuage": self.cc_usuage / len(self.energy_log),
+            "reward": sum(self.reward_log) / job_length,
+            "time": sum(self.time_log) / job_length,
+            "energy": sum(self.energy_log) /job_length,
+            "safe_fails": self.safe_fails_log /job_length,
+            "kind_fails": self.kind_fails_log /job_length,
+            "queue_fails": self.queue_fails_log /job_length,
+            "battery_fails": self.battery_fails_log /job_length,
+            "fails": self.fails_log /job_length,
+            "iot_usuage": self.iot_usuage /job_length,
+            "mec_usuage": self.mec_usuage /job_length,
+            "cc_usuage": self.cc_usuage /job_length,
         }
         self.state.save_agent_log(self.assigned_job, result, self.path_history)
 
+
     def update(self):
-        # updating the agent parameters
-        # calculating the loss
-        loss = self.local_actor_critic.calc_loss()
+        """Update the global actor-critic based on the local model."""
+        loss = self.local_actor_critic.calc_loss()  # compute the loss
+        self.save_agent_log(loss.item())  # save agent's performance
 
-        # sending back the result to the state
-        self.save_agent_log(loss.item())
-
-        # update params 
-        self.global_optimizer.zero_grad()
+        self.global_optimizer.zero_grad()  # zero gradients
         loss.backward()
 
-        # set global params and load them again
-        for local_param, global_param in zip(self.local_actor_critic.parameters(),
-                                             self.global_actor_critic.parameters()):
+        # Synchronize local and global models
+        for local_param, global_param in zip(self.local_actor_critic.parameters(), self.global_actor_critic.parameters()):
             global_param._grad = local_param.grad
-        self.global_optimizer.step()
-        self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())
 
-    ####### UTILITY #######
+        self.global_optimizer.step()  # update global model
+        self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())  # update local model
 
-    def get_input(self, task, pe_dict):
-        task_features = self.get_task_data(task)
+    ####### UTILITY FUNCTIONS #######
+
+    def _timeout_on_job(self):
+        """Handle timeout when a job is taking too long."""
+        print(f"Job {self.assigned_job} TIME OUT")
+        self.state.remove_job(self.assigned_job)
+        self.assigned_job = None
+    def _select_core_dvfs(self, selected_device, selected_core_dvfs_index):
+        selected_core_index = int(selected_core_dvfs_index / 3)
+        selected_core = selected_device["voltages_frequencies"][selected_core_index]
+        dvfs = selected_core[selected_core_dvfs_index % 3]
+        return selected_core_index, dvfs
+
+    def get_input(self, task, pe_dict={},device_features=False,subtree=False):
+        task_features = [
+            task["computational_load"],
+            task["input_size"],
+            task["output_size"],
+            task["kind1"],
+            task["kind2"],
+            task["kind3"],
+            task["kind4"],
+            task["is_safe"],
+        ]
+        if not subtree and not device_features:
+            return task_features
+        
         pe_features = []
         for pe in pe_dict.values():
-            pe_features.extend(self.get_pe_data(pe, pe['id']))
-        return task_features + pe_features
-    def get_input_subtree(self, task, pe_dict):
-        task_features = self.get_task_data(task)
-        pe_features = []
-        for pe in pe_dict.values():
-            pe_features.extend(self.get_pe_data_subtree(pe, pe['id']))
+            pe_features.extend(self.get_pe_data(pe, pe['id'],subtree))
         return task_features + pe_features
 
-    def get_pe_data(self, pe_dict, pe_id):
+    def get_pe_data(self, pe_dict, pe_id,subtree):
         pe = self.state.database.get_device(pe_id)
         devicePower = pe['devicePower']
 
@@ -227,30 +221,7 @@ class Agent(mp.Process):
 
         num_cores = pe['num_cores']
         cores = 1 - (sum(pe_dict['occupiedCores']) / num_cores)
-
-        return [cores, devicePower, battery]
-
-    def get_pe_data_subtree(self, pe_dict, pe_id):
-        pe = self.state.database.get_device(pe_id)
-        devicePower = pe['devicePower']
-
-        batteryLevel = pe_dict['batteryLevel']
-        battery_capacity = pe['battery_capacity']
-        battery_isl = pe['ISL']
-        battery = ((1 - battery_isl) * battery_capacity - batteryLevel) / battery_capacity
-
-        num_cores = pe['num_cores']
-
-        return pe_dict['occupiedCores'] + [ devicePower, battery]
-
-    def get_task_data(self, task):
-        return [
-            task["computational_load"],
-            task["input_size"],
-            task["output_size"],
-            task["kind1"],
-            task["kind2"],
-            task["kind3"],
-            task["kind4"],
-            task["is_safe"],
-        ]
+        if subtree:
+            return pe_dict['occupiedCores'] + [ devicePower, battery]
+        else:
+            return [cores, devicePower, battery]

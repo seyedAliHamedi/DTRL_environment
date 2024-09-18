@@ -9,7 +9,7 @@ import traceback
 import data.configs
 from environment.model.actor_critic import ActorCritic
 from environment.model.agent import Agent
-from environment.model.shared_adam import SharedAdam
+from environment.model.utilities import SharedAdam
 from environment.monitor import Monitor
 from environment.state import State
 from data.configs import environment_config, monitor_config
@@ -41,7 +41,7 @@ class Environment:
         print("Loading devices...")
         self.devices = self.db.get_all_devices()
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(input_dim=8,output_dim=len(self.devices),tree_max_depth=2,cirtic_input_dim=8,cirtic_hidden_layer_dim=128,devices=self.devices,discount_factor=0)
+        global_actor_critic = ActorCritic(input_dim=8,output_dim=len(self.devices),tree_max_depth=2,critic_input_dim=8,critic_hidden_layer_dim=128,discount_factor=0)
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
         # setting up workers and their barriers

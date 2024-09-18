@@ -1,171 +1,91 @@
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.multiprocessing as mp
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from sklearn.cluster import KMeans
 import torch.optim as optim
 
+from environment.model.utilities import DDT
 
-
+# Main Actor-Critic class, combining both the Actor and Critic networks
 class ActorCritic(nn.Module):
-    def __init__(self,input_dim,output_dim,tree_max_depth,cirtic_input_dim,cirtic_hidden_layer_dim,devices,discount_factor=0):
+    def __init__(self, input_dim, output_dim, tree_max_depth, critic_input_dim, critic_hidden_layer_dim, discount_factor=0):
         super(ActorCritic, self).__init__()
-        self.input_dim=input_dim
-        self.output_dim=output_dim
-        self.tree_max_depth=tree_max_depth 
-        self.cirtic_input_dim=cirtic_input_dim 
-        self.cirtic_hidden_layer_dim=cirtic_hidden_layer_dim 
-        self.devices=devices 
-        self.discount_factor=discount_factor
-        
-        self.actor = DDT(num_input=input_dim,num_output=output_dim,depth=0,max_depth=tree_max_depth)
+        self.input_dim =input_dim
+        self.output_dim =output_dim
+        self.tree_max_depth =tree_max_depth
+        self.critic_input_dim =critic_input_dim
+        self.critic_hidden_layer_dim =critic_hidden_layer_dim
+          
+        self.discount_factor = discount_factor
+        self.actor = DDT(input_dim, output_dim, 0, tree_max_depth)  # Decision tree-like actor
         self.critic = nn.Sequential(
-            nn.Linear(cirtic_input_dim,cirtic_hidden_layer_dim), 
+            nn.Linear(critic_input_dim, critic_hidden_layer_dim),
             nn.ReLU(),
-            nn.Linear(cirtic_hidden_layer_dim, 1)
+            nn.Linear(critic_hidden_layer_dim, 1)  # Output single value for value estimation
         )
-        self.rewards = []
-        self.actions = []
-        self.states = []
-        self.pis = []
 
+        # Initialize memory for storing the experiences
+        self.reset_memory()
+
+    # Store experiences in memory
     def archive(self, state, action, reward):
         self.states.append(state)
         self.actions.append(action)
         self.rewards.append(reward)
 
-    def clear_memory(self):
-        self.rewards = []
-        self.actions = []
-        self.states = []
-        self.pis = []
+    # Clear memory after an episode
+    def reset_memory(self):
+        self.rewards, self.actions, self.states, self.pis = [], [], [], []
 
+    # Forward pass through both actor and critic
     def forward(self, x):
-        p, path = self.actor(x)
-        v = self.critic(x)
+        p, path = self.actor(x)  # Policy distribution from the actor
+        v = self.critic(x)  # Value estimate from the critic
         return p, path, v
 
+    # Select action based on actor's policy
     def choose_action(self, observation):
         state = torch.tensor(observation, dtype=torch.float)
-        pi, path,_ = self.forward(state)
+        pi, path, _ = self.forward(state)
         
-        self.pis.append(pi)
-        
-        probs = F.softmax(pi, dim=-1)
+        self.pis.append(pi)  # Store policy distribution
 
-        dist = Categorical(probs)
+        probs = F.softmax(pi, dim=-1)
+        dist = Categorical(probs)  # Create a categorical distribution over actions
         action = dist.sample()
 
-        return action.item(), path
+        return action.item(), path  # Return sampled action and the path
 
+    # Calculate the discounted returns from the stored rewards
     def calculate_returns(self):
         G = 0
         returns = []
-        for reward in self.rewards[::-1]:
-            G = G * self.discount_factor + reward
+        for reward in reversed(self.rewards):
+            G = G * self.discount_factor + reward  # Discounted return calculation
             returns.append(G)
-
         returns.reverse()
-        returns = torch.tensor(returns, dtype=torch.float)
-        return returns
+        return torch.tensor(returns, dtype=torch.float)
 
+    # Compute the actor-critic loss
     def calc_loss(self):
         states = torch.tensor(self.states, dtype=torch.float)
         actions = torch.tensor(self.actions, dtype=torch.float)
         returns = self.calculate_returns()
-        values = []
-        for state in states:
-            v = self.critic(state)
-            values.append(v)
 
+        # Get value estimates for all states
+        values = torch.stack([self.critic(state) for state in states], dim=0).squeeze()
+
+        # Stack stored policy distributions
         pis = torch.stack(self.pis, dim=0)
-        values = torch.stack(values, dim=0).squeeze()
-
         probs = F.softmax(pis, dim=-1)
-
         dist = Categorical(probs)
+
+        # Log probabilities of the actions taken
         log_probs = dist.log_prob(actions)
 
-        # actor_loss = -log_probs * (returns - values)
+        # Actor loss (policy gradient) and critic loss (value estimation)
         actor_loss = -torch.sum(log_probs * returns)
         critic_loss = F.mse_loss(values, returns)
 
-        # total_loss = (actor_loss + critic_loss).mean()
-        total_loss = actor_loss
-        return total_loss
-
-
-class CoreScheduler(nn.Module):
-    def __init__(self,subtree_input_dims,subtree_max_depth, devices,subtree_lr=0.005):
-        super(CoreScheduler, self).__init__()
-        self.devices = devices
-        self.forest = [
-            self.createTree(input_dims=subtree_input_dims + device['num_cores'],
-                            subtree_max_depth=subtree_max_depth,
-                            output_dim=device['num_cores']*3)
-            for device in devices]
-        self.optimizers = [optim.Adam(tree.parameters(), lr=subtree_lr) for tree in self.forest]
-
-    def createTree(self,input_dims ,subtree_max_depth,output_dim):
-        return SubDDT(num_input=input_dims,num_output=output_dim,depth=0,max_depth=subtree_max_depth)
-
-
-class DDT(nn.Module):
-    def __init__(self, num_input, num_output, depth, max_depth):
-        super(DDT, self).__init__()
-        self.depth = depth
-        self.max_depth = max_depth
-        if depth != max_depth:
-            self.weights = nn.Parameter(torch.empty(num_input).normal_(mean=0, std=0.1))
-            self.bias = nn.Parameter(torch.zeros(1))
-        if depth == max_depth:
-            self.prob_dist = nn.Parameter(torch.zeros(num_output))
-        if depth < max_depth:
-            self.left = DDT(num_input, num_output, depth + 1,max_depth)
-            self.right = DDT(num_input, num_output, depth + 1,max_depth)
-        
-
-
-    def forward(self, x, path=""):
-        if self.depth == self.max_depth:
-            return self.prob_dist, path
-    
-        val = torch.sigmoid(torch.matmul(x, self.weights) + self.bias)
-        
-        left_output, left_path = self.left(x, path + "L")
-        right_output, right_path = self.right(x, path + "R")
-        
-        # Combine both left and right outputs
-        output = val * right_output + (1 - val) * left_output
-    
-        # Combine both paths (though paths would still follow the stronger choice)
-        final_path = right_path if val >= 0.5 else left_path
-        
-        return output, final_path
-
-
-class SubDDT(nn.Module):
-    def __init__(self, num_input, num_output, depth, max_depth):
-        super(SubDDT, self).__init__()
-        self.depth = depth
-        self.max_depth = max_depth
-        if depth != max_depth:
-            self.weights = nn.Parameter(torch.empty(num_input).normal_(mean=0, std=0.1))
-            self.bias = nn.Parameter(torch.zeros(1))
-        if depth == max_depth:
-            self.prob_dist = nn.Parameter(torch.zeros(num_output))
-        if depth < max_depth:
-            self.left = SubDDT(num_input, num_output, depth + 1,max_depth)
-            self.right = SubDDT(num_input, num_output, depth + 1,max_depth)
-        
-    def forward(self, x):
-        if self.depth == self.max_depth:
-            return self.prob_dist
-        val = torch.sigmoid(torch.matmul(x, self.weights) + self.bias)
-        if val >= 0.5:
-            return val *  self.right(x)
-        else:
-            return 1-val * self.left(x)
-
+        # Total loss = actor loss + critic loss
+        return actor_loss 

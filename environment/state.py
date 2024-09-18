@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 from data.db import Database
-from environment.model.actor_critic import CoreScheduler
 from environment.pre_processing import Preprocessing
 from environment.util import reward_function
 from environment.window_manager import WindowManager
