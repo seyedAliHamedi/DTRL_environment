@@ -5,7 +5,6 @@ import os
 import json
 import time
 import traceback
-
 import data.configs
 from environment.model.actor_critic import ActorCritic
 from environment.model.agent import Agent
@@ -41,7 +40,9 @@ class Environment:
         print("Loading devices...")
         self.devices = self.db.get_all_devices()
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(input_dim=8,output_dim=len(self.devices),tree_max_depth=2,critic_input_dim=8,critic_hidden_layer_dim=128,discount_factor=0)
+        global_actor_critic = ActorCritic(input_dim=8 + len(self.devices), output_dim=len(self.devices),
+                                          tree_max_depth=4, critic_input_dim=8 + len(self.devices),
+                                          critic_hidden_layer_dim=128, discount_factor=0.99)
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
         # setting up workers and their barriers
@@ -209,7 +210,8 @@ class Environment:
         # Heatmap for path history
         # print(path_history)
         if path_history and len(path_history) > 0:
-            output_classes = ["LL", "LR", "RL", "RR"]
+
+            output_classes = make_paths(len(path_history[0][0]))
             path_counts = np.zeros((len(path_history), len(output_classes)))
 
             for epoch in range(len(path_history)):
@@ -230,3 +232,19 @@ class Environment:
 
         # Save the plots to an image file
         plt.savefig(plot_path)
+
+
+def make_paths(depth):
+    paths = []
+    n = 0
+    for i in range(pow(2, depth)):
+        binary = np.binary_repr(i, width=depth)
+        actual_path = ''
+        for i in range(depth):
+            if binary[i] == '1':
+                actual_path += 'R'
+            else:
+                actual_path += 'L'
+        paths.append(actual_path)
+        n += 1
+    return paths
