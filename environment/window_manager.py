@@ -1,7 +1,6 @@
 import random
 from copy import copy
 
-from data.db import Database
 from data.configs import environment_config, monitor_config
 from environment.state import State
 from utilities.monitor import Monitor
@@ -10,7 +9,7 @@ from utilities.monitor import Monitor
 class WindowManager:
     _instance = None
 
-    def __new__(cls, config=environment_config['window']):
+    def __new__(cls, config=environment_config['window'], db=None):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.__pool = []
@@ -20,6 +19,7 @@ class WindowManager:
             cls._instance.current_cycle = 1
             cls._instance.__cycle = config["clock"]
             cls._instance.active_jobs_ID = []
+            cls._instance.db = db
         return cls._instance
 
     def run(self):
@@ -27,8 +27,11 @@ class WindowManager:
             self.current_cycle += 1
             State().set_task_window([])
         else:
-            self.current_cycle = 0
-            State().set_task_window(self.get_window())
+            if State().get_jobs_len() > 50:
+                State().set_task_window([])
+            else:
+                self.current_cycle = 0
+                State().set_task_window(self.get_window())
 
     def get_window(self):
         window = []
@@ -44,7 +47,7 @@ class WindowManager:
         return window
 
     def __slice(self):
-        sliced_jobs = Database.get_jobs_window(
+        sliced_jobs = self.db.get_jobs_window(
             self.__head_index, self.__max_jobs)
         self.__head_index = self.__head_index + self.__max_jobs
         selected_tasks = []
@@ -65,7 +68,7 @@ class WindowManager:
 class Preprocessing:
     _instance = None
 
-    def __new__(cls, config=environment_config['window']):
+    def __new__(cls, config=environment_config['window'], db=None):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.max_jobs = config["max_jobs"]
@@ -73,6 +76,7 @@ class Preprocessing:
             cls._instance.wait_queue = []
             cls._instance.queue = []
             cls._state_jobs = None
+            cls._instance.db = db
         return cls._instance
 
     def run(self):
@@ -99,12 +103,12 @@ class Preprocessing:
     def __sort_by_mobility(self):
         mobility_dict = {}
         for task in self.queue:
-            mobility_dict[task] = len(Database.get_task_successors(task))
+            mobility_dict[task] = len(self.db.get_task_successors(task))
         self.queue = list({k: v for k, v in sorted(
             mobility_dict.items(), key=lambda item: item[1])}.keys())
 
     def _is_ready_task(self, task):
-        selected_task = Database.get_task(task)
+        selected_task = self.db.get_task(task)
         task_job_id = selected_task['job_id']
         state_job = self._state_jobs[task_job_id]
         task_pred = copy(selected_task['predecessors'])
@@ -119,5 +123,6 @@ class Preprocessing:
     def get_agent_queue(self):
         return self.queue
 
-    def remove_from_queue(self, task_ID):
-        self.queue.remove(task_ID)
+    def remove_from_queue(self, tasks):
+        for task_ID in tasks:
+            self.queue.remove(task_ID)

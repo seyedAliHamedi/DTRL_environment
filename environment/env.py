@@ -15,19 +15,24 @@ class Environment:
         self.n_iterations = n_iterations
         self.display = display
         # ! important load db first
-        Database().load()
+        self.db = Database()
         Monitor().init(n_iterations)
-        State().initialize(display)
+        State(db=self.db).initialize(display)
+        Preprocessing(db=self.db)
+        WindowManager(db=self.db)
         self.cycle_wait = environment_config["environment"]["cycle"]
         self.__runner_flag = True
 
     def run(self):
-        agent = AgentWrapper(len(Database.get_all_devices()), 3, 5)
+        agent = AgentWrapper(len(self.db.get_all_devices()), 1, 8, self.db)
         iteration = 0
         try:
             while iteration <= self.n_iterations:
                 if iteration % 100 == 0:
-                    print(f"iteration : {iteration}")
+                    print(f"iteration : {iteration}, active_jobs:{State().get_jobs_len()}, done_jobs:{State().done_jobs}")
+                    if iteration != 0:
+                        # Monitor().save_logs()
+                        agent.plot_logs(monitor_config['paths']['agent']['plots'])
 
                 starting_time = time.time()
 

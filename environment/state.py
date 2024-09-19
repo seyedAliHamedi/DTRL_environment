@@ -2,25 +2,26 @@ import math
 from data.configs import summary_log_string, monitor_config
 import pandas as pd
 import numpy as np
-from data.db import Database
 from utilities.monitor import Monitor
 
 
 class State:
     _instance = None
 
-    def __new__(cls):
+    def __new__(cls, db=None):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._PEs = {}
             cls._instance._jobs = {}
             cls._instance._task_window = {}
             cls._instance.display = False
+            cls._instance.db = db
+            cls._instance.done_jobs = 0
         return cls._instance
 
     def initialize(self, display):
         self.display = display
-        self._init_PEs(Database.get_all_devices())
+        self._init_PEs(self.db.get_all_devices())
 
     def get(self):
         return self._jobs, self._PEs
@@ -34,10 +35,13 @@ class State:
     def get_job(self, job_id):
         return self._jobs[job_id]
 
+    def get_jobs_len(self):
+        return len(self._jobs.keys())
+
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
         pe = self._PEs[pe_ID]
-        pe_database = Database.get_device(pe_ID)
-        task = Database.get_task(task_ID)
+        pe_database = self.db.get_device(pe_ID)
+        task = self.db.get_task(task_ID)
 
         execution_time = np.ceil(task["computational_load"] / freq)
 
@@ -57,11 +61,8 @@ class State:
             fail_flags[1] = 1
         if queue_index == -1 and core_index == -1:
             # fail : assigned a task to a full queue core
-            fail_flags[2] = 0
-            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
-
-        if sum(fail_flags) > 0:
-            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
+            fail_flags[2] = 1
+            # return sum(fail_flags) * reward_function(0, 0, punish=True), fail_flags, 0, 0
 
         # apply on queue
         pe["queue"][core_index][queue_index] = placing_slot
@@ -77,7 +78,11 @@ class State:
         capacitance = pe_database["capacitance"][core_index]
         pe["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
         e = capacitance * (volt * volt) * freq * execution_time
-        return reward_function(t=execution_time, e=e), fail_flags, e, execution_time
+
+        if sum(fail_flags) > 0:
+            return sum(fail_flags) * reward_function(0, 0, punish=True), fail_flags, 10, 10
+
+        return reward_function(e, execution_time), fail_flags, e, execution_time
 
     def _init_PEs(self, PEs):
         for pe in PEs:
@@ -136,6 +141,7 @@ class State:
 
             # check for finished jobs
             if len(job["finishedTasks"]) == job["task_count"]:
+                self.done_jobs += 1
                 removing_items.append(job_ID)
 
         self.__remove_finished_active_jobs(removing_items)
@@ -144,9 +150,9 @@ class State:
         if self.display:
             print(f"new window{new_tasks}")
         for task in new_tasks:
-            job_id = Database.get_task(task)["job_id"]
+            job_id = self.db.get_task(task)["job_id"]
             if not self.__is_active_job(job_id):
-                self._set_jobs([Database.get_job(job_id)])
+                self._set_jobs([self.db.get_job(job_id)])
             self.__add_task_to_active_job(task, job_id)
 
     def __add_task_to_active_job(self, task, job_id):
@@ -183,7 +189,7 @@ class State:
     def __update_energy_consumption(self, pe, pe_ID):
         for core_index, core_av in enumerate(pe["occupiedCores"]):
             if core_av == 0:
-                pe["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
+                pe["energyConsumption"][core_index] = self.db.get_device(pe_ID)["powerIdle"][
                     core_index]
 
     def __update_PEs_queue(self, pe):
@@ -200,7 +206,7 @@ class State:
                 current_queue[0] = (current_queue[0][0] - 1, current_queue[0][1])
 
     def __task_finished(self, task_ID):
-        job_ID = Database.get_task(task_ID)["job_id"]
+        job_ID = self.db.get_task(task_ID)["job_id"]
         try:
             self._jobs[job_ID]["finishedTasks"].append(task_ID)
             self._jobs[job_ID]["runningTasks"].remove(task_ID)
@@ -216,7 +222,7 @@ class State:
                 if pe['type'] == 'cloud':
                     pe["energyConsumption"][core_index] = 0
                 else:
-                    pe["energyConsumption"][core_index] = Database.get_device(pe_ID)["powerIdle"][
+                    pe["energyConsumption"][core_index] = self.db.get_device(pe_ID)["powerIdle"][
                         core_index]
             else:
                 pe["occupiedCores"][core_index] = 1
@@ -256,8 +262,8 @@ def find_place(pe, core_i):
     return -1, -1, -1
 
 
-def reward_function(e=0, alpha=1, t=0, beta=1, punish=False):
+def reward_function(e, t, alpha=1, beta=1, punish=False):
     if punish is True:
         return -10
     else:
-        return np.exp(-1 * (e * alpha + t * beta))
+        return np.exp(-1 * (e * alpha + t * beta)) + 1

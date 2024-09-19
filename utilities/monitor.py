@@ -148,8 +148,6 @@ class Monitor:
                   agent=monitor_config['settings']['agent']):
         if time:
             self._save_time_log()
-        if agent:
-            self._save_agent_log()
 
     def _save_agent_log(self):
         self.agent_log['summary']['avg-time'] = np.sum(self.agent_log['live-log']['time']) / len(
