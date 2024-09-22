@@ -21,6 +21,8 @@ class ActorCritic(nn.Module):
         self.critic = nn.Sequential(
             nn.Linear(critic_input_dim, critic_hidden_layer_dim),
             nn.ReLU(),
+            nn.Linear( critic_hidden_layer_dim, critic_hidden_layer_dim),
+            nn.ReLU(),
             nn.Linear(critic_hidden_layer_dim, 1)  # Output single value for value estimation
         )
 
@@ -84,8 +86,8 @@ class ActorCritic(nn.Module):
         log_probs = dist.log_prob(actions)
 
         # Actor loss (policy gradient) and critic loss (value estimation)
-        actor_loss = -torch.sum(log_probs * returns)
+        actor_loss = -torch.sum(log_probs * (returns-values))
         critic_loss = F.mse_loss(values, returns)
 
         # Total loss = actor loss + critic loss
-        return actor_loss 
+        return actor_loss +critic_loss

@@ -40,8 +40,8 @@ class Environment:
         print("Loading devices...")
         self.devices = self.db.get_all_devices()
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(input_dim=8 + len(self.devices), output_dim=len(self.devices),
-                                          tree_max_depth=4, critic_input_dim=8 + len(self.devices),
+        global_actor_critic = ActorCritic(input_dim=8 , output_dim=len(self.devices),
+                                          tree_max_depth=4, critic_input_dim=8 ,
                                           critic_hidden_layer_dim=128, discount_factor=0.99)
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
