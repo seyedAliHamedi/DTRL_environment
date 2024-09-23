@@ -48,7 +48,10 @@ class State:
         return self._task_window
 
     def get_job(self, job_id):
-        return self.get_jobs().get(job_id)
+        try:
+            return self.get_jobs().get(job_id)
+        except:
+            return self.get_job(job_id)
 
     def remove_job(self, job_id):
         del self._jobs[job_id]
@@ -355,16 +358,23 @@ class State:
         job["runningTasks"].remove(task_ID)
 
     def find_place(self, pe, core_i):
-        lag_time = 0
-        if pe['type'] == 'cloud' or True:
-            for core_index, queue in enumerate(pe["queue"]):
-                if queue[0][1] == -1:
-                    return 0, core_index, 0
+        try:
+            lag_time = 0
+            if pe['type'] == 'cloud' or True:
+                for core_index, queue in enumerate(pe["queue"]):
+                    if queue[0][1] == -1:
+                        
+                        return 0, core_index, 0
+            return -1, -1, -1
+        except:
+            print("Retrying find place")
+            return self.find_place(pe,core_i)
         # if pe['type'] == 'cloud' and pe["queue"][core_i][0][1] != -1 and core_i < 127:
         #     return self.find_place(pe, core_i + 1)
-        return -1, -1, -1
+    
         for i, slot in enumerate(pe["queue"][core_i]):
             if slot[1] == -1:
                 lag_time = sum([time for time, taskIndex in pe["queue"][core_i][0:i]])
                 return i, core_i, lag_time
         return -1, -1, -1
+

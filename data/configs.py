@@ -65,7 +65,7 @@ jobs_config = {
         "input_size": [1, 1001],
         "output_size": [1, 1001],
         "computational_load": [1, 1001],
-        "safe_measurement": [0.5, 0.5],
+        "safe_measurement": [0.8, 0.2],
         "task_kinds": [1, 2, 3, 4],
     },
 }

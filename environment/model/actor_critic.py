@@ -8,7 +8,7 @@ from environment.model.utilities import DDT
 
 # Main Actor-Critic class, combining both the Actor and Critic networks
 class ActorCritic(nn.Module):
-    def __init__(self, input_dim, output_dim, tree_max_depth, critic_input_dim, critic_hidden_layer_dim, discount_factor=0):
+    def __init__(self, input_dim, output_dim, tree_max_depth, critic_input_dim, critic_hidden_layer_dim, discount_factor):
         super(ActorCritic, self).__init__()
         self.input_dim =input_dim
         self.output_dim =output_dim
