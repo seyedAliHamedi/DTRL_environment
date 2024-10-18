@@ -267,10 +267,14 @@ class State:
 
     def __task_finished(self, task_ID):
         # Multiprocess Robustness
-        task = self.db_tasks[task_ID]
-        job_ID = task["job_id"]
-        job = self.jobs[job_ID]
-        task_suc = task['successors']
+        try:
+            task = self.db_tasks[task_ID]
+            job_ID = task["job_id"]
+            job = self.jobs[job_ID]
+            task_suc = task['successors']
+        except:
+            return
+        
         if job is None or task_ID not in job["runningTasks"]:
             return
 

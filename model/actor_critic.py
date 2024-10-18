@@ -68,7 +68,7 @@ class ActorCritic(nn.Module):
     # Compute the actor-critic loss
     def calc_loss(self):
         states = torch.tensor(self.states, dtype=torch.float)
-        actions = torch.tensor(self.actions, dtype=torch.float)
+        actions = torch.tensor(self.actions, dtype=torch.long)
         returns = self.calculate_returns()
 
 
@@ -109,7 +109,7 @@ class ActorCritic(nn.Module):
             p1 = ratio * advantages
             p2 = torch.clamp(ratio, 1 - learning_config['ppo_epsilon'], 1 + learning_config['ppo_epsilon']) * advantages
 
-            actor_loss = -torch.min(p1, p2).mean()  # Minimize the clipped objective
+            actor_loss = -torch.min(p1, p2).sum()  # Minimize the clipped objective
         else:
             actor_loss = -torch.sum(new_log_probs * advantages)
 

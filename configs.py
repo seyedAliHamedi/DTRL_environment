@@ -81,7 +81,7 @@ devices_config = {
 #   battery capacity in W*micro-second : 36000 Ws - Equivalent to 36000*10^3 W * millisecond, 10Wh or
 
 learning_config = {
-    "num_epoch": 100000,
+    "num_epoch": 10000,
     ###### TREE #######
     "tree": "ddt",  # ddt
 
@@ -106,13 +106,13 @@ learning_config = {
     "beta": 1,  # time coefficient in the reward
 
     ###### PUNISH #######
-    "increasing_punish": True,
+    "increasing_punish": False,
     "init_punish": -10,
     "punish_epsilon": -0.001,
 
     ###### EXPLORE #######
-    "should_explore": False,
-    "explore_epsilon": 1e-5,
+    "should_explore": True,
+    "explore_epsilon": 5e-5,
 
     "drain_battery": False,
 
@@ -124,12 +124,12 @@ learning_config = {
 
     ###### ALGORITHM #######
 
-    "learning_algorithm": "policy_grad",
+    "learning_algorithm": "ppo",
     #   policy_grad
     #   a2c
     #   ppo
 
-    "ppo_epsilon": 0.8,
+    "ppo_epsilon": 0.2,
 
     "critic_hidden_layer_num": 1,
     "critic_hidden_layer_dim": 256,
@@ -158,7 +158,7 @@ learning_config = {
 
 
 environment_config = {
-    "multi_agent": 20,
+    "multi_agent": 15,
     "time_out_counter": 150,
     "window": {"size": 100, "max_jobs": 20, "clock": 10},
     "display":False

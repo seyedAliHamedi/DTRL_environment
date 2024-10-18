@@ -28,6 +28,7 @@ class Agent(mp.Process):
         self.barrier = barrier  # barrier for synchronization across processes
         self.state = shared_state  # shared state between agents
         # self.state.core = CoreScheduler(subtree_input_dims=10, subtree_max_depth=3, devices=self.devices, subtree_lr=0.005)
+        self.lock = mp.Lock()
 
 
     def init_logs(self):
@@ -160,18 +161,19 @@ class Agent(mp.Process):
 
     def update(self):
         """Update the global actor-critic based on the local model."""
-        loss = self.local_actor_critic.calc_loss()  # compute the loss
-        self.save_agent_log(loss.item())  # save agent's performance
+        with self.lock:
+            loss = self.local_actor_critic.calc_loss()  # compute the loss
+            self.save_agent_log(loss.item())  # save agent's performance
 
-        self.global_optimizer.zero_grad()  # zero gradients
-        loss.backward()
+            self.global_optimizer.zero_grad()  # zero gradients
+            loss.backward()
 
-        # Synchronize local and global models
-        for local_param, global_param in zip(self.local_actor_critic.parameters(), self.global_actor_critic.parameters()):
-            global_param._grad = local_param.grad
+            # Synchronize local and global models
+            for local_param, global_param in zip(self.local_actor_critic.parameters(), self.global_actor_critic.parameters()):
+                global_param._grad = local_param.grad
 
-        self.global_optimizer.step()  # update global model
-        self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())  # update local model
+            self.global_optimizer.step()  # update global model
+            self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())  # update local model
 
     ####### UTILITY FUNCTIONS #######
 

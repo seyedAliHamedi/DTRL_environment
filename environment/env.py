@@ -67,6 +67,7 @@ class Environment:
         try:
             print("Simulation starting...")
             while True:
+                barrier.wait()
                 if iteration % 10 == 0 and iteration != 0:
                     print(f"iteration : {iteration}", len(self.state.jobs))
                     if iteration % 100 == 0:
@@ -74,7 +75,6 @@ class Environment:
                         self.make_agents_plots()
                 starting_time = time.time()
                 self.state.update(self.manager)
-                barrier.wait()
 
                 iteration += 1
                 time_len = time.time() - starting_time
@@ -115,7 +115,6 @@ class Environment:
         plt.xlabel("iteration")
         plt.ylabel("sleeping time")
         plt.grid(True)
-        plt.legend()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         plt.savefig(path)
 
