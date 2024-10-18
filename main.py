@@ -1,17 +1,15 @@
-import os
-
-from environment.env import Environment
 import pandas as pd
-from data.configs import environment_config
 import torch.multiprocessing as mp
+from environment.env import Environment
 
 if __name__ == '__main__':
-    mp.set_start_method("spawn")
-    pd.set_option('display.max_rows', None)
-    pd.set_option('display.max_columns', None)
-    pd.set_option('display.max_colwidth', None)
-    pd.options.display.float_format = '{:,.5f}'.format
-    print("Creating environment...")
-    env = Environment(100000,  False)
+    # mp.set_start_method("spawn")
+    # pd.set_option('display.max_rows', None)
+    # pd.set_option('display.max_columns', None)
+    # pd.set_option('display.max_colwidth', None)
+    # pd.options.display.float_format = '{:,.5f}'.format
+    
+    
+    env = Environment()
     print("Running environment...")
-    env.run()
+    env.run() 

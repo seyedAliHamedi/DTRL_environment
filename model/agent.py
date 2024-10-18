@@ -1,38 +1,33 @@
 import numpy as np
+
 import torch
 import torch.nn.functional as F
 import torch.multiprocessing as mp
-from environment.model.actor_critic import ActorCritic
-from environment.model.utilities import CoreScheduler
+
+from environment.util import Utility
+from model.actor_critic import ActorCritic
+from model.utils import CoreScheduler
 
 
 class Agent(mp.Process):
-    def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state, time_out_counter):
+    def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state):
         super(Agent, self).__init__()
         
         self.name = name  # worker/agent name
-        self.devices = shared_state.database.get_all_devices()  # devices from database
+        self.devices = shared_state.db_devices  # devices from database
+        self.util = Utility(devices=self.devices)
         self.global_actor_critic = global_actor_critic  # global shared actor-critic model
         self.global_optimizer = global_optimizer  # shared Adam optimizer
         
         # the local actor-critic and the core scheduler
-        self.local_actor_critic = ActorCritic(
-            global_actor_critic.input_dim,
-            global_actor_critic.output_dim,
-            global_actor_critic.tree_max_depth,
-            global_actor_critic.critic_input_dim,
-            global_actor_critic.critic_hidden_layer_dim,
-            global_actor_critic.discount_factor
-        ) # local actor-critic model
+        self.local_actor_critic = ActorCritic(devices=global_actor_critic.devices) # local actor-critic model
        
 
         self.assigned_job = None  # current job assigned to the agent
         self.runner_flag = mp.Value('b', True)  # flag to control agent's execution loop
         self.barrier = barrier  # barrier for synchronization across processes
         self.state = shared_state  # shared state between agents
-        self.time_out_counter = time_out_counter  # counter for timeout detection
-        self.t_counter = 0  # tracks agent's wait time
-        self.state.core = CoreScheduler(subtree_input_dims=10, subtree_max_depth=3, devices=self.devices, subtree_lr=0.005)
+        # self.state.core = CoreScheduler(subtree_input_dims=10, subtree_max_depth=3, devices=self.devices, subtree_lr=0.005)
 
 
     def init_logs(self):
@@ -52,26 +47,27 @@ class Agent(mp.Process):
                 self.assigned_job = self.state.assign_job_to_agent()
                 if self.assigned_job is None:
                     continue
-                
                 # reset the status of the agent    
-                self.t_counter = 0
                 self.local_actor_critic.reset_memory()
                 self.init_logs()
 
             # retrive the agent task_queue
-            task_queue = self.state.preprocessor.get_agent_queue().get(self.assigned_job)
+            try:
+                task_queue = self.state.preprocessor.get_agent_queue().get(self.assigned_job)
+            except:
+                continue
             if task_queue is None:
                 continue
             
-            self.t_counter += 1
-            if self.t_counter >= self.time_out_counter:
-                self._timeout_on_job()
-                continue
             for task in task_queue:
                 self.schedule(task)
                 
+                
             # Check if the current job is complete
-            current_job = self.state.get_job(self.assigned_job)
+            try:
+                current_job = self.state.jobs[self.assigned_job]
+            except:
+                continue
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
                 print(f"DONE")
                 self.update()
@@ -81,36 +77,35 @@ class Agent(mp.Process):
         self.runner_flag = False
 
     def schedule(self, current_task_id):
-        # Multiprocess Robustness
-        try:
             # retrieve the necessary data
-            job_state, pe_state = self.state.get()
-            current_task = self.state.database.get_task_norm(current_task_id)
-            input_state = self.get_input(current_task)
-        except:
-            print("Retrying schedule on : ", self.name)
-            self.schedule(current_task_id)
+        pe_state = self.state.PEs
+        current_task = self.state.db_tasks[current_task_id]
+        input_state = self.util.get_input(current_task,gin=None,diversity=None)
 
-        # First-level scheduling: device selection
-        selected_device_index, path = self.local_actor_critic.choose_action(input_state)
+        action, path, devices = self.local_actor_critic.choose_action(input_state)
+        selected_device_index = action
+        if devices:
+            selected_device_index = self.env.devices.index(devices[selected_device_index])
+            
         selected_device = self.devices[selected_device_index]
         
-        # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
-        sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]},subtree=True)
-        sub_state = torch.tensor(sub_state, dtype=torch.float)
-        action_logits = self.state.core.forest[selected_device_index](sub_state)
-        action_dist = torch.distributions.Categorical(F.softmax(action_logits, dim=-1))
-        action = action_dist.sample()
-        selected_core_dvfs_index = action.item()
-        selected_core_index, dvfs = self._select_core_dvfs(selected_device,selected_core_dvfs_index)
+        # # second-level schedule for non cloud PEs , select a core and a Voltage Frequency Pair
+        # sub_state = self.get_input(current_task, {0: pe_state[selected_device['id']]},subtree=True)
+        # sub_state = torch.tensor(sub_state, dtype=torch.float)
+        # action_logits = self.state.core.forest[selected_device_index](sub_state)
+        # action_dist = torch.distributions.Categorical(F.softmax(action_logits, dim=-1))
+        # action = action_dist.sample()
+        # selected_core_dvfs_index = action.item()
+        # selected_core_index, dvfs = self._select_core_dvfs(selected_device,selected_core_dvfs_index)
 
+        selected_core_index = 0
+        (freq, vol) = selected_device['voltages_frequencies'][selected_core_index][0]
         # applying action on the state and retrieving the result
         reward, fail_flag, energy, time = self.state.apply_action(
-            selected_device_index, selected_core_index, dvfs[0], dvfs[1], current_task_id)
+            selected_device_index, selected_core_index, freq, vol, current_task_id)
 
         # update the core schudler forest
-        self.update_core_scheduler(selected_device_index,action_dist,action,reward)
-
+        # self.update_core_scheduler(selected_device_index,action_dist,action,reward)
         # archive the result to the agent 
         self.local_actor_critic.archive(input_state, selected_device_index, reward)
 
@@ -191,25 +186,7 @@ class Agent(mp.Process):
         dvfs = selected_core[selected_core_dvfs_index % 3]
         return selected_core_index, dvfs
 
-    def get_input(self, task, pe_dict={},device_features=False,subtree=False):
-        task_features = [
-            task["computational_load"],
-            task["input_size"],
-            task["output_size"],
-            task["kind1"],
-            task["kind2"],
-            task["kind3"],
-            task["kind4"],
-            task["is_safe"],
-        ]
-        if not subtree and not device_features:
-            return task_features
-        
-        pe_features = []
-        for pe in pe_dict.values():
-            pe_features.extend(self.get_pe_data(pe, pe['id'],subtree))
-        return task_features + pe_features
-
+    
     def get_pe_data(self, pe_dict, pe_id,subtree):
         pe = self.state.database.get_device(pe_id)
         devicePower = pe['devicePower']

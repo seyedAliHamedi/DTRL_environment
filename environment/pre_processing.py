@@ -1,4 +1,4 @@
-from data.configs import environment_config
+from configs import environment_config
 
 
 class Preprocessing:
@@ -29,7 +29,7 @@ class Preprocessing:
         self.assigned_jobs.remove(job_id)
 
     def update_active_jobs(self):
-        state_jobs = self.state.get_jobs()
+        state_jobs = self.state.jobs
         # Add or update jobs in active_jobs
         for job_ID in state_jobs.keys():
             self.active_jobs[job_ID] = state_jobs[job_ID]
@@ -47,8 +47,8 @@ class Preprocessing:
 
     def process(self):
         # add window tasks to the queues
-        for task_id in self.state.get_task_window():
-            task = self.state.database.get_task(task_id)
+        for task_id in self.state.task_window:
+            task = self.state.db_tasks[task_id]
             # check if the task is ready upon adding it to the queue
             if task['pred_count'] <= 0:
                 self.queue.append(task_id)
@@ -60,7 +60,7 @@ class Preprocessing:
         # mobility -> number of successors(necassity)
         mobility_dict = {}
         for task_id in self.queue:
-            task = self.state.database.get_task(task_id)
+            task = self.state.db_tasks[task_id]
             mobility_dict[task_id] = len(task['successors'])
         sorted_tasks = list({k: v for k, v in sorted(
             mobility_dict.items(), key=lambda item: item[1])}.keys())
@@ -78,7 +78,7 @@ class Preprocessing:
         for job_ID in job_keys:
             agent_queue[job_ID] = []
             for task_ID in queue:
-                task = self.state.database.get_task(task_ID)
+                task = self.state.db_tasks[task_ID]
                 if task['job_id'] == job_ID:
                     agent_queue[job_ID].append(task_ID)
         return agent_queue

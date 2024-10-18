@@ -5,78 +5,80 @@ import os
 import json
 import time
 import traceback
-import data.configs
-from environment.model.actor_critic import ActorCritic
-from environment.model.agent import Agent
-from environment.model.utilities import SharedAdam
-from environment.monitor import Monitor
+import configs
 from environment.state import State
-from data.configs import environment_config, monitor_config
+from configs import environment_config,learning_config
 
 import torch.multiprocessing as mp
+from data.gen import Generator
+from environment.util import make_paths
+from model.actor_critic import ActorCritic
+from model.agent import Agent
+from model.utils import SharedAdam
 
 
 class Environment:
 
-    def __init__(self, n_iterations, display):
-        # numver of iterations for the environment/simulation
-        self.n_iterations = n_iterations
-        # the minimumm wait between iterations
-        self.cycle_wait = environment_config["environment"]["cycle"]
+    def __init__(self):
+        print("\n ---------------------- ")
+        self.initialize()
         # the shared state and the manager for shared memory variables/dictionaries/lists
         manager = mp.Manager()
-        self.state = State(display=display, manager=manager)
         self.manager = manager
+        
+        
+        self.state = State(devices=self.devices,jobs=self.jobs,tasks=self.tasks,manager=manager)
         # the 3 global enteties of the shared state (preProcessor,windowManager,database)
-        self.db = self.state.database
-        self.monitor = Monitor()
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
 
+        self.display = environment_config['display']
         self.time_log = []
-        self.display = display
-
+        print("Envionment initialized ")
+        
+        
+    def initialize(self):
+        print("initialize Envionment ....")
+        self.devices = Generator.get_devices()
+        self.jobs = Generator.get_jobs()
+        self.tasks = Generator.get_tasks()
+        print("Data loaded")
+        
     def run(self):
-        print("Loading devices...")
-        self.devices = self.db.get_all_devices()
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(input_dim=8 , output_dim=len(self.devices),
-                                          tree_max_depth=4, critic_input_dim=8 ,
-                                          critic_hidden_layer_dim=128, discount_factor=0.99)
+        global_actor_critic = ActorCritic(devices=self.devices)
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
         # setting up workers and their barriers
         self.workers = []
         barrier = mp.Barrier(environment_config['multi_agent'] + 1)
         # kick off the state
-        print("Simulation starting...")
         self.state.update(self.manager)
+        print("Starting agents .....")
         for i in range(environment_config['multi_agent']):
             # organize and start the agents
             worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic,
                            global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state,
-                           time_out_counter=data.configs.environment_config["time_out_counter"])
+                           )
             self.workers.append(worker)
             worker.start()
 
         iteration = 0
         try:
-            while iteration <= self.n_iterations:
+            print("Simulation starting...")
+            while True:
                 if iteration % 10 == 0 and iteration != 0:
-                    print(f"iteration : {iteration}", len(self.state.get_jobs()))
+                    print(f"iteration : {iteration}", len(self.state.jobs))
                     if iteration % 100 == 0:
-                        self.save_time_log(monitor_config['paths']['time']['plot'])
+                        self.save_time_log(learning_config['result_time_plot'])
                         self.make_agents_plots()
-                        self.monitor.plot()
-
                 starting_time = time.time()
                 self.state.update(self.manager)
-                self.monitor.log_PEs(self.state.get_PEs())
                 barrier.wait()
 
-                time_len = time.time() - starting_time
-                self.sleep(time_len)
                 iteration += 1
+                time_len = time.time() - starting_time
+                self.time_log.append(time_len)
 
         except Exception as e:
             print("Caught an unexpected exception:", e)
@@ -84,7 +86,7 @@ class Environment:
         finally:
             print("Simulation Finished")
             print("Saving Logs......")
-            self.save_time_log(monitor_config['paths']['time']['plot'])
+            self.save_time_log(learning_config['result_time_plot'])
             self.make_agents_plots()
 
             # stopping and terminating the workers
@@ -95,23 +97,12 @@ class Environment:
                     worker.terminate()
                     worker.join()
 
-            self.memory_monitor.stop()
-
-    def sleep(self, time_len):
-        # sleep for the minimum time or the time that the actual simulation took
-        sleeping_time = self.cycle_wait - time_len
-        if sleeping_time < 0:
-            sleeping_time = 0
-            self.time_log.append(time_len)
-        else:
-            self.time_log.append(self.cycle_wait)
-        time.sleep(sleeping_time)
 
     def save_time_log(self, path):
-        if len(self.time_log) == 0:
+        if len(self.time_log) <= 10:
             return
         # saving time log gathered in the simulation
-        y_values = self.time_log
+        y_values = self.time_log[10:]
         time_summary_log = {
             'total_time': sum(y_values),
             'average_time': sum(y_values) / len(y_values),
@@ -120,8 +111,6 @@ class Environment:
         }
         plt.figure(figsize=(10, 5))
         plt.plot(y_values, marker='o', linestyle='-')
-        plt.axhline(y=environment_config['environment']['cycle'],
-                    color='red', linestyle='--', label='-set-cycle-time')
         plt.title("Sleeping time on each iteration")
         plt.xlabel("iteration")
         plt.ylabel("sleeping time")
@@ -129,10 +118,8 @@ class Environment:
         plt.legend()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         plt.savefig(path)
-        with open(monitor_config['paths']['time']['summery'], 'w') as f:
-            json.dump(time_summary_log, f, indent=2)
 
-    def make_agents_plots(self, plot_path=monitor_config['paths']['agent']['plots']):
+    def make_agents_plots(self, plot_path=learning_config['result_plot_path']):
         # saving the agent logs gatherd from the state
         filtered_data = {k: v for k, v in self.state.agent_log.items() if v}
         time_list = [v["time"] for v in filtered_data.values()]
@@ -233,18 +220,3 @@ class Environment:
         # Save the plots to an image file
         plt.savefig(plot_path)
 
-
-def make_paths(depth):
-    paths = []
-    n = 0
-    for i in range(pow(2, depth)):
-        binary = np.binary_repr(i, width=depth)
-        actual_path = ''
-        for i in range(depth):
-            if binary[i] == '1':
-                actual_path += 'R'
-            else:
-                actual_path += 'L'
-        paths.append(actual_path)
-        n += 1
-    return paths

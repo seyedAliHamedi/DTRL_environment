@@ -95,33 +95,57 @@ class SubDDT(nn.Module):
             return (1 - val) * self.left(x)
 
 
-class SharedAdam(torch.optim.Adam):
+import torch
+from torch.optim import Adam
+
+class SharedAdam(Adam):
     """
     Adam optimizer with shared states for multiprocessing environments.
     This allows parameters like step, exponential moving averages, and squared averages
     to be shared across multiple processes.
     """
 
-    def __init__(self, params, lr=0.005):
+    def __init__(self, params, lr=0.01, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, amsgrad=False, **kwargs):
         """
-        Initializes the SharedAdam optimizer.
+        Initializes the SharedAdam optimizer with shared states.
         
         Args:
         - params: Parameters to optimize.
-        - lr: Learning rate for the optimizer.
+        - lr: Learning rate for the optimizer (default: 0.01).
+        - betas: Coefficients used for computing running averages of gradient and its square (default: (0.9, 0.999)).
+        - eps: Term added to denominator to improve numerical stability (default: 1e-8).
+        - weight_decay: Weight decay (L2 penalty) (default: 0.0).
+        - amsgrad: Whether to use the AMSGrad variant of this algorithm (default: False).
+        - kwargs: Other keyword arguments to pass to the Adam optimizer.
         """
-        # Initialize with standard Adam optimizer
-        super(SharedAdam, self).__init__(params, lr=lr)
+        # Initialize with standard Adam optimizer, passing all arguments
+        super(SharedAdam, self).__init__(params, lr=lr, betas=betas, eps=eps, weight_decay=weight_decay, amsgrad=amsgrad, **kwargs)
         
-        # Share memory across processes for each parameter group
+        # Ensure that optimizer states are shared across processes
+        self._share_memory()
+
+    def _share_memory(self):
+        """
+        Moves the optimizer state to shared memory.
+        This includes the step count, exp_avg (moving average of gradients),
+        and exp_avg_sq (moving average of squared gradients).
+        """
         for group in self.param_groups:
             for p in group['params']:
                 if p.requires_grad:
-                    # Initialize shared state
                     state = self.state[p]
+
+                    # Initialize shared state (move to shared memory)
                     state['step'] = torch.tensor(0.0).share_memory_()  # Shared step counter
-                    state['exp_avg'] = torch.zeros_like(p.data).share_memory_()  # Shared exponential moving average
-                    state['exp_avg_sq'] = torch.zeros_like(p.data).share_memory_()  # Shared squared exponential average
+                    state['exp_avg'] = torch.zeros_like(p.data).share_memory_()  # Shared exponential moving average of gradient
+                    state['exp_avg_sq'] = torch.zeros_like(p.data).share_memory_()  # Shared squared exponential average of gradient
+
+    def share_memory(self):
+        """
+        Public method to move the state to shared memory, if needed.
+        Can be called externally to ensure all optimizer states are shared.
+        """
+        self._share_memory()
 
     def step(self, closure=None):
         """
@@ -144,3 +168,57 @@ class SharedAdam(torch.optim.Adam):
         
         # Call the original Adam step to perform weight updates
         super(SharedAdam, self).step(closure)
+
+
+
+
+import torch
+import torch.nn as nn
+
+from model.trees.ClusTree import ClusTree
+from model.trees.DDT import DDT
+from model.trees.SoftDDT import SoftDDT
+
+from configs import learning_config
+
+
+def get_tree(devices):
+    tree = learning_config['tree']
+    max_depth = learning_config['tree_max_depth']
+    if tree == "ddt":
+        return DDT(num_input=get_num_input(), num_output=len(devices), depth=0, max_depth=max_depth)
+    elif tree == "soft-ddt":
+        return SoftDDT(num_input=get_num_input(), num_output=len(devices), depth=0, max_depth=max_depth)
+    elif tree == "clustree":
+        return ClusTree(num_input=get_num_input(), devices=devices, depth=0, max_depth=max_depth)
+
+
+def get_num_input():
+    num_input = 8
+    if learning_config['onehot_kind']:
+        num_input = 11
+    if learning_config['utilization']:
+        num_input +=2
+    return num_input
+
+
+def get_critic():
+    num_input = get_num_input()
+
+    if learning_config["learning_algorithm"] == "ppo" or learning_config["learning_algorithm"] == "a2c":
+        num_hidden_layers = learning_config['critic_hidden_layer_num']
+        critic_hidden_layer_dim = learning_config['critic_hidden_layer_dim']
+        # Create list of layers
+        layers = [nn.Linear(num_input, critic_hidden_layer_dim), nn.Sigmoid()]
+
+        # Append hidden layers dynamically
+        for _ in range(num_hidden_layers):
+            layers.append(nn.Linear(critic_hidden_layer_dim, critic_hidden_layer_dim))
+            layers.append(nn.Sigmoid())
+
+        # Final output layer
+        layers.append(nn.Linear(critic_hidden_layer_dim, 1))
+
+        return nn.Sequential(*layers)
+    else:
+        return None
