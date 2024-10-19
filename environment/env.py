@@ -31,7 +31,6 @@ class Environment:
         # the 3 global enteties of the shared state (preProcessor,windowManager,database)
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
-
         self.display = environment_config['display']
         self.time_log = []
         print("Envionment initialized ")
@@ -46,7 +45,7 @@ class Environment:
         
     def run(self):
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(devices=self.devices)
+        global_actor_critic = ActorCritic(devices=self.devices,old_log_probs_global=self.state.old_log_probs_global)
         global_actor_critic.share_memory()
         global_optimizer = SharedAdam(global_actor_critic.parameters())
         # setting up workers and their barriers
@@ -58,8 +57,7 @@ class Environment:
         for i in range(environment_config['multi_agent']):
             # organize and start the agents
             worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic,
-                           global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state,
-                           )
+                           global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state)
             self.workers.append(worker)
             worker.start()
 

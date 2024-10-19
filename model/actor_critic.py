@@ -6,9 +6,15 @@ from configs import learning_config
 from environment.util import extract_pe_data
 from model.utils import *
 
+import torch.multiprocessing as mp
+
+
+
+
+
 # Main Actor-Critic class, combining both the Actor and Critic networks
 class ActorCritic(nn.Module):
-    def __init__(self, devices):
+    def __init__(self, devices,old_log_probs_global):
         super(ActorCritic, self).__init__()
         self.discount_factor = learning_config['discount_factor']
         self.devices = devices
@@ -16,7 +22,7 @@ class ActorCritic(nn.Module):
         self.critic = get_critic()  # Critic could be None
         self.checkpoint_file = learning_config['checkpoint_file_path']
         self.reset_memory()
-        self.old_log_probs = [ None for i in range(len(self.devices))]
+        self.old_log_probs_global = old_log_probs_global
 
     # Store experiences in memory
     def archive(self, state, action, reward):
@@ -92,19 +98,19 @@ class ActorCritic(nn.Module):
 
             # get log probs for the first time (no difference between old and new here)
             for i, action in enumerate(actions):
-                if self.old_log_probs[action.item()] is None:
-                    self.old_log_probs[action.item()] = Categorical(probs[i]).log_prob(action).item()
+                if self.old_log_probs_global[action.item()] is None:
+                    self.old_log_probs_global[action.item()] = Categorical(probs[i]).log_prob(action).item()
 
             # collect the correspanding old log probs
             old_log_probs = []
             for action in actions:
-                old_log_probs.append(self.old_log_probs[action.item()])
+                old_log_probs.append(self.old_log_probs_global[action.item()])
             old_log_probs = torch.tensor(old_log_probs)
 
             ratio = torch.exp(new_log_probs - old_log_probs)  # Importance ratio
             # update log probs
             for i, action in enumerate(actions):
-                self.old_log_probs[action.item()] = Categorical(probs[i]).log_prob(action).item()
+                self.old_log_probs_global[action.item()] = Categorical(probs[i]).log_prob(action).item()
 
             p1 = ratio * advantages
             p2 = torch.clamp(ratio, 1 - learning_config['ppo_epsilon'], 1 + learning_config['ppo_epsilon']) * advantages

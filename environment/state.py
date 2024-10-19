@@ -31,6 +31,8 @@ class State:
         # initializing the preprocessor and the window manager
         self.preprocessor = Preprocessing(state=self, manager=manager)
         self.window_manager = WindowManager(state=self, manager=manager)
+        
+        self.old_log_probs_global = manager.list([None for _ in range(len(self.db_devices))])
 
         # TODO : rest
         self.agent_log = manager.dict({})
@@ -96,7 +98,7 @@ class State:
                 fail_flags[1] = 1
             if queue_index == -1 and core_index == -1:
                 # fail : assigned a task to a full queue core
-                fail_flags[2] = 0
+                fail_flags[2] = 1
 
             if sum(fail_flags) > 0:
                 return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0

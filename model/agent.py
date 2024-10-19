@@ -18,9 +18,10 @@ class Agent(mp.Process):
         self.util = Utility(devices=self.devices)
         self.global_actor_critic = global_actor_critic  # global shared actor-critic model
         self.global_optimizer = global_optimizer  # shared Adam optimizer
-        
+       
+
         # the local actor-critic and the core scheduler
-        self.local_actor_critic = ActorCritic(devices=global_actor_critic.devices) # local actor-critic model
+        self.local_actor_critic = ActorCritic(devices=global_actor_critic.devices,old_log_probs_global=global_actor_critic.old_log_probs_global) # local actor-critic model
        
 
         self.assigned_job = None  # current job assigned to the agent

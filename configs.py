@@ -111,7 +111,7 @@ learning_config = {
     "punish_epsilon": -0.001,
 
     ###### EXPLORE #######
-    "should_explore": True,
+    "should_explore": False,
     "explore_epsilon": 5e-5,
 
     "drain_battery": False,
