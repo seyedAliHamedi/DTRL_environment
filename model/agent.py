@@ -1,14 +1,16 @@
 import numpy as np
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torch.multiprocessing as mp
+from torch.optim.lr_scheduler import StepLR
 
 from environment.util import Utility
 from model.actor_critic import ActorCritic
 from model.utils import CoreScheduler
 
-
+from configs import learning_config
 class Agent(mp.Process):
     def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state):
         super(Agent, self).__init__()
@@ -18,7 +20,8 @@ class Agent(mp.Process):
         self.util = Utility(devices=self.devices)
         self.global_actor_critic = global_actor_critic  # global shared actor-critic model
         self.global_optimizer = global_optimizer  # shared Adam optimizer
-        
+        self.scheduler = StepLR(self.global_optimizer, step_size=1000, gamma=0.9)
+
         # the local actor-critic and the core scheduler
         self.local_actor_critic = ActorCritic(devices=global_actor_critic.devices) # local actor-critic model
        
@@ -160,18 +163,25 @@ class Agent(mp.Process):
 
     def update(self):
         """Update the global actor-critic based on the local model."""
-        loss = self.local_actor_critic.calc_loss()  # compute the loss
-        self.save_agent_log(loss.item())  # save agent's performance
-
-        self.global_optimizer.zero_grad()  # zero gradients
-        loss.backward()
-
-        # Synchronize local and global models
-        for local_param, global_param in zip(self.local_actor_critic.parameters(), self.global_actor_critic.parameters()):
-            global_param._grad = local_param.grad
-
-        self.global_optimizer.step()  # update global model
-        self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())  # update local model
+        # !! Implement PPO's multiple epochs of minibatch updates
+        if learning_config['learning_algorithm']!='ppo':
+            learning_config['ppo_epochs']=1
+            for _ in range(learning_config['ppo_epochs']):
+                loss = self.local_actor_critic.calc_loss()
+    
+                self.global_optimizer.zero_grad()
+                loss.backward()
+    
+                # !! Add gradient clipping
+                torch.nn.utils.clip_grad_norm_(self.global_actor_critic.parameters(), max_norm=1.0)
+    
+                for local_param, global_param in zip(self.local_actor_critic.parameters(), self.global_actor_critic.parameters()):
+                    global_param._grad = local_param.grad
+    
+                self.global_optimizer.step()
+            # self.scheduler.step()
+            self.save_agent_log(loss.item())  # save agent's performance
+            self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())
 
     ####### UTILITY FUNCTIONS #######
 

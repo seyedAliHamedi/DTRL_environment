@@ -106,7 +106,7 @@ learning_config = {
     "beta": 1,  # time coefficient in the reward
 
     ###### PUNISH #######
-    "increasing_punish": True,
+    "increasing_punish": False,
     "init_punish": -10,
     "punish_epsilon": -0.001,
 
@@ -129,7 +129,8 @@ learning_config = {
     #   a2c
     #   ppo
 
-    "ppo_epsilon": 0.8,
+    "ppo_epsilon": 0.2,
+    "ppo_epochs": 10,
 
     "critic_hidden_layer_num": 1,
     "critic_hidden_layer_dim": 256,
@@ -158,8 +159,8 @@ learning_config = {
 
 
 environment_config = {
-    "multi_agent": 20,
+    "multi_agent": 32,
     "time_out_counter": 150,
-    "window": {"size": 100, "max_jobs": 20, "clock": 10},
+    "window": {"size": 175, "max_jobs": 35, "clock": 10},
     "display":False
 }
