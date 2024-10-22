@@ -105,7 +105,7 @@ class SharedAdam(Adam):
     to be shared across multiple processes.
     """
 
-    def __init__(self, params, lr=0.01, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, amsgrad=False, **kwargs):
+    def __init__(self, params, lr=0.005, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, amsgrad=False, **kwargs):
         """
         Initializes the SharedAdam optimizer with shared states.
         

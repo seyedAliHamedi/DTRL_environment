@@ -1,20 +1,22 @@
+import os
+import time
+import traceback
+
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-import os
-import json
-import time
-import traceback
-import configs
-from environment.state import State
-from configs import environment_config,learning_config
 
-import torch.multiprocessing as mp
+from environment.state import State
+from environment.util import *
 from data.gen import Generator
-from environment.util import make_paths
-from model.actor_critic import ActorCritic
+
 from model.agent import Agent
 from model.utils import SharedAdam
+from model.actor_critic import ActorCritic
+
+import torch.multiprocessing as mp
+
+from configs import environment_config,learning_config,devices_config
 
 
 class Environment:
@@ -57,7 +59,7 @@ class Environment:
         print("Starting agents .....")
         for i in range(environment_config['multi_agent']):
             # organize and start the agents
-            worker = Agent(name=f'worker_{i}', global_actor_critic=global_actor_critic,
+            worker = Agent(name=f'agent_{i}', global_actor_critic=global_actor_critic,
                            global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state,
                            )
             self.workers.append(worker)
@@ -70,7 +72,7 @@ class Environment:
                 if iteration % 10 == 0 and iteration != 0:
                     print(f"iteration : {iteration}", len(self.state.jobs))
                     if iteration % 100 == 0:
-                        self.save_time_log(learning_config['result_time_plot'])
+                        self.save_time_log()
                         self.make_agents_plots()
                 starting_time = time.time()
                 self.state.update(self.manager)
@@ -98,7 +100,7 @@ class Environment:
                     worker.join()
 
 
-    def save_time_log(self, path):
+    def save_time_log(self, path=learning_config['result_time_plot']):
         if len(self.time_log) <= 10:
             return
         # saving time log gathered in the simulation
@@ -115,7 +117,6 @@ class Environment:
         plt.xlabel("iteration")
         plt.ylabel("sleeping time")
         plt.grid(True)
-        plt.legend()
         os.makedirs(os.path.dirname(path), exist_ok=True)
         plt.savefig(path)
 
@@ -138,7 +139,7 @@ class Environment:
 
         path_history = self.state.paths
 
-        fig, axs = plt.subplots(5, 2, figsize=(15, 30))
+        fig, axs = plt.subplots(6, 2, figsize=(15, 36))
         axs[0, 0].plot(loss_list,
                        label='Loss', color="blue", marker='o')
         axs[0, 0].set_title('Loss')
@@ -213,7 +214,13 @@ class Environment:
             axs[4, 1].set_title(f'Path History Heatmap ')
             axs[4, 1].set_xlabel('Output Classes')
             axs[4, 1].set_ylabel('Epochs')
-
+            
+        # colors = ['blue'] *  devices_config['iot']['num_devices'] + ['orange'] *  devices_config['mec']['num_devices'] + ['green'] * devices_config['cloud']['num_devices']
+        # axs[5, 0].bar(range(1, len(self.state.device_usuages) + 1), [sum(x) for x in self.state.device_usuages], color=colors)
+        # axs[5, 0].set_title('PE ACTIVITY History')
+        # axs[5, 0].set_xlabel('Device')
+        # axs[5, 0].set_yticks([]) 
+        # axs[5, 0].set_xticks(range(1, len(self.state.device_usuages) + 1)) 
         # Adjust layout to prevent overlap
         plt.tight_layout()
 

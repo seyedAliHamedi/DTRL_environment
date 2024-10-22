@@ -14,7 +14,6 @@ class Preprocessing:
         
         self.max_jobs = config['multi_agent']
     
-
     def run(self):
         self.update_active_jobs()
         self.process()
@@ -25,9 +24,7 @@ class Preprocessing:
             if job not in self.assigned_jobs:
                 self.assigned_jobs.append(job)
                 return job
-    def drop_job(self,job_id):
-        self.assigned_jobs.remove(job_id)
-
+            
     def update_active_jobs(self):
         state_jobs = self.state.jobs
         # Add or update jobs in active_jobs
@@ -67,12 +64,8 @@ class Preprocessing:
         self.queue[:] = sorted_tasks
 
     def get_agent_queue(self):
-        try:
-            queue = self.queue
-            job_keys = self.active_jobs.keys()
-        except:
-            print("Retrying get agent queue")
-            return self.get_agent_queue()
+        queue = self.queue
+        job_keys = self.active_jobs.keys()
         # creating the agent queue dict
         agent_queue = {}
         for job_ID in job_keys:

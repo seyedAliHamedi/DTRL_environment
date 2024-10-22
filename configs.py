@@ -124,18 +124,19 @@ learning_config = {
 
     ###### ALGORITHM #######
 
-    "learning_algorithm": "policy_grad",
+    "learning_algorithm": "ppo",
     #   policy_grad
     #   a2c
     #   ppo
 
     "ppo_epsilon": 0.2,
-    "ppo_epochs": 10,
+    "gae_lambda": 0.95,
+    "ppo_epochs": 5,
 
     "critic_hidden_layer_num": 1,
     "critic_hidden_layer_dim": 256,
 
-    "discount_factor": 0.0,  # 0: reward , 0.99:return
+    "discount_factor": 0.99,  # 0: reward , 0.99:return
 
     "scalability": False,
     "add_device_iterations": 0.0001,
@@ -160,7 +161,7 @@ learning_config = {
 
 environment_config = {
     "multi_agent": 32,
-    "time_out_counter": 150,
-    "window": {"size": 175, "max_jobs": 35, "clock": 10},
+    "time_out_counter": 50,
+    "window": {"size": 200, "max_jobs": 40, "clock": 10},
     "display":False
 }

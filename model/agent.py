@@ -6,11 +6,11 @@ import torch.nn.functional as F
 import torch.multiprocessing as mp
 from torch.optim.lr_scheduler import StepLR
 
-from environment.util import Utility
+from environment.util import Utility, gini_coefficient
 from model.actor_critic import ActorCritic
 from model.utils import CoreScheduler
 
-from configs import learning_config
+from configs import learning_config,environment_config
 class Agent(mp.Process):
     def __init__(self, name, global_actor_critic, global_optimizer, barrier, shared_state):
         super(Agent, self).__init__()
@@ -31,6 +31,8 @@ class Agent(mp.Process):
         self.barrier = barrier  # barrier for synchronization across processes
         self.state = shared_state  # shared state between agents
         # self.state.core = CoreScheduler(subtree_input_dims=10, subtree_max_depth=3, devices=self.devices, subtree_lr=0.005)
+        self.time_out_counter = environment_config['time_out_counter']  # counter for timeout detection
+        self.t_counter = 0  # tracks agent's wait time
 
 
     def init_logs(self):
@@ -51,9 +53,14 @@ class Agent(mp.Process):
                 if self.assigned_job is None:
                     continue
                 # reset the status of the agent    
+                self.t_counter = 0
                 self.local_actor_critic.reset_memory()
                 self.init_logs()
-
+                # utilization = [sum(usage) for usage in self.state.device_usuages ]
+                # gin = gini_coefficient(utilization)
+                # used_devices_count = sum(1 for usage in self.state.device_usuages  if 1 in usage)
+                # diversity = used_devices_count / len(self.devices)
+                # utilization = torch.tensor(utilization, dtype=torch.float)
             # retrive the agent task_queue
             try:
                 task_queue = self.state.preprocessor.get_agent_queue().get(self.assigned_job)
@@ -62,7 +69,16 @@ class Agent(mp.Process):
             if task_queue is None:
                 continue
             
+            self.t_counter += 1
+            if self.t_counter >= self.time_out_counter:
+                self._timeout_on_job()
+                continue
+            
+           
+            
+            
             for task in task_queue:
+                # self.schedule(task,gin,diversity,utilization)
                 self.schedule(task)
                 
                 
@@ -79,7 +95,7 @@ class Agent(mp.Process):
     def stop(self):
         self.runner_flag = False
 
-    def schedule(self, current_task_id):
+    def schedule(self, current_task_id,gin=None,diversity=None,utilization=None):
             # retrieve the necessary data
         pe_state = self.state.PEs
         current_task = self.state.db_tasks[current_task_id]
@@ -163,25 +179,23 @@ class Agent(mp.Process):
 
     def update(self):
         """Update the global actor-critic based on the local model."""
-        # !! Implement PPO's multiple epochs of minibatch updates
         if learning_config['learning_algorithm']!='ppo':
             learning_config['ppo_epochs']=1
-            for _ in range(learning_config['ppo_epochs']):
-                loss = self.local_actor_critic.calc_loss()
-    
-                self.global_optimizer.zero_grad()
-                loss.backward()
-    
-                # !! Add gradient clipping
-                torch.nn.utils.clip_grad_norm_(self.global_actor_critic.parameters(), max_norm=1.0)
-    
-                for local_param, global_param in zip(self.local_actor_critic.parameters(), self.global_actor_critic.parameters()):
-                    global_param._grad = local_param.grad
-    
-                self.global_optimizer.step()
-            # self.scheduler.step()
-            self.save_agent_log(loss.item())  # save agent's performance
-            self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())
+        for epoch in range(learning_config['ppo_epochs']):
+            loss = self.local_actor_critic.calc_loss()
+
+            self.global_optimizer.zero_grad()
+            loss.backward(retain_graph=(epoch < learning_config['ppo_epochs'] - 1))
+
+            torch.nn.utils.clip_grad_norm_(self.global_actor_critic.parameters(), max_norm=1.0)
+
+            for local_param, global_param in zip(self.local_actor_critic.parameters(), self.global_actor_critic.parameters()):
+                global_param._grad = local_param.grad
+
+            self.global_optimizer.step()
+        # self.scheduler.step()
+        self.save_agent_log(loss.item())  # save agent's performance
+        self.local_actor_critic.load_state_dict(self.global_actor_critic.state_dict())
 
     ####### UTILITY FUNCTIONS #######
 
@@ -190,6 +204,7 @@ class Agent(mp.Process):
         print(f"Job {self.assigned_job} TIME OUT")
         self.state.remove_job(self.assigned_job)
         self.assigned_job = None
+        
     def _select_core_dvfs(self, selected_device, selected_core_dvfs_index):
         selected_core_index = int(selected_core_dvfs_index / 3)
         selected_core = selected_device["voltages_frequencies"][selected_core_index]

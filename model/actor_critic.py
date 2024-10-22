@@ -16,10 +16,10 @@ class ActorCritic(nn.Module):
         self.critic = get_critic()  # Critic could be None
         self.checkpoint_file = learning_config['checkpoint_file_path']
         self.reset_memory()
-        self.old_log_probs = [ None for i in range(len(self.devices))]
+        self.old_log_probs = [None for _ in range(len(self.devices))]
         
-        self.clip_param = 0.2
-        self.gae_lambda = 0.95
+        self.clip_param = learning_config['ppo_epsilon']
+        self.gae_lambda = learning_config['gae_lambda']
 
     # Store experiences in memory
     def archive(self, state, action, reward):
@@ -68,13 +68,11 @@ class ActorCritic(nn.Module):
         returns.reverse()
         return torch.tensor(returns, dtype=torch.float)
 
-    # Compute the actor-critic loss
     def calc_loss(self):
         states = torch.tensor(self.states, dtype=torch.float)
         actions = torch.tensor(self.actions, dtype=torch.long)
         rewards = torch.tensor(self.rewards, dtype=torch.float)
 
-        # !! Compute values and returns
         if self.critic is not None:
             values = self.critic(states).squeeze()
             next_value = self.critic(states[-1]).item()
@@ -84,7 +82,6 @@ class ActorCritic(nn.Module):
             returns = self.calculate_returns()
             advantages = returns
 
-        # !! Normalize advantages
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
         pis = torch.stack(self.pis, dim=0)
@@ -94,7 +91,6 @@ class ActorCritic(nn.Module):
         new_log_probs = dist.log_prob(actions)
 
         if learning_config['learning_algorithm'] == "ppo":
-            # PPO implementation
             old_log_probs = []
             for i, action in enumerate(actions):
                 if self.old_log_probs[action.item()] is None:
@@ -111,12 +107,8 @@ class ActorCritic(nn.Module):
             for i, action in enumerate(actions):
                 self.old_log_probs[action.item()] = new_log_probs[i].item()
 
-        elif learning_config['learning_algorithm'] == "policy_grad":
-            # REINFORCE implementation
-            actor_loss = -(new_log_probs * advantages).mean()
-
+        
         else:
-            # A2C implementation
             actor_loss = -(new_log_probs * advantages).mean()
 
         critic_loss = 0
@@ -126,8 +118,7 @@ class ActorCritic(nn.Module):
         loss = actor_loss + 0.5 * critic_loss
 
         return loss
-
-    # !! Add method to compute GAE
+    # !! # Add method to compute GAE
     def compute_gae(self, rewards, values, next_value):
         gae = 0
         returns = []
@@ -137,8 +128,6 @@ class ActorCritic(nn.Module):
             returns.insert(0, gae + values[step])
             next_value = values[step]
         return torch.tensor(returns)
-        
-        
 
     def update_regressor(self):
         def update_leaf_nodes(node):

@@ -1,3 +1,4 @@
+from collections import deque
 import numpy as np
 import pandas as pd
 import torch.multiprocessing as mp
@@ -12,31 +13,27 @@ from configs import environment_config
 
 
 class State:
-
-    def __init__(self, devices ,jobs ,tasks, manager):
+    def __init__(self, devices, jobs, tasks, manager):
         self.db_devices = devices
         self.db_jobs = jobs
         self.db_tasks = {item['id']: item for item in tasks}
         
-        # the state live values PEs & Jobs
+        # !! # Use manager.list only for mutable shared data
         self.PEs = manager.list()
         self.jobs = manager.dict()
-        
-        # initializing PEs in Idle from database
+        self.util = Utility(devices=self.db_devices)
         self.init_PEs(self.db_devices, manager)
         
-        # the task window manged by the window manager
         self.task_window = manager.list()
         
-        # initializing the preprocessor and the window manager
         self.preprocessor = Preprocessing(state=self, manager=manager)
         self.window_manager = WindowManager(state=self, manager=manager)
 
-        # TODO : rest
-        self.agent_log = manager.dict({})
-        self.paths = manager.list([])
+        self.agent_log = manager.dict()
+        self.paths = manager.list()
         self.display = environment_config['display']
         self.lock = mp.Lock()
+        # self.device_usuages = manager.list([manager.list([1]) for i in range(len(self.db_devices))])
         
 
     ##### Intializations
@@ -45,7 +42,7 @@ class State:
         for pe in PEs:
             self.PEs.append({
                 "type": pe["type"],
-                "batteryLevel": pe["battery_capacity"],
+                "batteryLevel": 100.0,
                 "occupiedCores": manager.list([0 for _ in range(pe["num_cores"])]),
                 "energyConsumption": manager.list([pe["powerIdle"] for _ in range(pe["num_cores"])]),
                 "queue": manager.list(
@@ -63,10 +60,20 @@ class State:
                 "remainingTasks": manager.list([]),
                 "remainingDeadline": job["deadline"],
             }
-
+    
+    def remove_job(self,job_id):
+        try:
+            with self.lock:
+                del self.jobs[job_id]
+        except:
+            return
+    
+    def clean_tasks(self):
+        for job in self.jobs.values():
+            for task in job['runningTasks']:
+                self.__task_finished(task)
     ##### Functionality
-    def apply_action(self, pe_ID, core_i, freq, volt, task_ID):
-        # Mutliprocessing robustness
+    def apply_action(self, pe_ID, core_i, freq, volt, task_ID, utilization=None, diversity=None, gin=None):
         try:
             pe_dict = self.PEs[pe_ID]
             pe = self.db_devices[pe_ID]
@@ -74,49 +81,63 @@ class State:
             job_dict = self.jobs[task["job_id"]]
         except:
             print("Retry apply action")
-            return self.apply_action(pe_ID, core_i, freq, volt, task_ID)
-        
-        
+            return self.apply_action(pe_ID, core_i, freq, volt, task_ID, utilization, diversity, gin)
         with self.lock:
-            execution_time = np.ceil(task["computational_load"] / freq)
+            total_t, total_e  = calc_total(pe,task,[self.db_tasks[pre_id] for pre_id in task["predecessors"]],core_i,0)
 
-            if execution_time > 5:
-                execution_time = 5
-            # TODO t must include time of tasks scheduled before it ,in selected queue
-            placing_slot = (execution_time, task_ID)
+            if total_t > 1:
+                total_t = 1
+
+            placing_slot = (total_t, task_ID)
 
             queue_index, core_index, lag_time = self.find_place(pe_dict, core_i)
 
             fail_flags = [0, 0, 0, 0]
             if task["is_safe"] and not pe['is_safe']:
-                # fail : assigned safe task to unsafe device
                 fail_flags[0] = 1
             if task["task_kind"] not in pe["acceptable_tasks"]:
-                # fail : assigned a kind of task to the inappropriate device
                 fail_flags[1] = 1
             if queue_index == -1 and core_index == -1:
-                # fail : assigned a task to a full queue core
-                fail_flags[2] = 0
+                return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
             if sum(fail_flags) > 0:
                 return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
-            # print(f'task{task_ID},   device{pe_ID},   core{core_index},    queue{queue_index}')
+
+            # for i, _ in enumerate(self.device_usuages):
+            #     if i == pe_ID:
+            #         self.device_usuages[i].append(1)
+            #     else:
+            #         self.device_usuages[i].append(0)
+            #     if len(self.device_usuages[i])>100:
+            #         self.device_usuages[i][:]=self.device_usuages[i][1:]
+                
+            
             pe_dict["queue"][core_index] = pe_dict["queue"][core_index][:queue_index] + [placing_slot] + \
                                            pe_dict["queue"][core_index][queue_index + 1:]
 
-            # updating the live status of the state after the schedule
-            # TODO robust
             job_dict["runningTasks"].append(task_ID)
-            job_dict["remainingTasks"].remove(task_ID)
+            try:
+                job_dict["remainingTasks"].remove(task_ID)
+            except:
+                pass
 
-            # updating the pre processor queue
             self.preprocessor.queue.remove(task_ID)
 
-        capacitance = pe["capacitance"]
-        pe_dict["energyConsumption"][core_index] = capacitance * (volt * volt) * freq
-        e = capacitance * (volt * volt) * freq * execution_time
-        return reward_function(t=execution_time + lag_time, e=e), fail_flags, e, execution_time + lag_time
+        
+        battery_punish, batteryFail=self.util.checkBatteryDrain(total_e,pe_dict,pe) 
+        if batteryFail:
+            fail_flags[3]=1
+            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
+        
+        lambda_penalty = 0
+        if learning_config['utilization']            :
+            lambda_diversity = learning_config["max_lambda"] * (1 - diversity)
+            lambda_gini = learning_config["max_lambda"] * gin
+            lambda_penalty = learning_config["alpha_diversity"] * lambda_diversity + learning_config["alpha_gin"] * lambda_gini
+
+        return reward_function(t=total_t + lag_time, e=total_e) +battery_punish, fail_flags, total_e, total_t+ lag_time
+
 
     def save_agent_log(self, assigned_job, dict, path_history):
         with self.lock:
@@ -183,7 +204,7 @@ class State:
             job["remainingDeadline"] -= 1
 
             # removing the finished jobs from the state
-            if len(job["finishedTasks"]) == job["task_count"]:
+            if  len(job["runningTasks"]) + len(job["finishedTasks"]) == job["task_count"]:
                 removing_items.append(job['id'])
 
         for item in removing_items:
