@@ -70,7 +70,7 @@ class Agent(mp.Process):
                 continue
             
             self.t_counter += 1
-            if self.t_counter >= self.time_out_counter:
+            if self.t_counter >= self.time_out_counter and len(current_job["runningTasks"]) ==0 and len(current_job["remainingTasks"]) ==0 :
                 self._timeout_on_job()
                 continue
             
@@ -185,7 +185,7 @@ class Agent(mp.Process):
             loss = self.local_actor_critic.calc_loss()
 
             self.global_optimizer.zero_grad()
-            loss.backward(retain_graph=(epoch < learning_config['ppo_epochs'] - 1))
+            loss.backward(retain_graph=(epoch <= learning_config['ppo_epochs'] - 1))
 
             torch.nn.utils.clip_grad_norm_(self.global_actor_critic.parameters(), max_norm=1.0)
 
@@ -201,8 +201,10 @@ class Agent(mp.Process):
 
     def _timeout_on_job(self):
         """Handle timeout when a job is taking too long."""
-        print(f"Job {self.assigned_job} TIME OUT")
+        print("JOB Stuck ",self.assigned_job)
         self.state.remove_job(self.assigned_job)
+        if len(self.local_actor_critic.states)>1:
+            self.update()
         self.assigned_job = None
         
     def _select_core_dvfs(self, selected_device, selected_core_dvfs_index):

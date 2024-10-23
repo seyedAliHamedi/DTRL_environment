@@ -64,7 +64,7 @@ class Generator:
                 "id": job_id,
                 "task_count": len(random_dag.nodes),
                 "tasks_ID": [task["id"] for task in tasks_data if task["job_id"] == job_id],
-                "deadline": np.random.randint(1, max_deadline),
+                "deadline": np.random.randint(max_deadline-5, max_deadline+5),
             }
             jobs_data.append(job_info)
 

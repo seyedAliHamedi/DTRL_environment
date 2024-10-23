@@ -68,16 +68,26 @@ class State:
         except:
             return
     
-    def clean_tasks(self):
+    def clean_jobs(self):
+        return
+        removing_items = []
         for job in self.jobs.values():
-            for task in job['runningTasks']:
-                self.__task_finished(task)
+            if job['remainingDeadline'] < 0 and job['id'] not in removing_items:
+                print("removed deadline")
+                removing_items.append(job['id'])
+                
+        for item in removing_items:
+            if item in self.jobs.keys():
+                del self.jobs[item]
+        
     ##### Functionality
     def apply_action(self, pe_ID, core_i, freq, volt, task_ID, utilization=None, diversity=None, gin=None):
         try:
             pe_dict = self.PEs[pe_ID]
             pe = self.db_devices[pe_ID]
             task = self.db_tasks[task_ID]
+            if task["job_id"] not in self.jobs.keys():
+                return 0, [0,0,0,0], 0, 0
             job_dict = self.jobs[task["job_id"]]
         except:
             print("Retry apply action")
@@ -98,7 +108,7 @@ class State:
             if task["task_kind"] not in pe["acceptable_tasks"]:
                 fail_flags[1] = 1
             if queue_index == -1 and core_index == -1:
-                return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
+                fail_flags[2] = 1
 
             if sum(fail_flags) > 0:
                 return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
@@ -157,33 +167,34 @@ class State:
         #   4. calling the preprocessor to update the agent queue based on the state
         self.window_manager.run()
         self.__update_jobs(manager)
+        # self.clean_jobs()
         self.__update_PEs()
         self.preprocessor.run()
 
         # displaying the live status of the state
-        if self.display:
+        if self.display :
             print("PEs::")
             pe_data = {}
-            for pe_id, pe in self.get_PEs().items():
+            for pe_id, pe in enumerate(self.PEs):
                 pe_data[pe_id] = {
-                    "id": pe["id"],
-                    "type": pe["type"],
-                    "batteryLevel": pe["batteryLevel"],
-                    "occupiedCores": list(pe["occupiedCores"]),
-                    "energyConsumption": list(pe["energyConsumption"]),
+                    "id": pe_id,
+                    # "type": pe["type"],
+                    # "batteryLevel": pe["batteryLevel"],
+                    # "occupiedCores": list(pe["occupiedCores"]),
+                    # "energyConsumption": list(pe["energyConsumption"]),
                     "queue": [list(core_queue) for core_queue in pe["queue"]]
                 }
             print('\033[94m', pd.DataFrame(pe_data), '\033[0m', '\n')
 
             print("Jobs::")
             job_data = {}
-            for job_id, job in self.get_jobs().items():
+            for job_id, job in self.jobs.items():
                 job_data[job_id] = {
-                    "task_count": job["task_count"],
-                    "finishedTasks": list(job["finishedTasks"]),
+                    # "task_count": job["task_count"],
+                    # "finishedTasks": list(job["finishedTasks"]),
                     "runningTasks": list(job["runningTasks"]),
-                    "remainingTasks": list(job["remainingTasks"]),
-                    "remainingDeadline": job["remainingDeadline"]
+                    # "remainingTasks": list(job["remainingTasks"]),
+                    # "remainingDeadline": job["remainingDeadline"]
                 }
             print('\033[92m', pd.DataFrame(job_data), '\033[0m', "\n")
 
@@ -199,12 +210,18 @@ class State:
         self.__add_new_active_jobs(self.task_window, manager)
 
         removing_items = []
-        for job in self.jobs.values():
+        for job_id in list(self.jobs.keys()):
+            job = self.jobs[job_id]
             # decreasing the deadline of the jobs by 1 cycle
-            job["remainingDeadline"] -= 1
+            old_deadline = job["remainingDeadline"]
+            updated_job = dict(job)
+            updated_job["remainingDeadline"] = old_deadline - 1
+            
+            # Replace the old dictionary in the manager.dict()
+            self.jobs[job_id] = updated_job
 
             # removing the finished jobs from the state
-            if  len(job["runningTasks"]) + len(job["finishedTasks"]) == job["task_count"]:
+            if  len(job["finishedTasks"]) == job["task_count"]:
                 removing_items.append(job['id'])
 
         for item in removing_items:
@@ -268,7 +285,7 @@ class State:
         for core_index, core_queue in enumerate(pe["queue"]):
             first_task = core_queue[0]
 
-            if first_task[0] == 0:
+            if first_task[0] <= 0:
                 # Removing the finished task from queue
                 if first_task[1] != -1:
                     self.__task_finished(first_task[1])
@@ -316,7 +333,6 @@ class State:
             if pe['type'] == 'cloud' or True:
                 for core_index, queue in enumerate(pe["queue"]):
                     if queue[0][1] == -1:
-                        
                         return 0, core_index, 0
             return -1, -1, -1
         except:

@@ -1,6 +1,6 @@
 jobs_config = {
     "num_jobs": 10000,
-    "max_deadline": 2000,
+    "max_deadline": 100,
     "max_task_per_depth": 2,
     "max_depth": 5,
     "task": {
@@ -8,7 +8,7 @@ jobs_config = {
         "input_size": [1, 1001],
         "output_size": [1, 1001],
         "computational_load": [1, 1001],
-        "safe_measurement": [0.5, 0.5],
+        "safe_measurement": [0.8, 0.2],
         "task_kinds": [1, 2, 3, 4]
     },
     "max_num_parents_dag": 1,
@@ -19,7 +19,7 @@ jobs_config = {
 devices_config = {
     "iot": {
         "num_devices": 100,
-        "num_cores": [4, 8, 16],
+        "num_cores": [4,8,16],
         "voltage_frequencies": [
             (10e6, 1.8),
             (20e6, 2.3),
@@ -40,7 +40,7 @@ devices_config = {
     },
     "mec": {
         "num_devices": 50,
-        "num_cores": [16, 32, 64],
+        "num_cores": [16,32,64],
         "voltage_frequencies": [
             (600 * 1e6, 0.8),
             (750 * 1e6, 0.825),
@@ -131,7 +131,7 @@ learning_config = {
 
     "ppo_epsilon": 0.2,
     "gae_lambda": 0.95,
-    "ppo_epochs": 5,
+    "ppo_epochs": 10,
 
     "critic_hidden_layer_num": 1,
     "critic_hidden_layer_dim": 256,
@@ -160,8 +160,8 @@ learning_config = {
 
 
 environment_config = {
-    "multi_agent": 32,
-    "time_out_counter": 50,
-    "window": {"size": 200, "max_jobs": 40, "clock": 10},
+    "multi_agent": 15,
+    "time_out_counter": 100,
+    "window": {"size": 100, "max_jobs": 20, "clock": 10},
     "display":False
 }
