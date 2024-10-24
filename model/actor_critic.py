@@ -16,7 +16,7 @@ class ActorCritic(nn.Module):
         self.critic = get_critic()  # Critic could be None
         self.checkpoint_file = learning_config['checkpoint_file_path']
         self.reset_memory()
-        
+        self.old_log_probs = [None for _ in range(len(self.devices))]
         
         self.clip_param = learning_config['ppo_epsilon']
         self.gae_lambda = learning_config['gae_lambda']
@@ -26,19 +26,10 @@ class ActorCritic(nn.Module):
         self.states.append(state)
         self.actions.append(action)
         self.rewards.append(reward)
-         # Calculate and store log_prob immediately
-        state_tensor = torch.tensor(state, dtype=torch.float)
-        with torch.no_grad():
-            pi, _, _, _ = self.forward(state_tensor)
-            self.pis.append(pi)
-            probs = F.softmax(pi, dim=-1)
-            dist = Categorical(probs)
-            self.old_log_probs.append(dist.log_prob(torch.tensor(action)).item())
 
     # Clear memory after an episode
     def reset_memory(self):
         self.rewards, self.actions, self.states, self.pis = [], [], [], []
-        self.old_log_probs = []  
 
     # Forward pass through both actor and critic (if present)
     def forward(self, x):
@@ -97,8 +88,6 @@ class ActorCritic(nn.Module):
         probs = F.softmax(pis, dim=-1)
         dist = Categorical(probs)
 
-        # Calculate entropy bonus to prevent collapse
-        entropy = dist.entropy().mean()
         new_log_probs = dist.log_prob(actions)
 
         if learning_config['learning_algorithm'] == "ppo":
@@ -126,6 +115,7 @@ class ActorCritic(nn.Module):
         if self.critic:
             critic_loss = F.mse_loss(values, returns)
 
+        entropy = dist.entropy().mean()
         entropy_coef = 0.00  # Small entropy coefficient
         loss = actor_loss + 0.5 * critic_loss - entropy_coef * entropy
 
@@ -133,21 +123,13 @@ class ActorCritic(nn.Module):
     def compute_gae(self, rewards, values, next_value):
         gae = 0
         returns = []
-        
-        # Reversed GAE calculation
         for step in reversed(range(len(rewards))):
-            if step == len(rewards) - 1:
-                next_val = next_value
-            else:
-                next_val = values[step + 1]
-                
-            delta = rewards[step] + self.discount_factor * next_val - values[step]
+            delta = rewards[step] + self.discount_factor * next_value - values[step]
             gae = delta + self.discount_factor * self.gae_lambda * gae
             
-            # Clip GAE to prevent extreme values
             # gae = torch.clamp(gae, -10.0, 10.0)
             returns.insert(0, gae + values[step])
-            
+            next_value = values[step]
         return torch.tensor(returns)
 
     def update_regressor(self):

@@ -19,9 +19,6 @@ class Utility:
                 (task["input_size"] - inputs[0]) / (inputs[1] - inputs[0]),
                 (task["output_size"] - outputs[0]) / (outputs[1] - outputs[0]),
                 task["is_safe"],
-                task['live_state']["iot_predecessors"],
-                task['live_state']["mec_predecessors"],
-                task['live_state']["cloud_predecessors"]
             ]
         else:
             task_features = [
@@ -29,9 +26,6 @@ class Utility:
                 task["input_size"],
                 task["output_size"],
                 task["is_safe"],
-                task['live_state']["iot_predecessors"],
-                task['live_state']["mec_predecessors"],
-                task['live_state']["cloud_predecessors"]
             ]
 
         if learning_config['onehot_kind']:

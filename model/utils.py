@@ -105,7 +105,7 @@ class SharedAdam(Adam):
     to be shared across multiple processes.
     """
 
-    def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, amsgrad=False, **kwargs):
+    def __init__(self, params, lr=0.001, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.0, amsgrad=False, **kwargs):
         """
         Initializes the SharedAdam optimizer with shared states.
         
@@ -194,12 +194,13 @@ def get_tree(devices):
 
 
 def get_num_input():
-    num_input = 8
+    num_input = 5
     if learning_config['onehot_kind']:
-        num_input = 11
+        num_input = 8
     if learning_config['utilization']:
         num_input +=2
     return num_input
+
 
 def get_critic():
     num_input = get_num_input()
