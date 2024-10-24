@@ -94,11 +94,11 @@ class State:
             return self.apply_action(pe_ID, core_i, freq, volt, task_ID, utilization, diversity, gin)
         with self.lock:
             total_t, total_e  = calc_total(pe,task,[self.db_tasks[pre_id] for pre_id in task["predecessors"]],core_i,0)
-
+            execution_time = total_t
             if total_t > 1:
                 total_t = 1
 
-            placing_slot = (total_t, task_ID)
+            placing_slot = (execution_time, task_ID)
 
             queue_index, core_index, lag_time = self.find_place(pe_dict, core_i)
 
@@ -110,7 +110,7 @@ class State:
             if queue_index == -1 and core_index == -1:
                 fail_flags[2] = 1
 
-            if sum(fail_flags) > 0:
+            if sum(fail_flags) > 0 or (queue_index == -1 and core_index == -1):
                 return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
 
@@ -146,7 +146,7 @@ class State:
             lambda_gini = learning_config["max_lambda"] * gin
             lambda_penalty = learning_config["alpha_diversity"] * lambda_diversity + learning_config["alpha_gin"] * lambda_gini
 
-        return reward_function(t=total_t + lag_time, e=total_e) +battery_punish, fail_flags, total_e, total_t+ lag_time
+        return reward_function(t=total_t + lag_time, e=total_e) + battery_punish, fail_flags, total_e, total_t+ lag_time
 
 
     def save_agent_log(self, assigned_job, dict, path_history):

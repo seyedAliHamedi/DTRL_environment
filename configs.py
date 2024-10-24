@@ -160,8 +160,8 @@ learning_config = {
 
 
 environment_config = {
-    "multi_agent": 15,
+    "multi_agent": 32,
     "time_out_counter": 100,
-    "window": {"size": 100, "max_jobs": 20, "clock": 10},
+    "window": {"size": 200, "max_jobs": 40, "clock": 10},
     "display":False
 }
