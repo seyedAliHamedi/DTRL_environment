@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import torch.multiprocessing as mp
 
+from data.gen import Generator
 from environment.util import *
 from environment.pre_processing import Preprocessing
 from environment.window_manager import WindowManager
@@ -24,11 +25,16 @@ class State:
         
         self.preprocessor = Preprocessing(state=self, manager=manager)
         self.window_manager = WindowManager(state=self, manager=manager)
+        
+        self.device_usage = manager.list([manager.list([1]) for _ in range(len(self.db_devices))])
+        self.max_usage_history = 100
 
         self.agent_log = manager.dict()
         self.paths = manager.list()
         self.display = environment_config['display']
         self.lock = mp.Lock()
+
+    
 
     def init_PEs(self, PEs, manager):
         # OPTIMIZATION: Batch initialize PEs
@@ -90,9 +96,9 @@ class State:
             if task["task_kind"] not in pe["acceptable_tasks"]:
                 fail_flags[1] = 1
             if queue_index == -1 and core_index == -1:
-                fail_flags[2] = 1
+                fail_flags[2] = 0
 
-            if sum(fail_flags) > 0:
+            if sum(fail_flags) > 0 or (queue_index == -1 and core_index == -1):
                 return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
             pe_dict["queue"][core_index] = pe_dict["queue"][core_index][:queue_index] + [placing_slot] + \
@@ -106,6 +112,8 @@ class State:
 
             self.preprocessor.queue.remove(task_ID)
 
+        self.update_device_usage(pe_ID)
+        
         battery_punish, batteryFail = self.util.checkBatteryDrain(total_e, pe_dict, pe)
         if batteryFail:
             fail_flags[3] = 1
@@ -128,15 +136,86 @@ class State:
         with self.lock:
             return self.preprocessor.assign_job()
 
+    def update_device_usage(self, device_index, used=True):
+        """Track device usage with thread safety."""
+        with self.lock:
+            for d_index,usage in enumerate(self.device_usage):
+                usage.append(1 if d_index==device_index else 0)
+            if len(usage) > self.max_usage_history:
+                usage[:] = usage[1:]
+
+    def add_device(self, manager,new_device=None):
+        """Add a new device to the system."""
+        with self.lock:
+            try:
+                if new_device is None:
+                    new_device = Generator.generate_random_device()
+                
+                # Add to device database
+                # self.db_devices.append(new_device)
+                
+                # Initialize PE state for new device
+                new_pe = {
+                    "type": new_device["type"],
+                    "batteryLevel": 100.0,
+                    "occupiedCores": manager.list([0 for _ in range(new_device["num_cores"])]),
+                    "energyConsumption": manager.list([new_device["powerIdle"] for _ in range(new_device["num_cores"])]),
+                    "queue": manager.list(
+                        [manager.list([(0, -1) for _ in range(new_device["maxQueue"])])
+                         for _ in range(new_device["num_cores"])])
+                }
+                self.PEs.append(new_pe)
+                
+                # Initialize usage tracking
+                self.device_usage.append(manager.list([1]))
+                
+                # Update utility with new device list
+                self.util = Utility(devices=self.db_devices)
+                
+                return True
+            except Exception as e:
+                print(f"Error adding device: {e}")
+                return False
+
+    def remove_device(self, device_index):
+        """Remove a device from the system."""
+        with self.lock:
+            try:
+                if device_index >= len(self.db_devices):
+                    return False
+                    
+                device = self.db_devices[device_index]
+                if device['type'] == 'cloud' :
+                    return False
+                
+                # Remove from device database
+                # del self.db_devices[device_index]
+                
+                # Remove PE state
+                del self.PEs[device_index]
+                
+                # Remove usage tracking
+                del self.device_usage[device_index]
+                
+                # Update utility with new device list
+                self.util = Utility(devices=self.db_devices)
+                
+                return True
+            except Exception as e:
+                print(f"Error removing device: {e}")
+                return False
+
     def update(self, manager):
+        # Original update functionality
         self.window_manager.run()
         self.__update_jobs(manager)
         self.__update_PEs()
         self.preprocessor.run()
 
+        # Display status if enabled
         if self.display:
-            self.__display_state()
-
+            self.__display_status()
+    
     def __update_jobs(self, manager):
         self.__add_new_active_jobs(self.task_window, manager)
 

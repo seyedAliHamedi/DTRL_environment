@@ -36,6 +36,7 @@ class Environment:
 
         self.display = environment_config['display']
         self.time_log = []
+        self.stablized = False
         print("Envionment initialized ")
         
         
@@ -48,19 +49,19 @@ class Environment:
         
     def run(self):
         # define the global Actor-Critic and the shared optimizer (A3C)
-        global_actor_critic = ActorCritic(devices=self.devices)
-        global_actor_critic.share_memory()
-        global_optimizer = SharedAdam(global_actor_critic.parameters())
+        self.global_actor_critic = ActorCritic(devices=self.devices)
+        self.global_actor_critic.share_memory()
+        global_optimizer = SharedAdam(self.global_actor_critic.parameters())
         # setting up workers and their barriers
         self.workers = []
-        barrier = mp.Barrier(environment_config['multi_agent'] + 1)
+        self.barrier = mp.Barrier(environment_config['multi_agent'] + 1)
         # kick off the state
         self.state.update(self.manager)
         print("Starting agents .....")
         for i in range(environment_config['multi_agent']):
             # organize and start the agents
-            worker = Agent(name=f'agent_{i}', global_actor_critic=global_actor_critic,
-                           global_optimizer=global_optimizer, barrier=barrier, shared_state=self.state,
+            worker = Agent(name=f'agent_{i}', global_actor_critic=self.global_actor_critic,
+                           global_optimizer=global_optimizer, barrier=self.barrier, shared_state=self.state,
                            )
             self.workers.append(worker)
             worker.start()
@@ -69,15 +70,30 @@ class Environment:
         try:
             print("Simulation starting...")
             while True:
+                if self.stablized and learning_config['scalability']:
+                   if np.random.random() < learning_config['add_device_iterations']:
+                       self.add_device()
+                   if np.random.random() < learning_config['remove_device_iterations']:
+                       self.remove_device()
+                       
                 if iteration % 10 == 0 and iteration != 0:
                     print(f"iteration : {iteration}", len(self.state.jobs))
                     if iteration % 100 == 0:
                         self.save_time_log()
                         self.make_agents_plots()
+                
                 starting_time = time.time()
+                self.check_dead_iot_devices()
                 self.state.update(self.manager)
-                barrier.wait()
+                self.barrier.wait()
                 # print("ITERATION " ,iteration,time.time()-starting_time)
+                
+                if not self.stablized and iteration > 500:
+                    # recent_fails = [log.get('fails', 1) for log in list(self.state.agent_log.values())[-1000:]]
+                    # if all(x <= 0.2 for x in recent_fails):
+                    print("STABILIZED")
+                    self.stablized = True
+                
                 iteration += 1
                 time_len = time.time() - starting_time
                 self.time_log.append(time_len)
@@ -99,6 +115,67 @@ class Environment:
                     worker.terminate()
                     worker.join()
 
+
+    def add_device(self):
+        print("added a device")
+        """Add device and propagate changes downstream."""
+        new_device = Generator.generate_random_device()
+        self.devices.append(new_device)
+        
+        # Update state
+        self.state.add_device(manager=self.manager,new_device=new_device)
+        
+        # Update global actor critic first
+        self.global_actor_critic.add_device(new_device)
+        # Update all workers
+        for worker in self.workers:
+            worker.local_actor_critic.add_device(new_device)
+            worker.add_device(new_device)
+            
+        # Wait for all processes to finish updating
+            
+    def remove_device(self, device_index=None):
+        print("device removed")
+        """Remove device with synchronized update."""
+        if len(self.devices) <= 1:
+            return
+        
+        if device_index is None:
+            # Random selection weighted by inverse usage
+            weights = [1/(sum(usage)+1) for usage in self.state.device_usage]
+            device_index = np.random.choice(range(len(self.devices)), p=weights/np.sum(weights))
+            
+            
+        if self.devices[device_index]['type'] == 'cloud':
+            return
+            
+        del self.devices[device_index]
+        
+        # Update state
+        self.state.remove_device(device_index)
+        
+        # Update global actor critic first
+        self.global_actor_critic.remove_device(device_index)
+        
+        # Then update all workers synchronously
+        for worker in self.workers:
+            worker.local_actor_critic.remove_device(device_index)
+            worker.remove_device(device_index)
+            
+        # Wait for all processes to finish updating
+   
+    def check_dead_iot_devices(self):
+        """Remove IoT devices with depleted batteries."""
+        removing_devices = []
+        for idx, device in enumerate(self.devices):
+            if (device['type'] == 'iot' and 
+                self.state.PEs[idx]['batteryLevel'] < device['ISL'] * 100):
+                removing_devices.append(idx)
+        
+        # Remove devices in reverse order
+        for idx in sorted(removing_devices, reverse=True):
+            self.remove_device(idx)
+            print("IoT device removed due to depleted battery")
 
     def save_time_log(self, path=learning_config['result_time_plot']):
         if len(self.time_log) <= 10:

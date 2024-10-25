@@ -21,6 +21,18 @@ class ActorCritic(nn.Module):
         self.clip_param = learning_config['ppo_epsilon']
         self.gae_lambda = learning_config['gae_lambda']
 
+    def add_device(self, new_device):
+        """Handle adding a new device."""
+        # self.devices.append(new_device)
+        self.old_log_probs.append(None)
+        self.actor.add_device(new_device)
+
+    def remove_device(self, device_index):
+        """Handle removing a device."""
+        # del self.devices[device_index]
+        del self.old_log_probs[device_index]
+        self.actor.remove_device(device_index)
+        
     # Store experiences in memory
     def archive(self, state, action, reward):
         self.states.append(state)
@@ -33,6 +45,8 @@ class ActorCritic(nn.Module):
 
     # Forward pass through both actor and critic (if present)
     def forward(self, x):
+        self.actor.train_logit_regressor(self.devices)
+        
         # Get policy distribution and path from the actor
         # Determine if the actor is ClusTree or DDT based on its output
         if isinstance(self.actor, ClusTree):
@@ -132,27 +146,27 @@ class ActorCritic(nn.Module):
             next_value = values[step]
         return torch.tensor(returns)
 
-    def update_regressor(self):
-        def update_leaf_nodes(node):
-            if node.depth == node.max_depth:
-                devices = node.devices if isinstance(self.actor, ClusTree) else self.devices
-                dist = node.prob_dist
-                pe_data = torch.tensor(
-                    [extract_pe_data(device) for device in devices],
-                    dtype=torch.float32
-                )
-                pred = node.logit_regressor(pe_data)
-                loss = F.mse_loss(pred.squeeze(), dist)
-                node.logit_optimizer.zero_grad()
-                loss.backward()
-                node.logit_optimizer.step()
-                return
+    # def update_regressor(self):
+    #     def update_leaf_nodes(node):
+    #         if node.depth == node.max_depth:
+    #             devices = node.devices if isinstance(self.actor, ClusTree) else self.devices
+    #             dist = node.prob_dist
+    #             pe_data = torch.tensor(
+    #                 [extract_pe_data(device) for device in devices],
+    #                 dtype=torch.float32
+    #             )
+    #             pred = node.logit_regressor(pe_data)
+    #             loss = F.mse_loss(pred.squeeze(), dist)
+    #             node.logit_optimizer.zero_grad()
+    #             loss.backward()
+    #             node.logit_optimizer.step()
+    #             return
 
-            if node.left:
-                update_leaf_nodes(node.left)
-            if node.right:
-                update_leaf_nodes(node.right)
+    #         if node.left:
+    #             update_leaf_nodes(node.left)
+    #         if node.right:
+    #             update_leaf_nodes(node.right)
 
-        # Start from the root actor
-        actor = self.actor
-        update_leaf_nodes(actor)
+    #     # Start from the root actor
+    #     actor = self.actor
+    #     update_leaf_nodes(actor)

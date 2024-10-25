@@ -123,14 +123,14 @@ class Utility:
 
 
 def extract_pe_data(pe):
-    battery_now = pe['live_state']['battery_now']
+    # battery_now = pe['live_state']['battery_now']
     acceptable_tasks = [0, 0, 0, 0]
     for i in range(1, 5):
         if i in pe['acceptable_tasks']:
             acceptable_tasks[i - 1] = 1
 
     # return [battery_now /100, pe['is_safe']] + acceptable_tasks
-    return [battery_now / 100, pe['is_safe']]
+    return [pe['is_safe']]+acceptable_tasks
 
 
 def lambda_D(D, lambda_max, T_low, T_high):

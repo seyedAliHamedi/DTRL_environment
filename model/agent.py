@@ -24,7 +24,9 @@ class Agent(mp.Process):
         self.scheduler = StepLR(self.global_optimizer, step_size=1000, gamma=0.9)
 
         # the local actor-critic and the core scheduler
-        self.local_actor_critic = ActorCritic(devices=global_actor_critic.devices) # local actor-critic model
+           # Use the already updated global model's state dict
+        self.local_actor_critic = ActorCritic(devices=self.devices)
+
        
 
         self.assigned_job = None  # current job assigned to the agent
@@ -96,7 +98,14 @@ class Agent(mp.Process):
 
     def stop(self):
         self.runner_flag = False
-
+    def add_device(self, new_device):
+        """Add device with synchronized state dict update."""
+        self.util = Utility(devices=self.devices)
+        
+    def remove_device(self, device_index):
+        """Remove device with synchronized state dict update."""
+        self.util = Utility(devices=self.devices)
+        
     def schedule(self, current_task_id,gin=None,diversity=None,utilization=None):
             # retrieve the necessary data
         pe_state = self.state.PEs
@@ -138,6 +147,7 @@ class Agent(mp.Process):
         self.state.core.optimizers[selected_device_index].zero_grad()
         sub_tree_loss.backward()
         self.state.core.optimizers[selected_device_index].step()
+    
     def update_agent_logs(self, reward, time, energy, fail_flag, selected_device, path):
         """Update the logs for the agent based on task performance."""
         self.reward_log.append(reward)

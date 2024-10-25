@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 
 from configs import learning_config
@@ -28,7 +29,7 @@ class DDT(nn.Module):
         self.depth = depth
         self.max_depth = max_depth
         self.counter = counter
-
+        
         # Exploration parameters
         self.epsilon = learning_config['explore_epsilon']
         num_epoch = learning_config['num_epoch']
@@ -55,6 +56,7 @@ class DDT(nn.Module):
             self.right = DDT(num_input, num_output, depth + 1, max_depth, self.counter, self.exploration_rate)
 
     def forward(self, x, path=""):
+        
         # Leaf node: return the probability distribution
         if self.depth == self.max_depth:
             return self.prob_dist, path
@@ -104,34 +106,47 @@ class DDT(nn.Module):
         return 1 - val
 
     def add_device(self, new_device):
+        """Add a new device to the tree."""
         if self.depth == self.max_depth:
-            # Get the features of the new device
             new_device_features = extract_pe_data(new_device)
+            device_tensor = torch.tensor(new_device_features, dtype=torch.float32)
+            new_device_dist = self.logit_regressor(device_tensor)
 
-            # Ensure the features are in the right shape for the regressor (2D array)
-            # Predict logit using the logit regressor
-            new_device_dist = self.logit_regressor(torch.tensor(new_device_features, dtype=torch.float32))
-
-            # Logging predicted and average logits for debugging
             avg_logit = sum(self.prob_dist) / len(self.prob_dist)
-            print(f"Avg Logit: {avg_logit:.4f}, Predicted Logit: {new_device_dist,}")
+            print(f"{len(avg_logit)} Avg Logit: {avg_logit:.4f}, Predicted Logit: {new_device_dist,}")
 
-            # Concatenate the new distribution and wrap it in nn.Parameter
             self.prob_dist = nn.Parameter(torch.cat((self.prob_dist, new_device_dist)))
-
         else:
-            # Recursively call add_device on the left and right subtrees
             self.left.add_device(new_device)
             self.right.add_device(new_device)
 
     def remove_device(self, device_index):
+        """Remove a device from the tree."""
         if self.depth == self.max_depth:
-            # Remove the device's entry in prob_dist
-            self.prob_dist = nn.Parameter(torch.cat((self.prob_dist[:device_index], self.prob_dist[device_index + 1:])))
-
-            # Re-normalize the probabilities to ensure they sum to 1
-            # with torch.no_grad():
-            #     self.prob_dist /= torch.sum(self.prob_dist)
+            self.prob_dist = nn.Parameter(torch.cat((self.prob_dist[:device_index], 
+                                                   self.prob_dist[device_index + 1:])))
         else:
             self.left.remove_device(device_index)
             self.right.remove_device(device_index)
+            
+    def train_logit_regressor(self, devices):
+        """Train the logit regressor using current probabilities."""
+        if self.depth == self.max_depth:
+            # Get features and current probabilities for all devices
+            device_features = torch.tensor([extract_pe_data(device) for device in devices], 
+                                        dtype=torch.float32)
+            current_probs = self.prob_dist.detach()
+            
+            # Train regressor
+            self.logit_optimizer.zero_grad()
+            predicted_logits = self.logit_regressor(device_features).squeeze()
+            loss = F.mse_loss(predicted_logits, current_probs)
+            loss.backward()
+            self.logit_optimizer.step()
+            
+            return loss.item()
+        
+        # Recursively train child nodes
+        left_loss = self.left.train_logit_regressor(devices) if hasattr(self, 'left') else 0
+        right_loss = self.right.train_logit_regressor(devices) if hasattr(self, 'right') else 0
+        return (left_loss + right_loss) / 2
