@@ -77,7 +77,7 @@ class Environment:
                 starting_time = time.time()
                 self.state.update(self.manager)
                 barrier.wait()
-
+                # print("ITERATION " ,iteration,time.time()-starting_time)
                 iteration += 1
                 time_len = time.time() - starting_time
                 self.time_log.append(time_len)

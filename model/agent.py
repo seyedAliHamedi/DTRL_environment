@@ -1,5 +1,6 @@
 import numpy as np
 
+import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -76,7 +77,6 @@ class Agent(mp.Process):
             
            
             
-            
             for task in task_queue:
                 # self.schedule(task,gin,diversity,utilization)
                 self.schedule(task)
@@ -89,7 +89,9 @@ class Agent(mp.Process):
                 continue
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
                 print(f"DONE")
+                # start_time = time.time()
                 self.update()
+                # print(self.name,"TOOK " ,time.time()-start_time,"UPDATE UPDATE PARAMETERS")
                 self.assigned_job = None
 
     def stop(self):

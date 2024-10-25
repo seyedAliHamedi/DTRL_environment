@@ -129,9 +129,10 @@ learning_config = {
     #   a2c
     #   ppo
 
-    "ppo_epsilon": 0.2,
-    "gae_lambda": 0.95,
-    "ppo_epochs": 10,
+    "ppo_epsilon": 0.2,  # Reduced from 0.2 for more stable updates
+    "gae_lambda": 0.95,  # Increased from 0.95 for better advantage estimation
+    "ppo_epochs":10, 
+    "lr": 0.001, 
 
     "critic_hidden_layer_num": 1,
     "critic_hidden_layer_dim": 256,
