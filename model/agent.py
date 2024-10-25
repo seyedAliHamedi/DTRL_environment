@@ -108,7 +108,6 @@ class Agent(mp.Process):
         
     def schedule(self, current_task_id,gin=None,diversity=None,utilization=None):
             # retrieve the necessary data
-        pe_state = self.state.PEs
         current_task = self.state.db_tasks[current_task_id]
         input_state = self.util.get_input(current_task,gin=None,diversity=None)
 

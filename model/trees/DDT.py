@@ -42,9 +42,9 @@ class DDT(nn.Module):
         if depth == max_depth:
             self.prob_dist = nn.Parameter(torch.ones(num_output))
             self.logit_regressor = nn.Sequential(
-                nn.Linear(learning_config['pe_num_features'], 256),
+                nn.Linear(learning_config['pe_num_features'], 64),
                 nn.Sigmoid(),
-                nn.Linear(256, 1),
+                nn.Linear(64, 1),
             )
             self.logit_optimizer = optim.Adam(self.logit_regressor.parameters(), lr=0.01)
         if depth < max_depth:
@@ -113,7 +113,7 @@ class DDT(nn.Module):
             new_device_dist = self.logit_regressor(device_tensor)
 
             avg_logit = sum(self.prob_dist) / len(self.prob_dist)
-            print(f"{len(avg_logit)} Avg Logit: {avg_logit:.4f}, Predicted Logit: {new_device_dist,}")
+            print(f"Avg Logit: {avg_logit:.4f}, Predicted Logit: {new_device_dist,}")
 
             self.prob_dist = nn.Parameter(torch.cat((self.prob_dist, new_device_dist)))
         else:

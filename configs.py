@@ -140,8 +140,8 @@ learning_config = {
     "discount_factor": 0.99,  # 0: reward , 0.99:return
 
     'scalability': True,
-    'add_device_iterations': 0.001,  # Probability of adding device each iteration
-    'remove_device_iterations': 0.001,  
+    'add_device_iterations': 0.01,  # Probability of adding device each iteration
+    'remove_device_iterations': 0.01,  
 
     "utilization": False,
     "alpha_diversity": 1,

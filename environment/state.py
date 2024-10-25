@@ -71,16 +71,16 @@ class State:
         except:
             return
     
-    def apply_action(self, pe_ID, core_i, freq, volt, task_ID, utilization=None, diversity=None, gin=None):
+    def apply_action(self, pe_ID, core_i, freq, volt, task_ID, utilization=None, diversity=None, gin=None,failed=False):
         try:
             pe_dict = self.PEs[pe_ID]
             pe = self.db_devices[pe_ID]
             task = self.db_tasks[task_ID]
-            if task["job_id"] not in self.jobs.keys():
-                return 0, [0,0,0,0], 0, 0
             job_dict = self.jobs[task["job_id"]]
         except:
-            return self.apply_action(pe_ID, core_i, freq, volt, task_ID, utilization, diversity, gin)
+            if failed:
+                return 0, [0,0,0,0], 0, 0
+            return self.apply_action(pe_ID, core_i, freq, volt, task_ID, utilization, diversity, gin,True)
 
         with self.lock:
             # OPTIMIZATION: Calculate totals before lock
@@ -107,10 +107,10 @@ class State:
             job_dict["runningTasks"].append(task_ID)
             try:
                 job_dict["remainingTasks"].remove(task_ID)
+                self.preprocessor.queue.remove(task_ID)
             except:
                 pass
 
-            self.preprocessor.queue.remove(task_ID)
 
         self.update_device_usage(pe_ID)
         
@@ -158,8 +158,6 @@ class State:
                 new_pe = {
                     "type": new_device["type"],
                     "batteryLevel": 100.0,
-                    "occupiedCores": manager.list([0 for _ in range(new_device["num_cores"])]),
-                    "energyConsumption": manager.list([new_device["powerIdle"] for _ in range(new_device["num_cores"])]),
                     "queue": manager.list(
                         [manager.list([(0, -1) for _ in range(new_device["maxQueue"])])
                          for _ in range(new_device["num_cores"])])

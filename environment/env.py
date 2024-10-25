@@ -36,7 +36,6 @@ class Environment:
 
         self.display = environment_config['display']
         self.time_log = []
-        self.stablized = False
         print("Envionment initialized ")
         
         
@@ -70,7 +69,7 @@ class Environment:
         try:
             print("Simulation starting...")
             while True:
-                if self.stablized and learning_config['scalability']:
+                if learning_config['scalability']:
                    if np.random.random() < learning_config['add_device_iterations']:
                        self.add_device()
                    if np.random.random() < learning_config['remove_device_iterations']:
@@ -86,13 +85,7 @@ class Environment:
                 self.check_dead_iot_devices()
                 self.state.update(self.manager)
                 self.barrier.wait()
-                # print("ITERATION " ,iteration,time.time()-starting_time)
                 
-                if not self.stablized and iteration > 500:
-                    # recent_fails = [log.get('fails', 1) for log in list(self.state.agent_log.values())[-1000:]]
-                    # if all(x <= 0.2 for x in recent_fails):
-                    print("STABILIZED")
-                    self.stablized = True
                 
                 iteration += 1
                 time_len = time.time() - starting_time
@@ -141,10 +134,20 @@ class Environment:
             return
         
         if device_index is None:
-            # Random selection weighted by inverse usage
-            weights = [1/(sum(usage)+1) for usage in self.state.device_usage]
-            device_index = np.random.choice(range(len(self.devices)), p=weights/np.sum(weights))
-            
+            adjusted_usage = self.state.device_usage
+            if len(self.state.device_usage) < len(self.devices):
+                adjusted_usage = self.state.device_usage + [[0]] * (len(self.devices) - len(self.state.device_usage))
+            elif len(self.state.device_usage) > len(self.devices):
+                adjusted_usage = self.state.device_usage[:len(self.devices)]
+                
+            # Calculate weights as inverse usage, avoid division by zero
+            usage_sums = [sum(usage) for usage in adjusted_usage]
+            weights = [1 / (usage_sum + 1) for usage_sum in usage_sums]  # Adding 1 to avoid zero division
+            weights = np.array(weights) / np.sum(weights)  # Normalize to sum to 1
+
+            # Select device index based on weights
+            device_index = np.random.choice(range(len(self.devices)), p=weights)
+
             
         if self.devices[device_index]['type'] == 'cloud':
             return
@@ -162,7 +165,6 @@ class Environment:
             worker.local_actor_critic.remove_device(device_index)
             worker.remove_device(device_index)
             
-        # Wait for all processes to finish updating
    
     def check_dead_iot_devices(self):
         """Remove IoT devices with depleted batteries."""
