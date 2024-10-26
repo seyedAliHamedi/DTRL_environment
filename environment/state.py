@@ -111,8 +111,10 @@ class State:
             except:
                 pass
 
-
-        self.update_device_usage(pe_ID)
+        try:
+            self.update_device_usage(pe_ID)
+        except:
+            pass
         
         battery_punish, batteryFail = self.util.checkBatteryDrain(total_e, pe_dict, pe)
         if batteryFail:

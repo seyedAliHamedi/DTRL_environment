@@ -73,9 +73,15 @@ class Agent(mp.Process):
                 continue
             
             self.t_counter += 1
-            if self.t_counter >= self.time_out_counter and current_job and len(current_job["runningTasks"]) ==0 and len(current_job["remainingTasks"]) ==0 :
-                self._timeout_on_job()
-                continue
+            try:
+                if self.t_counter >= self.time_out_counter :
+                    print("job 1stuck")
+                    if current_job and len(current_job["runningTasks"]) ==0 :
+                        print("job 2stuck")
+                        self._timeout_on_job()
+                    continue
+            except:
+                pass
             
            
             

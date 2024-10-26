@@ -5,46 +5,35 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from configs import learning_config
-from sklearn.linear_model import LinearRegression
-
 from environment.util import extract_pe_data
-
 
 class DDT(nn.Module):
     def __init__(self, num_input, num_output, depth, max_depth, counter=0, exploration_rate=0):
-        """
-        Initializes the DDT structure.
-        
-        Args:
-            num_input: Number of input features.
-            num_output: Number of output classes or predictions.
-            depth: Current depth of the tree.
-            max_depth: Maximum depth of the tree.
-            counter: Counter for exploration steps.
-            exploration_rate: Initial exploration rate for the tree.
-        """
         super(DDT, self).__init__()
 
         # Tree properties
         self.depth = depth
         self.max_depth = max_depth
         self.counter = counter
+        self.train_counter = 0
         
         # Exploration parameters
         self.epsilon = learning_config['explore_epsilon']
         num_epoch = learning_config['num_epoch']
-
         self.exp_mid_bound = num_epoch * self.epsilon
         self.exploration_rate = self.exp_mid_bound + self.exp_mid_bound / 2
         self.exp_threshold = self.exp_mid_bound - self.exp_mid_bound / 2
-        self.shouldExplore = learning_config['should_explore']  # Use boolean for clarity
+        self.shouldExplore = learning_config['should_explore']  
 
         if depth == max_depth:
-            self.prob_dist = nn.Parameter(torch.ones(num_output))
+            # Initialize probability distribution with proper normalization
+            self.prob_dist = nn.Parameter(torch.ones(num_output) / num_output)
+            
+            # Improved logit regressor architecture
             self.logit_regressor = nn.Sequential(
-                nn.Linear(learning_config['pe_num_features'], 64),
-                nn.Sigmoid(),
-                nn.Linear(64, 1),
+                nn.Linear(learning_config['pe_num_features'], 32),
+                nn.ReLU(),
+                nn.Linear(32, 1),
             )
             self.logit_optimizer = optim.Adam(self.logit_regressor.parameters(), lr=0.01)
         if depth < max_depth:
@@ -106,14 +95,15 @@ class DDT(nn.Module):
         return 1 - val
 
     def add_device(self, new_device):
-        """Add a new device to the tree."""
+        """Add a new device with normalized probabilities."""
         if self.depth == self.max_depth:
+            # Get features and predict initial probability
             new_device_features = extract_pe_data(new_device)
             device_tensor = torch.tensor(new_device_features, dtype=torch.float32)
-            new_device_dist = self.logit_regressor(device_tensor)
+            new_prob = self.logit_regressor(device_tensor)
 
             avg_logit = sum(self.prob_dist) / len(self.prob_dist)
-            print(f"Avg Logit: {avg_logit:.4f}, Predicted Logit: {new_device_dist,}")
+            new_device_dist = 0.8*new_prob + 0.2*avg_logit
 
             self.prob_dist = nn.Parameter(torch.cat((self.prob_dist, new_device_dist)))
         else:
@@ -121,32 +111,60 @@ class DDT(nn.Module):
             self.right.add_device(new_device)
 
     def remove_device(self, device_index):
-        """Remove a device from the tree."""
+        """Remove a device with probability redistribution."""
         if self.depth == self.max_depth:
-            self.prob_dist = nn.Parameter(torch.cat((self.prob_dist[:device_index], 
-                                                   self.prob_dist[device_index + 1:])))
+            with torch.no_grad():
+                # Get probability of removed device
+                removed_prob = self.prob_dist[device_index]
+                
+                # Create new distribution without the removed device
+                remaining_probs = torch.cat((
+                    self.prob_dist[:device_index],
+                    self.prob_dist[device_index + 1:]
+                ))
+                
+                # Calculate redistribution weights based on current probabilities
+                weights = F.softmax(remaining_probs, dim=0)
+                
+                # Redistribute the removed probability
+                remaining_probs += removed_prob * weights
+                
+                # Update probability distribution
+                self.prob_dist = nn.Parameter(remaining_probs)
         else:
             self.left.remove_device(device_index)
             self.right.remove_device(device_index)
             
     def train_logit_regressor(self, devices):
-        """Train the logit regressor using current probabilities."""
+        """Train logit regressor with improved stability."""
+        if self.train_counter < 10:
+            self.train_counter += 1
+            return
+        
         if self.depth == self.max_depth:
-            # Get features and current probabilities for all devices
             device_features = torch.tensor([extract_pe_data(device) for device in devices], 
                                         dtype=torch.float32)
-            current_probs = self.prob_dist.detach()
             
-            # Train regressor
-            self.logit_optimizer.zero_grad()
-            predicted_logits = self.logit_regressor(device_features).squeeze()
-            loss = F.mse_loss(predicted_logits, current_probs)
-            loss.backward()
-            self.logit_optimizer.step()
+            # Normalize current probabilities
+            current_probs = F.softmax(self.prob_dist, dim=0).detach()
             
-            return loss.item()
-        
-        # Recursively train child nodes
-        left_loss = self.left.train_logit_regressor(devices) if hasattr(self, 'left') else 0
-        right_loss = self.right.train_logit_regressor(devices) if hasattr(self, 'right') else 0
-        return (left_loss + right_loss) / 2
+            # Multiple training iterations with gradient accumulation
+            for _ in range(3):
+                self.logit_optimizer.zero_grad()
+                predicted_logits = self.logit_regressor(device_features).squeeze()
+                
+                # Use KL divergence loss for better probability distribution learning
+                predicted_probs = F.softmax(predicted_logits, dim=0)
+                loss = F.kl_div(
+                    predicted_probs.log(),
+                    current_probs,
+                    reduction='batchmean'
+                )
+                
+                loss.backward()
+                self.logit_optimizer.step()
+            
+            self.train_counter = 0
+        else:
+            self.left.train_logit_regressor(devices)
+            self.right.train_logit_regressor(devices)

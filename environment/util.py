@@ -99,7 +99,7 @@ class Utility:
         if device['type'] == "iot":
             battery_capacity = device["battery_capacity"]
             battery_start = device_dict['batteryLevel']
-            battery_end = ((battery_start * battery_capacity) - (energy * 1e5)) / battery_capacity
+            battery_end = ((battery_start * battery_capacity) - (energy * 5e5)) / battery_capacity
             punish = self.getBatteryPunish(battery_start, battery_end)
             device_dict['batteryLevel'] = battery_end
             if battery_end < device["ISL"] * 100:

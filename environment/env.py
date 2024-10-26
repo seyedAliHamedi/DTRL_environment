@@ -33,7 +33,8 @@ class Environment:
         # the 3 global enteties of the shared state (preProcessor,windowManager,database)
         self.preprocessor = self.state.preprocessor
         self.window_manager = self.state.window_manager
-
+        self.num_device_added=0
+        self.num_device_removed=0
         self.display = environment_config['display']
         self.time_log = []
         print("Envionment initialized ")
@@ -70,9 +71,13 @@ class Environment:
             print("Simulation starting...")
             while True:
                 if learning_config['scalability']:
-                   if np.random.random() < learning_config['add_device_iterations']:
+                    a = np.random.random()
+                    b = np.random.random()
+                    if a < learning_config['add_device_iterations'] and self.num_device_added-self.num_device_removed <=2:
+                       self.num_device_added +=1
                        self.add_device()
-                   if np.random.random() < learning_config['remove_device_iterations']:
+                    if b < learning_config['remove_device_iterations'] and self.num_device_removed-self.num_device_added <=2:
+                       self.num_device_removed +=1
                        self.remove_device()
                        
                 if iteration % 10 == 0 and iteration != 0:
@@ -107,7 +112,6 @@ class Environment:
                 if worker.is_alive():
                     worker.terminate()
                     worker.join()
-
 
     def add_device(self):
         print("added a device")
@@ -165,7 +169,6 @@ class Environment:
             worker.local_actor_critic.remove_device(device_index)
             worker.remove_device(device_index)
             
-   
     def check_dead_iot_devices(self):
         """Remove IoT devices with depleted batteries."""
         removing_devices = []
@@ -288,6 +291,14 @@ class Environment:
                     path_index = output_classes.index(path)
                     path_counts[epoch, path_index] += 1
 
+             # Find the threshold value (excluding top 10 values)
+            flat_counts = path_counts.flatten()
+            sorted_counts = np.sort(flat_counts)  # Get non-zero values
+            if len(sorted_counts) > 10:
+                threshold = sorted_counts[-11]  # Get the 11th highest value
+        
+            path_counts = np.minimum(path_counts, threshold)
+            # Clamp the values to the threshold
             sns.heatmap(path_counts, cmap="YlGnBu",
                         xticklabels=output_classes, ax=axs[4, 1])
             axs[4, 1].set_title(f'Path History Heatmap ')
