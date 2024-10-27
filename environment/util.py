@@ -7,7 +7,7 @@ class Utility:
         self.min_time, self.max_time, self.min_energy, self.max_energy = self.get_min_max_time_energy()
 
     # FEATURE EXTRACTION
-    def get_input(self, task, diversity, gin):
+    def get_input(self, task):
 
         if learning_config['regularize_input']:
             compLoad = [min(jobs_config["task"]["computational_load"]) * 1e6,
@@ -40,10 +40,6 @@ class Utility:
                 task["task_kind"],
             ])
 
-        if learning_config['utilization']:
-            task_features.extend([
-                diversity, gin
-            ])
         return task_features
 
     def get_min_max_time_energy(self):

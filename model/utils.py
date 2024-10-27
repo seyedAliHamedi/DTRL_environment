@@ -159,8 +159,6 @@ def get_num_input():
     num_input = 5
     if learning_config['onehot_kind']:
         num_input = 8
-    if learning_config['utilization']:
-        num_input +=2
     return num_input
 
 

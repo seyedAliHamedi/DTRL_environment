@@ -57,6 +57,7 @@ class Environment:
         self.barrier = mp.Barrier(environment_config['multi_agent'] + 1)
         # kick off the state
         self.state.update(self.manager)
+        self.state.update_utilization_metrics()
         print("Starting agents .....")
         for i in range(environment_config['multi_agent']):
             # organize and start the agents
@@ -82,6 +83,7 @@ class Environment:
                        
                 if iteration % 10 == 0 and iteration != 0:
                     print(f"iteration : {iteration}", len(self.state.jobs))
+                    self.state.update_utilization_metrics()
                     if iteration % 100 == 0:
                         self.save_time_log()
                         self.make_agents_plots()
@@ -203,7 +205,7 @@ class Environment:
         plt.savefig(path)
 
     def make_agents_plots(self, plot_path=learning_config['result_plot_path']):
-        # saving the agent logs gatherd from the state
+        # Get filtered data
         filtered_data = {k: v for k, v in self.state.agent_log.items() if v}
         time_list = [v["time"] for v in filtered_data.values()]
         energy_list = [v["energy"] for v in filtered_data.values()]
@@ -221,99 +223,98 @@ class Environment:
 
         path_history = self.state.paths
 
-        fig, axs = plt.subplots(6, 2, figsize=(15, 36))
-        axs[0, 0].plot(loss_list,
-                       label='Loss', color="blue", marker='o')
-        axs[0, 0].set_title('Loss')
-        axs[0, 0].legend()
+        fig = plt.figure(figsize=(25, 40))
+        gs = fig.add_gridspec(5, 2)  # 6 rows,  columns
 
-        # Plot for time
-        axs[0, 1].plot(time_list,
-                       label='Time', color="red", marker='o')
-        axs[0, 1].set_title('Time')
-        axs[0, 1].legend()
+        # Plot Loss
+        ax1 = fig.add_subplot(gs[0, 0])
+        ax1.plot(loss_list, label='Loss', color="blue", marker='o')
+        ax1.set_title('Loss')
+        ax1.legend()
+        ax1.grid(True)
 
-        # Plot for energy
-        axs[1, 0].plot(energy_list,
-                       label='Energy', color="green", marker='o')
-        axs[1, 0].set_title('Energy')
-        axs[1, 0].legend()
+        # Plot Time
+        ax2 = fig.add_subplot(gs[0, 1])
+        ax2.plot(time_list, label='Time', color="red", marker='o')
+        ax2.set_title('Time')
+        ax2.legend()
+        ax2.grid(True)
 
-        # Plot for all fail
-        axs[1, 1].plot(fails_list,
-                       label='ALL Fails', color="purple", marker='o')
-        axs[1, 1].set_title('Fail')
-        axs[1, 1].legend()
+        # Plot Energy
+        ax3 = fig.add_subplot(gs[1, 0])
+        ax3.plot(energy_list, label='Energy', color="green", marker='o')
+        ax3.set_title('Energy')
+        ax3.legend()
+        ax3.grid(True)
 
-        axs[2, 0].plot(safe_fails_list,
-                       label='Safe task Fail', color="purple", marker='o')
-        axs[2, 0].set_title('Fail')
-        axs[2, 0].legend()
+        # Plot All Fails
+        ax4 = fig.add_subplot(gs[1, 1])
+        ax4.plot(fails_list, label='ALL Fails', color="purple", marker='o')
+        ax4.set_title('Fail')
+        ax4.legend()
+        ax4.grid(True)
 
-        # Plot for kind fail
-        axs[2, 1].plot(kind_fails_list,
-                       label='Task kind Fail', color="purple", marker='o')
-        axs[2, 1].set_title('Fail')
-        axs[2, 1].legend()
+        # Plot Safe Fails
+        ax5 = fig.add_subplot(gs[2, 0])
+        ax5.plot(safe_fails_list, label='Safe task Fail', color="purple", marker='o')
+        ax5.set_title('Fail')
+        ax5.legend()
+        ax5.grid(True)
 
-        # Plot for queue fail
-        axs[3, 0].plot(queue_fails_list,
-                       label='Queue full Fail', color="purple", marker='o')
-        axs[3, 0].set_title('Fail')
-        axs[3, 0].legend()
+        # Plot Kind Fails
+        ax6 = fig.add_subplot(gs[2, 1])
+        ax6.plot(kind_fails_list, label='Task kind Fail', color="purple", marker='o')
+        ax6.set_title('Fail')
+        ax6.legend()
+        ax6.grid(True)
 
-        # Plot for battery fail
-        axs[3, 1].plot(battery_fails_list,
-                       label='Battery punish', color="purple", marker='o')
-        axs[3, 1].set_title('Fail')
-        axs[3, 1].legend()
+        # Plot Device Type Usage
+        ax7 = fig.add_subplot(gs[3, 0])
+        ax7.plot(iot_usage, label='IoT Usage', color='blue', marker='o')
+        ax7.plot(mec_usuage, label='MEC Usage', color='orange', marker='x')
+        ax7.plot(cc_usuage, label='Cloud Usage', color='green', marker='s')
+        ax7.set_title('Devices Usage History')
+        ax7.set_xlabel('Epochs')
+        ax7.set_ylabel('Usage')
+        ax7.legend()
+        ax7.grid(True)
 
-        axs[4, 0].plot(iot_usage, label='IoT Usage', color='blue', marker='o')
-        axs[4, 0].plot(mec_usuage, label='MEC Usage', color='orange', marker='x')
-        axs[4, 0].plot(cc_usuage, label='Cloud Usage', color='green', marker='s')
-        axs[4, 0].set_title('Devices Usage History')
-        axs[4, 0].set_xlabel('Epochs')
-        axs[4, 0].set_ylabel('Usage')
-        axs[4, 0].legend()
-        axs[4, 0].grid(True)
-
-        # Heatmap for path history
-        # print(path_history)
+        # Plot Path History Heatmap
         if path_history and len(path_history) > 0:
-
+            ax8 = fig.add_subplot(gs[3, 1])
             output_classes = make_paths(len(path_history[0][0]))
             path_counts = np.zeros((len(path_history), len(output_classes)))
 
             for epoch in range(len(path_history)):
                 epoch_paths = path_history[epoch]
-
                 for path in epoch_paths:
                     path_index = output_classes.index(path)
                     path_counts[epoch, path_index] += 1
 
-             # Find the threshold value (excluding top 10 values)
+            # Find threshold value
             flat_counts = path_counts.flatten()
-            sorted_counts = np.sort(flat_counts)  # Get non-zero values
+            sorted_counts = np.sort(flat_counts)
             if len(sorted_counts) > 10:
-                threshold = sorted_counts[-11]  # Get the 11th highest value
+                threshold = sorted_counts[-11]
+                path_counts = np.minimum(path_counts, threshold)
+
+            sns.heatmap(path_counts, cmap="YlGnBu", xticklabels=output_classes, ax=ax8)
+            ax8.set_title('Path History Heatmap')
+            ax8.set_xlabel('Output Classes')
+            ax8.set_ylabel('Epochs')
+
+        ax9 = fig.add_subplot(gs[4:, :])  # Use last two rows and span all columns
+        colors = ['blue'] * devices_config['iot']['num_devices'] + \
+                ['orange'] * devices_config['mec']['num_devices'] + \
+                ['green'] * devices_config['cloud']['num_devices']
         
-            path_counts = np.minimum(path_counts, threshold)
-            # Clamp the values to the threshold
-            sns.heatmap(path_counts, cmap="YlGnBu",
-                        xticklabels=output_classes, ax=axs[4, 1])
-            axs[4, 1].set_title(f'Path History Heatmap ')
-            axs[4, 1].set_xlabel('Output Classes')
-            axs[4, 1].set_ylabel('Epochs')
-            
-        # colors = ['blue'] *  devices_config['iot']['num_devices'] + ['orange'] *  devices_config['mec']['num_devices'] + ['green'] * devices_config['cloud']['num_devices']
-        # axs[5, 0].bar(range(1, len(self.state.device_usuages) + 1), [sum(x) for x in self.state.device_usuages], color=colors)
-        # axs[5, 0].set_title('PE ACTIVITY History')
-        # axs[5, 0].set_xlabel('Device')
-        # axs[5, 0].set_yticks([]) 
-        # axs[5, 0].set_xticks(range(1, len(self.state.device_usuages) + 1)) 
-        # Adjust layout to prevent overlap
+        # Calculate device usage from state's device_usage list
+        device_usage = [sum(usage) for usage in self.state.device_usage]
+        ax9.bar(range(1, len(device_usage) + 1), device_usage, color=colors)
+        ax9.set_title('PE Activity History')
+        ax9.set_xlabel('Device')
+        ax9.set_yticks([])
+        ax9.set_xticks(range(1, len(device_usage) + 1))
+
         plt.tight_layout()
-
-        # Save the plots to an image file
         plt.savefig(plot_path)
-

@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import pandas as pd
 import torch.multiprocessing as mp
 
@@ -33,6 +34,7 @@ class State:
         self.paths = manager.list()
         self.display = environment_config['display']
         self.lock = mp.Lock()
+    
 
     
 
@@ -71,16 +73,23 @@ class State:
         except:
             return
     
-    def apply_action(self, pe_ID, core_i, freq, volt, task_ID, utilization=None, diversity=None, gin=None,failed=False):
+    def update_utilization_metrics(self):
+        utilization = [sum(usage) for usage in self.device_usage ]
+        used_devices_count = sum(1 for usage in self.device_usage  if 1 in usage)
+        self.gin = gini_coefficient(utilization)
+        self.diversity = used_devices_count / len(self.db_devices)
+        self.utilization = torch.tensor(utilization, dtype=torch.float)
+        
+    def apply_action(self, pe_ID, core_i, freq, volt, task_ID, failed=False):
         try:
             pe_dict = self.PEs[pe_ID]
             pe = self.db_devices[pe_ID]
             task = self.db_tasks[task_ID]
             job_dict = self.jobs[task["job_id"]]
-        except:
+        except Exception as e:
             if failed:
                 return 0, [0,0,0,0], 0, 0
-            return self.apply_action(pe_ID, core_i, freq, volt, task_ID, utilization, diversity, gin,True)
+            return self.apply_action(pe_ID, core_i, freq, volt, task_ID,True)
 
         with self.lock:
             # OPTIMIZATION: Calculate totals before lock
@@ -110,24 +119,23 @@ class State:
                 self.preprocessor.queue.remove(task_ID)
             except:
                 pass
-
         try:
             self.update_device_usage(pe_ID)
         except:
             pass
         
-        battery_punish, batteryFail = self.util.checkBatteryDrain(total_e, pe_dict, pe)
-        if batteryFail:
-            fail_flags[3] = 1
-            return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
+        if learning_config['drain_battery']:
+            battery_punish, batteryFail = self.util.checkBatteryDrain(total_e, pe_dict, pe)
+            if batteryFail:
+                fail_flags[3] = 1
+                return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0
 
         lambda_penalty = 0
         if learning_config['utilization']:
-            lambda_diversity = learning_config["max_lambda"] * (1 - diversity)
-            lambda_gini = learning_config["max_lambda"] * gin
+            lambda_diversity = learning_config["max_lambda"] * (1 - self.diversity)
+            lambda_gini = learning_config["max_lambda"] * self.gin
             lambda_penalty = learning_config["alpha_diversity"] * lambda_diversity + learning_config["alpha_gin"] * lambda_gini
-
-        return reward_function(t=total_t + lag_time, e=total_e) + battery_punish, fail_flags, total_e, total_t + lag_time
+        return reward_function(t=total_t + lag_time, e=total_e) * (1 - lambda_penalty * self.utilization[pe_ID]) + battery_punish, fail_flags, total_e, total_t + lag_time
 
     def save_agent_log(self, assigned_job, dict, path_history):
         with self.lock:

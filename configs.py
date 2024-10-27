@@ -114,7 +114,7 @@ learning_config = {
     "should_explore": False,
     "explore_epsilon": 1e-5,
 
-    "drain_battery": False,
+    "drain_battery": True,
 
     ###### INPUT & OUTPUT #######
     "onehot_kind": True,  # one-hotting the task kind
@@ -130,20 +130,20 @@ learning_config = {
     #   ppo
 
     "ppo_epsilon": 0.2,  # Reduced from 0.2 for more stable updates
-    "gae_lambda": 0.95,  # Increased from 0.95 for better advantage estimation
+    "gae_lambda": 0.0,  # Increased from 0.95 for better advantage estimation
     "ppo_epochs":10, 
     "lr": 0.001, 
 
     "critic_hidden_layer_num": 1,
     "critic_hidden_layer_dim": 256,
 
-    "discount_factor": 0.99,  # 0: reward , 0.99:return
+    "discount_factor": 0.0,  # 0: reward , 0.99:return
 
     'scalability': True,
     'add_device_iterations': 0.01,  # Probability of adding device each iteration
     'remove_device_iterations': 0.01,  
 
-    "utilization": False,
+    "utilization": True,
     "alpha_diversity": 1,
     "alpha_gin": 1,
     "max_lambda": 10,

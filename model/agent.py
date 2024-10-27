@@ -59,11 +59,7 @@ class Agent(mp.Process):
                 self.t_counter = 0
                 self.local_actor_critic.reset_memory()
                 self.init_logs()
-                # utilization = [sum(usage) for usage in self.state.device_usuages ]
-                # gin = gini_coefficient(utilization)
-                # used_devices_count = sum(1 for usage in self.state.device_usuages  if 1 in usage)
-                # diversity = used_devices_count / len(self.devices)
-                # utilization = torch.tensor(utilization, dtype=torch.float)
+
             # retrive the agent task_queue
             try:
                 task_queue = self.state.preprocessor.get_agent_queue().get(self.assigned_job)
@@ -75,9 +71,7 @@ class Agent(mp.Process):
             self.t_counter += 1
             try:
                 if self.t_counter >= self.time_out_counter :
-                    print("job 1stuck")
                     if current_job and len(current_job["runningTasks"]) ==0 :
-                        print("job 2stuck")
                         self._timeout_on_job()
                     continue
             except:
@@ -86,7 +80,6 @@ class Agent(mp.Process):
            
             
             for task in task_queue:
-                # self.schedule(task,gin,diversity,utilization)
                 self.schedule(task)
                 
                 
@@ -97,9 +90,7 @@ class Agent(mp.Process):
                 continue
             if current_job and len(current_job["runningTasks"]) + len(current_job["finishedTasks"]) == current_job["task_count"]:
                 print(f"DONE")
-                # start_time = time.time()
                 self.update()
-                # print(self.name,"TOOK " ,time.time()-start_time,"UPDATE UPDATE PARAMETERS")
                 self.assigned_job = None
 
     def stop(self):
@@ -112,10 +103,10 @@ class Agent(mp.Process):
         """Remove device with synchronized state dict update."""
         self.util = Utility(devices=self.devices)
         
-    def schedule(self, current_task_id,gin=None,diversity=None,utilization=None):
+    def schedule(self, current_task_id):
             # retrieve the necessary data
         current_task = self.state.db_tasks[current_task_id]
-        input_state = self.util.get_input(current_task,gin=None,diversity=None)
+        input_state = self.util.get_input(current_task)
 
         action, path, devices = self.local_actor_critic.choose_action(input_state)
         selected_device_index = action
