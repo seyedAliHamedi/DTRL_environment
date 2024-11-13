@@ -101,11 +101,11 @@ class State:
 
             fail_flags = [0, 0, 0, 0]
             if task["is_safe"] and not pe['is_safe']:
-                fail_flags[0] = 1
+                fail_flags[0] = learning_config['safe_punish'] and 1
             if task["task_kind"] not in pe["acceptable_tasks"]:
-                fail_flags[1] = 1
+                fail_flags[1] = learning_config['kind_punish'] and 1
             if queue_index == -1 and core_index == -1:
-                fail_flags[2] = 0
+                fail_flags[2] = learning_config['queue_punish'] and 1
 
             if sum(fail_flags) > 0 or (queue_index == -1 and core_index == -1):
                 return sum(fail_flags) * reward_function(punish=True), fail_flags, 0, 0

@@ -115,6 +115,14 @@ learning_config = {
     "explore_epsilon": 1e-5,
 
     "drain_battery": True,
+    'scalability': True,
+    "utilization": False,
+    "safe_punish":False,
+    "kind_punish":False,
+    "queue_punish":False,
+    
+    
+    
 
     ###### INPUT & OUTPUT #######
     "onehot_kind": True,  # one-hotting the task kind
@@ -139,11 +147,9 @@ learning_config = {
 
     "discount_factor": 0.0,  # 0: reward , 0.99:return
 
-    'scalability': True,
     'add_device_iterations': 0.01,  # Probability of adding device each iteration
     'remove_device_iterations': 0.01,  
 
-    "utilization": True,
     "alpha_diversity": 1,
     "alpha_gin": 1,
     "max_lambda": 10,

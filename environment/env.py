@@ -83,7 +83,8 @@ class Environment:
                        
                 if iteration % 10 == 0 and iteration != 0:
                     print(f"iteration : {iteration}", len(self.state.jobs))
-                    self.state.update_utilization_metrics()
+                    if learning_config['utilization']:
+                        self.state.update_utilization_metrics()
                     if iteration % 100 == 0:
                         self.save_time_log()
                         self.make_agents_plots()

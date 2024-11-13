@@ -45,7 +45,8 @@ class ActorCritic(nn.Module):
 
     # Forward pass through both actor and critic (if present)
     def forward(self, x):
-        self.actor.train_logit_regressor(self.devices)
+        if learning_config['scalability']:
+            self.actor.train_logit_regressor(self.devices)
         
         # Get policy distribution and path from the actor
         # Determine if the actor is ClusTree or DDT based on its output
