@@ -81,7 +81,7 @@ devices_config = {
 #   battery capacity in W*micro-second : 36000 Ws - Equivalent to 36000*10^3 W * millisecond, 10Wh or
 
 learning_config = {
-    "num_epoch": 100000,
+    "num_epoch": 10000,
     ###### TREE #######
     "tree": "ddt",  # ddt
 
@@ -116,9 +116,9 @@ learning_config = {
 
     "drain_battery": True,
     'scalability': True,
-    "utilization": False,
-    "safe_punish":False,
-    "kind_punish":False,
+    "utilization": True,
+    "safe_punish":True,
+    "kind_punish":True,
     "queue_punish":False,
     
     
@@ -137,7 +137,7 @@ learning_config = {
     #   a2c
     #   ppo
 
-    "ppo_epsilon": 0.2,  # Reduced from 0.2 for more stable updates
+    "ppo_epsilon": 0.1,  # Reduced from 0.2 for more stable updates
     "gae_lambda": 0.0,  # Increased from 0.95 for better advantage estimation
     "ppo_epochs":10, 
     "lr": 0.001, 
@@ -147,8 +147,8 @@ learning_config = {
 
     "discount_factor": 0.0,  # 0: reward , 0.99:return
 
-    'add_device_iterations': 0.01,  # Probability of adding device each iteration
-    'remove_device_iterations': 0.01,  
+    'add_device_iterations': 0.0005,  # Probability of adding device each iteration
+    'remove_device_iterations': 0.0005,  
 
     "alpha_diversity": 1,
     "alpha_gin": 1,

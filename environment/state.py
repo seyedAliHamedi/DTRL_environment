@@ -123,7 +123,7 @@ class State:
             self.update_device_usage(pe_ID)
         except:
             pass
-        
+        battery_punish = 0
         if learning_config['drain_battery']:
             battery_punish, batteryFail = self.util.checkBatteryDrain(total_e, pe_dict, pe)
             if batteryFail:

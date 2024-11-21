@@ -1,8 +1,10 @@
 import os
 import time
 import traceback
+import torch
 
 import numpy as np
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
@@ -88,7 +90,10 @@ class Environment:
                     if iteration % 100 == 0:
                         self.save_time_log()
                         self.make_agents_plots()
-                
+                        self.save_results()
+                        self.save_model()
+                        self.load_model()
+                    
                 starting_time = time.time()
                 self.check_dead_iot_devices()
                 self.state.update(self.manager)
@@ -107,6 +112,7 @@ class Environment:
             print("Saving Logs......")
             self.save_time_log(learning_config['result_time_plot'])
             self.make_agents_plots()
+            self.save_results()
 
             # stopping and terminating the workers
             for worker in self.workers:
@@ -319,3 +325,88 @@ class Environment:
 
         plt.tight_layout()
         plt.savefig(plot_path)
+        
+    def save_model(self, path=learning_config['checkpoint_file_path']):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        torch.save(self.global_actor_critic.state_dict(), path)
+        print(f"Model saved at {path}")
+        
+    def load_model(self, path=learning_config['checkpoint_file_path']):
+        if os.path.exists(path):
+            self.global_actor_critic.load_state_dict(torch.load(path,weights_only=True))
+            print(f"Model loaded from {path}")
+        else:
+            print(f"No model found at {path}")
+
+
+        
+        
+    def save_results(self):
+        filtered_data = {k: v for k, v in self.state.agent_log.items() if v}
+        time_list = [v["time"] for v in filtered_data.values()]
+        energy_list = [v["energy"] for v in filtered_data.values()]
+        reward_list = [v["reward"] for v in filtered_data.values()]
+        loss_list = [v["loss"] for v in filtered_data.values()]
+
+        fails_list = [v["fails"] for v in filtered_data.values()]
+        safe_fails_list = [v["safe_fails"] for v in filtered_data.values()]
+        kind_fails_list = [v["kind_fails"] for v in filtered_data.values()]
+        queue_fails_list = [v["queue_fails"] for v in filtered_data.values()]
+        battery_fails_list = [v["battery_fails"] for v in filtered_data.values()]
+        iot_usage = [v["iot_usuage"] for v in filtered_data.values()]
+        mec_usuage = [v["mec_usuage"] for v in filtered_data.values()]
+        cc_usuage = [v["cc_usuage"] for v in filtered_data.values()]
+        num_epoch = len(time_list)
+        half_num_epoch = num_epoch // 2
+
+        new_epoch_data = {
+            "Setup": learning_config['rewardSetup'],
+            "Punishment": learning_config['init_punish'],
+
+            "Average Loss": sum(loss_list) / num_epoch,
+            "Last Epoch Loss": loss_list[-1],
+            
+            "Battery Fail Percentage": np.count_nonzero(battery_fails_list) / len(battery_fails_list),
+            "Task Fail Percentage": np.count_nonzero(kind_fails_list) / len(kind_fails_list),
+            "Safe Fail Percentage": np.count_nonzero(safe_fails_list) / len(safe_fails_list),
+
+            "Average Time": sum(time_list) / num_epoch,
+            "Last Epoch Time": time_list[-1],
+
+            "Average Energy": sum(energy_list) / num_epoch,
+            "Last Epoch Energy": energy_list[-1],
+
+            "Average Reward": sum(reward_list) / num_epoch,
+            "Last Epoch Reward": reward_list[-1],
+
+            "First 10 Avg Time": np.mean(time_list[:10]),
+            "Mid 10 Avg Time": np.mean(time_list[half_num_epoch:half_num_epoch + 10]),
+            "Last 10 Avg Time": np.mean(time_list[:-10]),
+
+            "First 10 Avg Energy": np.mean(energy_list[:10]),
+            "Mid 10 Avg Energy": np.mean(energy_list[half_num_epoch:half_num_epoch + 10]),
+            "Last 10 Avg Energy": np.mean(energy_list[:-10]),
+
+            "First 10 Avg Reward": np.mean(reward_list[:10]),
+            "Mid 10 Avg Reward": np.mean(reward_list[half_num_epoch:half_num_epoch + 10]),
+            "Last 10 Avg Reward": np.mean(reward_list[:-10]),
+
+            "First 10 Avg Loss": np.mean(loss_list[:10]),
+            "Mid 10 Avg Loss": np.mean(loss_list[half_num_epoch:half_num_epoch + 10]),
+            "Last 10 Avg Loss": np.mean(loss_list[:-10]),
+
+            "First 10 (total, task, safe) Fail": sum(fails_list[:10])/len(fails_list[:10]),
+            "Mid 10 (total, task, safe) Fail": sum(fails_list[half_num_epoch:half_num_epoch + 10])/len(fails_list[half_num_epoch:half_num_epoch + 10]), 
+            "Last 10 (total, task, safe) Fail": sum(fails_list[:-10])/len(fails_list[:-10]),
+        }
+        new_epoch_data_list = [new_epoch_data]
+
+        df = None
+        if os.path.exists(learning_config['result_summery_path']):
+            df = pd.read_csv(learning_config['result_summery_path'])
+            new_df = pd.DataFrame(new_epoch_data_list)
+            df = pd.concat([df, new_df], ignore_index=True)
+        else:
+            df = pd.DataFrame(new_epoch_data_list)
+
+        df.to_csv(learning_config['result_summery_path'], index=False)
