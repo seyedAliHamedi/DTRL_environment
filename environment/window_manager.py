@@ -14,6 +14,7 @@ class WindowManager:
         self.__cycle = config['window']["clock"]
         self.__head_index = 0
         
+        
     def run(self):
         # OPTIMIZATION: Early return and simplified logic
         if len(self.state.jobs) > 50:

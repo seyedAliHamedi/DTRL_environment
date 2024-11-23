@@ -82,6 +82,7 @@ class Environment:
                     if b < learning_config['remove_device_iterations'] and self.num_device_removed-self.num_device_added <=2:
                        self.num_device_removed +=1
                        self.remove_device()
+
                        
                 if iteration % 10 == 0 and iteration != 0:
                     print(f"iteration : {iteration}", len(self.state.jobs))
@@ -362,6 +363,8 @@ class Environment:
         new_epoch_data = {
             "Setup": learning_config['rewardSetup'],
             "Punishment": learning_config['init_punish'],
+            "diversity": self.state.diversity,
+            "giniImact": self.state.gin,
 
             "Average Loss": sum(loss_list) / num_epoch,
             "Last Epoch Loss": loss_list[-1],

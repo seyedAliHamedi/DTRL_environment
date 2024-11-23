@@ -141,6 +141,7 @@ class State:
         with self.lock:
             self.agent_log[assigned_job] = dict
             self.paths.append(path_history)
+            
 
     def assign_job_to_agent(self):
         with self.lock:
