@@ -135,7 +135,14 @@ class State:
             lambda_diversity = learning_config["max_lambda"] * (1 - self.diversity)
             lambda_gini = learning_config["max_lambda"] * self.gin
             lambda_penalty = learning_config["alpha_diversity"] * lambda_diversity + learning_config["alpha_gin"] * lambda_gini
-        return reward_function(t=total_t + lag_time, e=total_e) * (1 - lambda_penalty * self.utilization[pe_ID]) + battery_punish, fail_flags, total_e, total_t + lag_time
+
+        reg_t = total_t
+        reg_e=total_e
+        if learning_config['regularize_output']:
+            reg_t = self.util.regularize_output(total_t=total_t)
+            reg_e = self.util.regularize_output(total_e=total_e)
+
+        return reward_function(t=reg_t , e=reg_e) * (1 - lambda_penalty * self.utilization[pe_ID]) + battery_punish, fail_flags, total_e, total_t
 
     def save_agent_log(self, assigned_job, dict, path_history):
         with self.lock:

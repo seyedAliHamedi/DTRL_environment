@@ -102,8 +102,14 @@ learning_config = {
     #   6 : -np.log(alpha * e + beta * t)
     #   7 : -((alpha * e + beta * t) ** 2)
 
-    "alpha": 1,  # energy coefficient in the reward
-    "beta": 1,  # time coefficient in the reward
+    "alpha": 6.251,  # energy coefficient in the reward
+    "beta": 6.006,  # time coefficient in the reward
+
+    # 6.251935375294513 6.006166273981825
+    # 12.52006546934442 18.047677607714768
+    # 4.131588785046729 18.704523364485983
+    # 20.936010072747624 18.747957470621156
+    # 18.85417560321716 6.032607238605898
 
     ###### PUNISH #######
     "increasing_punish": False,
@@ -127,7 +133,7 @@ learning_config = {
     ###### INPUT & OUTPUT #######
     "onehot_kind": True,  # one-hotting the task kind
     "regularize_input": True,  # regularize the task/device features to feed the tree
-    "regularize_output": False,  # regularize t,e for the reward
+    "regularize_output": True,  # regularize t,e for the reward
     'pe_num_features': 5,
 
     ###### ALGORITHM #######
@@ -167,7 +173,7 @@ learning_config = {
 
 
 environment_config = {
-    "multi_agent": 32,
+    "multi_agent": 16,
     "time_out_counter": 100,
     "window": {"size": 200, "max_jobs": 40, "clock": 10},
     "display":False

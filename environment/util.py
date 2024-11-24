@@ -256,6 +256,7 @@ def calc_total(device, task, task_pres, core, dvfs):
     totalTime += predecessors_time_cost
     totalEnergy += predecessors_energy_cost
 
+
     return totalTime, totalEnergy
 
 # REWARDS AND PUNISHMENTS
