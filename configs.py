@@ -12,8 +12,8 @@ jobs_config = {
         "task_kinds": [1, 2, 3, 4]
     },
     "max_num_parents_dag": 1,
-    "min_num_nodes_dag": 5,
-    "max_num_nodes_dag": 15
+    "min_num_nodes_dag": 20,
+    "max_num_nodes_dag": 60
 }
 
 devices_config = {
@@ -102,8 +102,8 @@ learning_config = {
     #   6 : -np.log(alpha * e + beta * t)
     #   7 : -((alpha * e + beta * t) ** 2)
 
-    "alpha": 6.251,  # energy coefficient in the reward
-    "beta": 6.006,  # time coefficient in the reward
+    "alpha": 1,  # energy coefficient in the reward
+    "beta": 1,  # time coefficient in the reward
 
     # 6.251935375294513 6.006166273981825
     # 12.52006546934442 18.047677607714768
@@ -151,7 +151,7 @@ learning_config = {
     "critic_hidden_layer_num": 1,
     "critic_hidden_layer_dim": 256,
 
-    "discount_factor": 0.0,  # 0: reward , 0.99:return
+    "discount_factor": 0.99,  # 0: reward , 0.99:return
 
     'add_device_iterations': 0.0005,  # Probability of adding device each iteration
     'remove_device_iterations': 0.0005,  
@@ -173,8 +173,8 @@ learning_config = {
 
 
 environment_config = {
-    "multi_agent": 16,
-    "time_out_counter": 100,
-    "window": {"size": 200, "max_jobs": 40, "clock": 10},
+    "multi_agent": 24,
+    "time_out_counter": 200,
+    "window": {"size": 1000, "max_jobs": 40, "clock": 15},
     "display":False
 }

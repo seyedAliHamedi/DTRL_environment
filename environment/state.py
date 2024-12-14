@@ -159,8 +159,8 @@ class State:
         with self.lock:
             for d_index,usage in enumerate(self.device_usage):
                 usage.append(1 if d_index==device_index else 0)
-            if len(usage) > self.max_usage_history:
-                usage[:] = usage[1:]
+                if len(usage) > self.max_usage_history:
+                    usage[:] = usage[1:]
 
     def add_device(self, manager,new_device=None):
         """Add a new device to the system."""
@@ -282,7 +282,6 @@ class State:
             # Apply all updates at once to minimize manager.list() access
             for core_index, new_queue in updates:
                 queue_list[core_index] = new_queue
-
             
     def find_place(self, pe, core_i):
         try:

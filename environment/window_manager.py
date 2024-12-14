@@ -17,7 +17,7 @@ class WindowManager:
         
     def run(self):
         # OPTIMIZATION: Early return and simplified logic
-        if len(self.state.jobs) > 50:
+        if len(self.state.jobs) > 200:
             self.state.task_window = []
             return
             
